@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+:root {
+  --background: #050505;
+  --foreground: #ededed;
+  --shin-red: #ff2a2a;
+  --shin-gold: #fbbf24;
+  --shin-dark: #09090b;
+}
+
+html, body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+
+  max-width: 100vw;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+  touch-action: pan-x pan-y;
+  -webkit-tap-highlight-color: transparent;
+
+  background-image:
+    radial-gradient(circle at 50% 20%, rgba(255, 42, 42, 0.14), transparent 55%),
+    radial-gradient(circle at 80% 80%, rgba(251, 191, 36, 0.12), transparent 50%),
+    url('/assets/shin_bg.png');
+  background-size: cover, cover, 135vw auto;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  animation: panBackground 90s linear infinite alternate;
+}
+
+@keyframes panBackground {
+  0% {
+    background-position: center, center, 0% 50%;
+  }
+  100% {
+    background-position: center, center, 100% 50%;
+  }
+}
+
+@keyframes floatIdle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes comboPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotate(-6deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-2deg);
+  }
+}
+
+.animate-float-idle {
+  animation: floatIdle 3.2s ease-in-out infinite;
+}
+
+.animate-combo-pop {
+  animation: comboPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.arcade-skew {
+  transform: skewX(-10deg);
+}
+
+.arcade-unskew {
+  transform: skewX(10deg);
+}
+
+.arcade-skew-right {
+  transform: skewX(10deg);
+}
+
+.arcade-unskew-right {
+  transform: skewX(-10deg);
+}
+
+h1, h2, h3, .font-cinzel {
+  font-family: var(--font-cinzel), serif;
+}
+
+.text-shin-red { color: var(--shin-red); }
+.text-shin-gold { color: var(--shin-gold); }
+
+.glow-text {
+  text-shadow: 0 0 14px rgba(255, 42, 42, 0.75);
+}
+
+.glow-gold {
+  text-shadow: 0 0 16px rgba(251, 191, 36, 0.75);
+}
+
+.glow-box {
+  box-shadow: 0 0 24px rgba(255, 42, 42, 0.35);
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .touch-controls {
+    display: none !important;
+  }
+}

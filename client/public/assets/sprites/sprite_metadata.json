@@ -1,0 +1,52 @@
+{
+  "Fighter": {
+    "name": "Fighter",
+    "description": "A skilled combatant in the arena, known for their agility and strength.",
+    "image": "https://salmon-fancy-reindeer-274.mypinata.cloud/ipfs/bafybeiesgru3poquuzqnxh26w25ki2qz43gr2grf72ol35cgwzs2nok2wu/Fighter_AllActions.gif"
+  },
+  "Shinobi": {
+    "name": "Shinobi",
+    "description": "A master of ninja arts, wielding shurikens and stealth to defeat opponents.",
+    "image": "https://salmon-fancy-reindeer-274.mypinata.cloud/ipfs/bafybeiesgru3poquuzqnxh26w25ki2qz43gr2grf72ol35cgwzs2nok2wu/Shinobi_AllActions.gif"
+  },
+  "Knight": {
+    "name": "Knight",
+    "description": "A valiant warrior, known for their courage and shield-bearing skills.",
+    "image": "https://salmon-fancy-reindeer-274.mypinata.cloud/ipfs/bafybeiesgru3poquuzqnxh26w25ki2qz43gr2grf72ol35cgwzs2nok2wu/Knight_AllActions.gif"
+  },
+  "Kunoichi": {
+    "name": "Kunoichi",
+    "description": "A female ninja, skilled in combat and espionage.",
+    "image": "https://salmon-fancy-reindeer-274.mypinata.cloud/ipfs/bafybeiesgru3poquuzqnxh26w25ki2qz43gr2grf72ol35cgwzs2nok2wu/Kunoich_AllActions.gif"
+  },
+  "Monk": {
+    "name": "Monk",
+    "description": "A holy warrior, known for their faith and martial arts.",
+    "image": "https://salmon-fancy-reindeer-274.mypinata.cloud/ipfs/bafybeiesgru3poquuzqnxh26w25ki2qz43gr2grf72ol35cgwzs2nok2wu/Ninja_Monk_AllActions.gif"
+  },
+  "Peasant": {
+    "name": "Peasant",
+    "description": "A simple farmer, known for their resilience and hard work.",
+    "image": "https://salmon-fancy-reindeer-274.mypinata.cloud/ipfs/bafybeiesgru3poquuzqnxh26w25ki2qz43gr2grf72ol35cgwzs2nok2wu/Ninja_Peasant_AllActions.gif"
+  },
+  "Samurai_1": {
+    "name": "Samurai_1",
+    "description": "A skilled warrior, known for their honor and swordsmanship.",
+    "image": "https://salmon-fancy-reindeer-274.mypinata.cloud/ipfs/bafybeiesgru3poquuzqnxh26w25ki2qz43gr2grf72ol35cgwzs2nok2wu/Samurai_AllActions.gif"
+  },
+  "Samurai_2": {
+    "name": "Samurai_2",
+    "description": "A skilled warrior, known for their honor and swordsmanship.",
+    "image": "https://salmon-fancy-reindeer-274.mypinata.cloud/ipfs/bafybeiesgru3poquuzqnxh26w25ki2qz43gr2grf72ol35cgwzs2nok2wu/Samurai_1_AllAction.gif"
+  },
+  "Archer": {
+    "name": "Archer",
+    "description": "A skilled marksman, known for their precision and ranged attacks.",
+    "image": "https://salmon-fancy-reindeer-274.mypinata.cloud/ipfs/bafybeiesgru3poquuzqnxh26w25ki2qz43gr2grf72ol35cgwzs2nok2wu/Samurai_Archer_AllActions.gif"
+  },
+  "Commander": {
+    "name": "Commander",
+    "description": "A strategic leader, known for their tactical prowess and command of troops.",
+    "image": "https://salmon-fancy-reindeer-274.mypinata.cloud/ipfs/bafybeiesgru3poquuzqnxh26w25ki2qz43gr2grf72ol35cgwzs2nok2wu/Samurai_Commander_AllActions.gif"
+  }
+}

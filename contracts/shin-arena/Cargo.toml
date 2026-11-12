@@ -1,0 +1,22 @@
+[package]
+name = "shin-arena-contract"
+version = "0.2.0"
+edition = "2021"
+authors = ["28 Dreams Studio"]
+description = "SHIN: Autonomous Fighter NFTs, Agent Wallets, Escrow Pools, Pari-Mutuel Spectator Betting & Dynamic NPC Economy on NEAR"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = "5.5.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
