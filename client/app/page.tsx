@@ -40,6 +40,50 @@ export default function Home() {
 
   const [wager, setWager] = useState<{ token: string; amount: number } | null>(null);
   const [balances, setBalances] = useState({ NEAR: 25, USDC: 100, USDT: 50 });
+  const [orientationPreference, setOrientationPreference] = useState<
+    'AUTO_HYBRID' | 'FORCE_LANDSCAPE' | 'FORCE_PORTRAIT'
+  >('AUTO_HYBRID');
+
+  const isInCombatOrSpectating = isGameStarted || isSpectating;
+  const isForceLandscapeActive =
+    orientationPreference === 'FORCE_LANDSCAPE' ||
+    (orientationPreference === 'AUTO_HYBRID' && isInCombatOrSpectating);
+
+  const applyNativeOrientation = (target: 'landscape' | 'portrait' | 'unlock') => {
+    try {
+      const orientation = (screen as any)?.orientation;
+      if (!orientation) return;
+      if (target === 'unlock' && typeof orientation.unlock === 'function') {
+        orientation.unlock();
+      } else if (target !== 'unlock' && typeof orientation.lock === 'function') {
+        orientation.lock(target).catch(() => {});
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (isForceLandscapeActive) {
+      applyNativeOrientation('landscape');
+    } else if (orientationPreference === 'FORCE_PORTRAIT') {
+      applyNativeOrientation('portrait');
+    } else {
+      applyNativeOrientation('unlock');
+    }
+    // Notify Phaser canvases to recalculate dimensions after CSS rotation settles
+    const t = setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
+    return () => clearTimeout(t);
+  }, [isForceLandscapeActive, orientationPreference]);
+
+  const handleToggleMobileOrientation = () => {
+    const nextIsLandscape = !isForceLandscapeActive;
+    if (nextIsLandscape) {
+      setOrientationPreference('FORCE_LANDSCAPE');
+      applyNativeOrientation('landscape');
+    } else {
+      setOrientationPreference('FORCE_PORTRAIT');
+      applyNativeOrientation('portrait');
+    }
+  };
 
   const syncFromNearEngine = () => {
     const st = nearArenaEngine.getState();
@@ -200,25 +244,41 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    const tryLockLandscape = () => {
-      try {
-        const orientation = (screen as any)?.orientation;
-        if (orientation && typeof orientation.lock === 'function') {
-          orientation.lock('landscape').catch(() => {});
-        }
-      } catch {}
-    };
-    window.addEventListener('touchstart', tryLockLandscape, { once: true });
-    window.addEventListener('click', tryLockLandscape, { once: true });
-    return () => {
-      window.removeEventListener('touchstart', tryLockLandscape);
-      window.removeEventListener('click', tryLockLandscape);
-    };
-  }, []);
-
   return (
-    <main className="mobile-landscape-shell relative">
+    <main
+      id="shin-mobile-shell"
+      className={`${isForceLandscapeActive ? 'mobile-landscape-shell' : 'mobile-hybrid-shell'} relative`}
+    >
+      {/* Floating Mobile Orientation Toggle Pill (visible on screens <= 900px) */}
+      {!isLoading && (
+        <div
+          className="fixed z-[90] flex items-center gap-1 lg:hidden"
+          style={{
+            bottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))',
+            left: '50%',
+            transform: 'translateX(-50%)',
+          }}
+        >
+          <button
+            onClick={handleToggleMobileOrientation}
+            className="px-3 py-1 rounded-full bg-black/85 border border-shin-gold/50 text-shin-gold text-[10px] font-mono uppercase tracking-widest shadow-[0_0_15px_rgba(0,0,0,0.9)] backdrop-blur-md flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+            title="Switch between Widescreen Landscape and Portrait on mobile"
+          >
+            <span>🔄</span>
+            <span>{isForceLandscapeActive ? 'Switch to Portrait' : 'Rotate to Landscape'}</span>
+          </button>
+          {orientationPreference !== 'AUTO_HYBRID' && (
+            <button
+              onClick={() => setOrientationPreference('AUTO_HYBRID')}
+              className="px-2 py-1 rounded-full bg-gray-900/90 border border-white/20 text-gray-300 text-[9px] font-mono uppercase tracking-wider cursor-pointer"
+              title="Reset to Smart Hybrid (Portrait Menus + Auto-Landscape Fights)"
+            >
+              Auto
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Loading Screen */}
       {isLoading && <LoadingScreen onComplete={handleLoadComplete} />}
 

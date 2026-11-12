@@ -150,10 +150,14 @@ h1, h2, h3, .font-cinzel {
 }
 
 /* ============================================================================
-   AUTO-LANDSCAPE MOBILE CONSOLE SHELL
-   Automatically rotates the entire game into widescreen landscape when a mobile
-   phone is held in portrait mode (just like native mobile fighting games).
+   SMART HYBRID MOBILE CONSOLE SHELL
+   - Default (`.mobile-hybrid-shell`): Follows device orientation naturally for
+     menus, Dojo Market, and Agent Arena dashboards.
+   - Forced Landscape (`.mobile-landscape-shell`): Automatically rotates the
+     game 90deg clockwise into widescreen landscape on portrait phones during
+     active combat (or when the user taps the Orientation Toggle button).
    ============================================================================ */
+.mobile-hybrid-shell,
 .mobile-landscape-shell {
   position: fixed;
   inset: 0;

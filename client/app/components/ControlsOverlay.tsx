@@ -219,10 +219,14 @@ const ControlsOverlay = ({
         const rawDx = touch.clientX - joyStartPos.current.x;
         const rawDy = touch.clientY - joyStartPos.current.y;
 
-        // If the phone is physically held in portrait and auto-rotated 90deg clockwise into landscape,
-        // map physical screen axes (+Y down, +X right) to rotated landscape axes (+X right, +Y down).
+        // If the phone is physically held in portrait and rotated 90deg clockwise into landscape
+        // via `.mobile-landscape-shell`, map physical screen axes to rotated landscape axes.
+        const shellEl =
+            typeof document !== 'undefined' ? document.getElementById('shin-mobile-shell') : null;
+        const hasLandscapeShell = shellEl?.classList.contains('mobile-landscape-shell') ?? true;
         const isAutoRotatedPortrait =
             typeof window !== 'undefined' &&
+            hasLandscapeShell &&
             window.innerHeight > window.innerWidth &&
             window.innerWidth <= 900;
         const dx = isAutoRotatedPortrait ? rawDy : rawDx;
