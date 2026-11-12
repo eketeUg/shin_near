@@ -85,6 +85,10 @@ pub struct ShinArenaContract {
     pub matches: LookupMap<String, ArenaMatchPool>,
     pub npc_dojo: NpcDojoMaster,
     pub next_token_nonce: u64,
+    /// NEP-245 Multi-Token balances keyed by "{account_id}:{token_id}"
+    pub mt_balances: LookupMap<String, u128>,
+    /// NEP-245 Multi-Token total supply keyed by "{token_id}"
+    pub mt_supplies: LookupMap<String, u128>,
 }
 
 #[near_bindgen]
@@ -102,7 +106,61 @@ impl ShinArenaContract {
                 base_training_cost_milli_near: 500, // 0.5 NEAR base cost, scales with demand
             },
             next_token_nonce: 1,
+            mt_balances: LookupMap::new(b"b"),
+            mt_supplies: LookupMap::new(b"s"),
         }
+    }
+
+    /// Internal helper to mint NEP-245 multi-tokens and emit standard NEP-245 EVENT_JSON log
+    fn internal_mt_mint(&mut self, owner_id: &str, token_ids: &[String], amounts: &[u128], memo: Option<&str>) {
+        assert_eq!(token_ids.len(), amounts.len(), "NEP-245: token_ids and amounts length mismatch");
+        for (token_id, amount) in token_ids.iter().zip(amounts.iter()) {
+            let key = format!("{}:{}", owner_id, token_id);
+            let current = self.mt_balances.get(&key).unwrap_or(0);
+            self.mt_balances.insert(&key, &(current + amount));
+
+            let supply = self.mt_supplies.get(token_id).unwrap_or(0);
+            self.mt_supplies.insert(token_id, &(supply + amount));
+        }
+        let amounts_str: Vec<String> = amounts.iter().map(|a| a.to_string()).collect();
+        env::log_str(&format!(
+            "EVENT_JSON:{{\"standard\":\"nep245\",\"version\":\"1.0.0\",\"event\":\"mt_mint\",\"data\":[{{\"owner_id\":\"{}\",\"token_ids\":{:?},\"amounts\":{:?},\"memo\":{:?}}}]}}",
+            owner_id,
+            token_ids,
+            amounts_str,
+            memo.unwrap_or("SHIN NEP-245 Mint")
+        ));
+    }
+
+    /// Internal helper to transfer NEP-245 multi-tokens between accounts
+    fn internal_mt_transfer(
+        &mut self,
+        sender_id: &str,
+        receiver_id: &str,
+        token_ids: &[String],
+        amounts: &[u128],
+        memo: Option<&str>,
+    ) {
+        assert_eq!(token_ids.len(), amounts.len(), "NEP-245: token_ids and amounts length mismatch");
+        for (token_id, amount) in token_ids.iter().zip(amounts.iter()) {
+            let sender_key = format!("{}:{}", sender_id, token_id);
+            let sender_bal = self.mt_balances.get(&sender_key).unwrap_or(0);
+            assert!(sender_bal >= *amount, "NEP-245: insufficient balance for token {}", token_id);
+            self.mt_balances.insert(&sender_key, &(sender_bal - amount));
+
+            let receiver_key = format!("{}:{}", receiver_id, token_id);
+            let receiver_bal = self.mt_balances.get(&receiver_key).unwrap_or(0);
+            self.mt_balances.insert(&receiver_key, &(receiver_bal + amount));
+        }
+        let amounts_str: Vec<String> = amounts.iter().map(|a| a.to_string()).collect();
+        env::log_str(&format!(
+            "EVENT_JSON:{{\"standard\":\"nep245\",\"version\":\"1.0.0\",\"event\":\"mt_transfer\",\"data\":[{{\"old_owner_id\":\"{}\",\"new_owner_id\":\"{}\",\"token_ids\":{:?},\"amounts\":{:?},\"memo\":{:?}}}]}}",
+            sender_id,
+            receiver_id,
+            token_ids,
+            amounts_str,
+            memo.unwrap_or("SHIN NEP-245 Batch Transfer")
+        ));
     }
 
     /// Mint a new Fighter NFT with its own embedded Agent Sub-Account Wallet
@@ -144,6 +202,17 @@ impl ShinArenaContract {
         };
 
         self.fighters.insert(&token_id, &fighter);
+
+        // Register Fighter NFT and starter Shinobi Scroll in NEP-245 Multi-Token ledger
+        let nep245_fighter_id = format!("fighter:{}", token_id);
+        let nep245_starter_scroll = "scroll:way-of-the-shinobi".to_string();
+        self.internal_mt_mint(
+            caller.as_str(),
+            &[nep245_fighter_id, nep245_starter_scroll],
+            &[1, 1],
+            Some("Mint Fighter NFT + Starter Shinobi Scroll via NEP-245"),
+        );
+
         fighter
     }
 
@@ -298,7 +367,7 @@ impl ShinArenaContract {
         }
 
         // 3. Autonomous Agent-to-NPC Commerce: if auto_train_at_dojo is enabled and affordable,
-        // the Fighter Agent autonomously pays the NPC Dojo Master to boost its stats!
+        // the Fighter Agent autonomously pays the NPC Dojo Master to boost its stats and receives a NEP-245 Scroll!
         let current_dojo_cost = self.get_dynamic_dojo_cost();
         if winner.auto_train_at_dojo && winner.vault_balance_milli_near >= current_dojo_cost * 3 {
             winner.vault_balance_milli_near -= current_dojo_cost;
@@ -307,6 +376,14 @@ impl ShinArenaContract {
             winner.power_level += 1;
             winner.def += 2;
             winner.spd += 2;
+
+            let scroll_token_id = "scroll:shadow-step-mastery".to_string();
+            self.internal_mt_mint(
+                &winner.agent_wallet_id,
+                &[scroll_token_id],
+                &[1],
+                Some("Autonomous NPC Dojo Scroll minted to Fighter Agent via NEP-245"),
+            );
         }
 
         self.fighters.insert(&winner_token_id, &winner);
@@ -321,6 +398,46 @@ impl ShinArenaContract {
     pub fn get_dynamic_dojo_cost(&self) -> u128 {
         self.npc_dojo.base_training_cost_milli_near
             + (self.npc_dojo.total_trainings_completed as u128 * 25)
+    }
+
+    /// Purchase a NEP-245 Shinobi Scroll from Grandmaster Hanzo's Autonomous NPC Dojo (`hanzo-dojo-npc.shin-arena.testnet`)
+    pub fn buy_dojo_scroll(&mut self, token_id: String, scroll_type: String) -> FighterNft {
+        let mut fighter = self.fighters.get(&token_id).expect("Fighter not found");
+        let cost = self.get_dynamic_dojo_cost();
+        assert!(
+            fighter.vault_balance_milli_near >= cost,
+            "Insufficient Fighter Agent Vault balance for Dojo Scroll"
+        );
+
+        fighter.vault_balance_milli_near -= cost;
+        self.npc_dojo.treasury_balance_milli_near += cost;
+        self.npc_dojo.total_trainings_completed += 1;
+        fighter.power_level += 1;
+
+        let nep245_scroll_id = match scroll_type.as_str() {
+            "ATK" => {
+                fighter.atk += 3;
+                "scroll:crimson-katana".to_string()
+            }
+            "DEF" => {
+                fighter.def += 3;
+                "scroll:iron-posture".to_string()
+            }
+            _ => {
+                fighter.spd += 3;
+                "scroll:shadow-step-mastery".to_string()
+            }
+        };
+
+        self.internal_mt_mint(
+            &fighter.agent_wallet_id,
+            &[nep245_scroll_id],
+            &[1],
+            Some("Purchased NEP-245 Shinobi Scroll from Grandmaster Hanzo NPC Dojo"),
+        );
+
+        self.fighters.insert(&token_id, &fighter);
+        fighter
     }
 
     /// Player-Owned Fighter Market: List or Buy a trained Fighter NFT (along with its embedded wallet!)
@@ -340,12 +457,96 @@ impl ShinArenaContract {
         assert!(attached >= fighter.market_price_milli_near, "Insufficient attached NEAR");
 
         let seller = fighter.owner_id.clone();
-        fighter.owner_id = env::predecessor_account_id();
+        let buyer = env::predecessor_account_id();
+        fighter.owner_id = buyer.clone();
         fighter.market_price_milli_near = 0;
         self.fighters.insert(&token_id, &fighter);
 
+        // Transfer NEP-245 Fighter multi-token ownership atomically
+        let nep245_fighter_id = format!("fighter:{}", token_id);
+        self.internal_mt_transfer(
+            seller.as_str(),
+            buyer.as_str(),
+            &[nep245_fighter_id],
+            &[1],
+            Some("Bazaar Fighter NFT Ownership Transfer (NEP-245)"),
+        );
+
         Promise::new(seller).transfer(NearToken::from_millinear(attached));
         fighter
+    }
+
+    // =========================================================================
+    // NEP-245 MULTI-TOKEN STANDARD INTERFACE (mt_transfer, mt_batch_transfer, mt_balance_of, mt_batch_balance_of)
+    // =========================================================================
+
+    #[payable]
+    pub fn mt_transfer(
+        &mut self,
+        receiver_id: AccountId,
+        token_id: String,
+        amount: String,
+        #[allow(unused_variables)] approval: Option<(AccountId, u64)>,
+        memo: Option<String>,
+    ) {
+        let sender_id = env::predecessor_account_id();
+        let parsed_amount: u128 = amount.parse().expect("NEP-245: invalid amount");
+        self.internal_mt_transfer(
+            sender_id.as_str(),
+            receiver_id.as_str(),
+            &[token_id],
+            &[parsed_amount],
+            memo.as_deref(),
+        );
+    }
+
+    #[payable]
+    pub fn mt_batch_transfer(
+        &mut self,
+        receiver_id: AccountId,
+        token_ids: Vec<String>,
+        amounts: Vec<String>,
+        #[allow(unused_variables)] approvals: Option<Vec<Option<(AccountId, u64)>>>,
+        memo: Option<String>,
+    ) {
+        let sender_id = env::predecessor_account_id();
+        let parsed_amounts: Vec<u128> = amounts
+            .iter()
+            .map(|a| a.parse::<u128>().expect("NEP-245: invalid amount in batch"))
+            .collect();
+        self.internal_mt_transfer(
+            sender_id.as_str(),
+            receiver_id.as_str(),
+            &token_ids,
+            &parsed_amounts,
+            memo.as_deref(),
+        );
+    }
+
+    pub fn mt_balance_of(&self, account_id: AccountId, token_id: String) -> String {
+        let key = format!("{}:{}", account_id, token_id);
+        self.mt_balances.get(&key).unwrap_or(0).to_string()
+    }
+
+    pub fn mt_batch_balance_of(&self, account_id: AccountId, token_ids: Vec<String>) -> Vec<String> {
+        token_ids
+            .into_iter()
+            .map(|token_id| {
+                let key = format!("{}:{}", account_id, token_id);
+                self.mt_balances.get(&key).unwrap_or(0).to_string()
+            })
+            .collect()
+    }
+
+    pub fn mt_supply(&self, token_id: String) -> Option<String> {
+        self.mt_supplies.get(&token_id).map(|s| s.to_string())
+    }
+
+    pub fn mt_batch_supply(&self, token_ids: Vec<String>) -> Vec<Option<String>> {
+        token_ids
+            .into_iter()
+            .map(|token_id| self.mt_supplies.get(&token_id).map(|s| s.to_string()))
+            .collect()
     }
 
     pub fn get_all_fighters(&self) -> Vec<FighterNft> {

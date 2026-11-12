@@ -762,11 +762,39 @@ const MainMenu = ({
                     </div>
                   </div>
 
+                  {/* NEP-245 Multi-Token Batch Inventory */}
+                  <div className="bg-white/5 border border-purple-500/30 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-mono font-bold text-purple-300 uppercase">
+                        4. NEP-245 Multi-Token Batch Inventory (`mt_batch_balance_of`)
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                        STANDARD: NEP-245 v1.0.0
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto">
+                      {nearArenaEngine.getNep245MultiTokenInventory().map((item, idx) => (
+                        <div
+                          key={`${item.tokenId}-${idx}`}
+                          className="flex items-center justify-between bg-black/75 px-3 py-1.5 rounded border border-white/10 text-[10px] font-mono"
+                        >
+                          <div className="truncate pr-2">
+                            <span className="text-purple-300 font-bold">{item.tokenId}</span>
+                            <div className="text-[9px] text-gray-400 truncate">
+                              Holder: {item.holderAccountId}
+                            </div>
+                          </div>
+                          <span className="text-shin-gold font-bold shrink-0">{item.balance}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Recent Contract Receipts */}
                   <div className="bg-white/5 border border-white/10 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-mono font-bold text-white uppercase">
-                        4. Live Contract Receipts (shin-arena.testnet)
+                        5. Live Contract Receipts (shin-arena.testnet)
                       </span>
                       <button
                         onClick={() => {

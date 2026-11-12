@@ -105,6 +105,15 @@ export interface PlayerWalletState {
   USDT: number;
 }
 
+export interface Nep245TokenBalance {
+  tokenId: string;
+  standard: 'NEP-245';
+  category: 'FIGHTER_NFT' | 'DOJO_SCROLL' | 'ARENA_CURRENCY';
+  label: string;
+  balance: string;
+  holderAccountId: string;
+}
+
 export const COMBAT_DOCTRINES: {
   id: CombatDoctrineId;
   name: string;
@@ -172,12 +181,14 @@ export function buildSessionFunctionCallAccessKey() {
     NEAR_ARENA_CONTRACT_ID,
     [
       'mint_fighter',
-      'fund_fighter_pool',
-      'update_fighter_strategy',
-      'create_escrow_match',
+      'fund_agent_wallet',
+      'configure_agent',
+      'create_agent_match_pool',
       'place_spectator_bet',
       'settle_match',
       'buy_dojo_scroll',
+      'mt_transfer',
+      'mt_batch_transfer',
     ],
     allowanceYocto ? BigInt(allowanceYocto) : undefined,
   );
@@ -562,6 +573,65 @@ class NearArenaEngine {
     return this.state;
   }
 
+  /**
+   * Computes the NEP-245 Multi-Token batch inventory (`mt_batch_balance_of`)
+   * across Fighter NFTs (`fighter:*`), Shinobi Dojo Scrolls (`scroll:*`), and Arena Tokens (`nep141:*`).
+   */
+  public getNep245MultiTokenInventory(): Nep245TokenBalance[] {
+    const playerAcct = this.state.playerWallet.accountId;
+    const ownedFighters = this.state.fighters.filter(
+      (f) => !f.isNpc && f.ownerAccountId === playerAcct,
+    );
+    const items: Nep245TokenBalance[] = [
+      {
+        tokenId: 'nep141:wrap.testnet',
+        standard: 'NEP-245',
+        category: 'ARENA_CURRENCY',
+        label: 'Wrapped NEAR (Arena Multi-Token)',
+        balance: `${this.state.playerWallet.NEAR.toFixed(2)} NEAR`,
+        holderAccountId: playerAcct,
+      },
+      {
+        tokenId: 'nep141:usdc.fakes.testnet',
+        standard: 'NEP-245',
+        category: 'ARENA_CURRENCY',
+        label: 'USDC (Arena Multi-Token)',
+        balance: `${this.state.playerWallet.USDC.toFixed(2)} USDC`,
+        holderAccountId: playerAcct,
+      },
+      {
+        tokenId: 'scroll:way-of-the-shinobi',
+        standard: 'NEP-245',
+        category: 'DOJO_SCROLL',
+        label: 'Starter Shinobi Clan Scroll',
+        balance: `${Math.max(1, ownedFighters.length)}x`,
+        holderAccountId: playerAcct,
+      },
+    ];
+
+    ownedFighters.forEach((f) => {
+      items.push({
+        tokenId: `fighter:${f.tokenId}`,
+        standard: 'NEP-245',
+        category: 'FIGHTER_NFT',
+        label: `${f.title} (Lv.${f.powerLevel} ${f.name})`,
+        balance: '1 NFT',
+        holderAccountId: playerAcct,
+      });
+      const scrollsEarned = Math.max(1, f.powerLevel - 1);
+      items.push({
+        tokenId: 'scroll:shadow-step-mastery',
+        standard: 'NEP-245',
+        category: 'DOJO_SCROLL',
+        label: `Master Hanzo Dojo Scrolls (${f.title})`,
+        balance: `${scrollsEarned}x`,
+        holderAccountId: f.agentWalletId,
+      });
+    });
+
+    return items;
+  }
+
   public syncUsername(username: string): PlayerWalletState {
     if (!username || username === this.state.playerWallet.username) {
       return this.state.playerWallet;
@@ -668,7 +738,7 @@ class NearArenaEngine {
       id: 'tx-' + Date.now(),
       txHash: makeTxHash(),
       type: 'MINT_NFT',
-      summary: `Minted Fighter NFT ${tokenId} (${newFighter.title}) with Sub-Account Agent Wallet ${agentWalletId}`,
+      summary: `NEP-245 mt_mint: fighter:${tokenId} + scroll:way-of-the-shinobi (${newFighter.title}) with Sub-Account Wallet ${agentWalletId}`,
       amountNear: totalCost,
       actorWallet: this.state.playerWallet.accountId,
       timestamp: Date.now(),
@@ -814,7 +884,7 @@ class NearArenaEngine {
       id: 'tx-' + Date.now(),
       txHash: makeTxHash(),
       type: 'NPC_DOJO_TRAIN',
-      summary: `${fighter.title} paid ${cost.toFixed(2)} NEAR to NPC ${this.state.npcDojo.npcWalletId} -> Upgraded to Power Lv.${fighter.powerLevel}! (Next Dojo price: ${this.state.npcDojo.currentDynamicCostNear.toFixed(2)} NEAR)`,
+      summary: `NEP-245 mt_mint (scroll:shadow-step-mastery): ${fighter.title} paid ${cost.toFixed(2)} NEAR to NPC ${this.state.npcDojo.npcWalletId} -> Lv.${fighter.powerLevel}`,
       amountNear: cost,
       actorWallet: fighter.agentWalletId,
       timestamp: Date.now(),
