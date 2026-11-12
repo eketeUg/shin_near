@@ -6,11 +6,13 @@ import {
   createCipheriv,
   createDecipheriv,
   createHash,
+  createPrivateKey,
+  createPublicKey,
   randomBytes,
 } from 'crypto';
-import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
 import * as dotenv from 'dotenv';
+import { KeyPair, providers, utils } from 'near-api-js';
 
 dotenv.config();
 
@@ -36,11 +38,12 @@ export class WalletService {
 
   /**
    * Creates a new NEAR Protocol Embedded Wallet (Ed25519 implicit account + optional sub-account)
-   * and returns its accountId / address and ed25519 private key.
+   * using official `near-api-js` KeyPair.fromRandom('ed25519').
    */
   createNEARWallet = (username?: string): Record<string, any> => {
-    const keypair = Keypair.generate();
-    const implicitAccountId = Buffer.from(keypair.publicKey.toBytes()).toString('hex');
+    const keyPair = KeyPair.fromRandom('ed25519');
+    const pubKeyBytes = Buffer.from(keyPair.getPublicKey().data);
+    const implicitAccountId = pubKeyBytes.toString('hex');
     const cleanHandle = username
       ? username.toLowerCase().replace(/[^a-z0-9_-]/g, '')
       : '';
@@ -51,8 +54,8 @@ export class WalletService {
     return {
       address: namedAccountId,
       implicitAccountId,
-      publicKey: `ed25519:${bs58.encode(keypair.publicKey.toBytes())}`,
-      privateKey: `ed25519:${bs58.encode(keypair.secretKey)}`,
+      publicKey: keyPair.getPublicKey().toString(),
+      privateKey: keyPair.toString(),
     };
   };
 
@@ -75,15 +78,36 @@ export class WalletService {
   ): Record<string, string> => {
     try {
       const normalized = privateKey.replace(/^ed25519:/, '');
-      const privateKeyBytes = bs58.decode(normalized);
-      const wallet = Keypair.fromSecretKey(privateKeyBytes);
-      const implicitHex = Buffer.from(wallet.publicKey.toBytes()).toString('hex');
+      const secretKeyBytes = Buffer.from(bs58.decode(normalized));
+      let pubBytes: Buffer;
+      let fullSecretBytes: Buffer;
+
+      if (secretKeyBytes.length === 64) {
+        pubBytes = secretKeyBytes.subarray(32, 64);
+        fullSecretBytes = secretKeyBytes;
+      } else if (secretKeyBytes.length === 32) {
+        const keyObj = createPrivateKey({
+          key: {
+            kty: 'OKP',
+            crv: 'Ed25519',
+            d: secretKeyBytes.toString('base64url'),
+          },
+          format: 'jwk',
+        });
+        const pubJwk = createPublicKey(keyObj).export({ format: 'jwk' }) as { x: string };
+        pubBytes = Buffer.from(pubJwk.x, 'base64url');
+        fullSecretBytes = Buffer.concat([secretKeyBytes, pubBytes]);
+      } else {
+        throw new Error(`Expected 32 or 64 byte Ed25519 secret key, got ${secretKeyBytes.length}`);
+      }
+
+      const implicitHex = pubBytes.toString('hex');
       return {
         address: implicitHex,
-        privateKey: bs58.encode(wallet.secretKey),
+        privateKey: bs58.encode(fullSecretBytes),
       };
     } catch (error) {
-      throw new Error(`Invalid private key format: ${error.message}`);
+      throw new Error(`Invalid NEAR Ed25519 key format: ${error.message}`);
     }
   };
 
@@ -131,31 +155,22 @@ export class WalletService {
   };
 
   /**
-   * Queries native NEAR balance via NEAR JSON-RPC (`query` -> `view_account`).
+   * Queries native NEAR balance via `near-api-js` `providers.JsonRpcProvider` (`view_account`).
    */
   getNearBalance = async (
     accountId: string,
     rpcURL: string = DEFAULT_NEAR_RPC,
   ): Promise<Record<string, number>> => {
     try {
-      const response = await fetch(rpcURL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 'shin-near-balance',
-          method: 'query',
-          params: {
-            request_type: 'view_account',
-            finality: 'final',
-            account_id: accountId,
-          },
-        }),
+      const provider = new providers.JsonRpcProvider({ url: rpcURL });
+      const accountView = await provider.query<any>({
+        request_type: 'view_account',
+        finality: 'final',
+        account_id: accountId,
       });
-      const json = await response.json();
-      if (json?.result?.amount) {
-        const near = Number(json.result.amount) / YOCTO_NEAR;
-        return { balance: Number(near.toFixed(4)) };
+      if (accountView?.amount) {
+        const formatted = utils.format.formatNearAmount(accountView.amount, 4);
+        return { balance: Number(formatted.replace(/,/g, '')) };
       }
       return { balance: 0 };
     } catch (error) {

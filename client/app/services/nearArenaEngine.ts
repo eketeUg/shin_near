@@ -1,5 +1,16 @@
 'use client';
 
+import { KeyPair, providers, transactions, utils } from 'near-api-js';
+
+export const NEAR_ARENA_CONTRACT_ID =
+  process.env.NEXT_PUBLIC_NEAR_CONTRACT_ID || 'shin-arena.testnet';
+export const NEAR_RPC_ENDPOINT =
+  process.env.NEXT_PUBLIC_NEAR_RPC_URL || 'https://rpc.testnet.near.org';
+
+export const nearRpcProvider = new providers.JsonRpcProvider({
+  url: NEAR_RPC_ENDPOINT,
+});
+
 export type CombatDoctrineId =
   | 'AGGRESSIVE_RUSHDOWN'
   | 'IRON_GUARD'
@@ -139,12 +150,37 @@ export const COMBAT_DOCTRINES: {
 const STORAGE_KEY = 'shin_near_arena_state_v3';
 
 function randomHex(len: number): string {
-  const chars = '0123456789abcdef';
-  let out = '';
-  for (let i = 0; i < len; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)];
+  try {
+    const kp = KeyPair.fromRandom('ed25519');
+    const hex = Array.from(kp.getPublicKey().data)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    return hex.slice(0, len);
+  } catch {
+    const chars = '0123456789abcdef';
+    let out = '';
+    for (let i = 0; i < len; i++) {
+      out += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return out;
   }
-  return out;
+}
+
+export function buildSessionFunctionCallAccessKey() {
+  const allowanceYocto = utils.format.parseNearAmount('0.25');
+  return transactions.functionCallAccessKey(
+    NEAR_ARENA_CONTRACT_ID,
+    [
+      'mint_fighter',
+      'fund_fighter_pool',
+      'update_fighter_strategy',
+      'create_escrow_match',
+      'place_spectator_bet',
+      'settle_match',
+      'buy_dojo_scroll',
+    ],
+    allowanceYocto ? BigInt(allowanceYocto) : undefined,
+  );
 }
 
 function makeTxHash(): string {
