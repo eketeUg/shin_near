@@ -54,6 +54,12 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
   const [listPrice, setListPrice] = useState<string>('15');
   const [betAmounts, setBetAmounts] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [isFastForwarding, setIsFastForwarding] = useState<boolean>(false);
+  const [simStep, setSimStep] = useState<number>(0);
+  const [simHeadline, setSimHeadline] = useState<string>(
+    'Click "Fast-Forward 7 Days" to simulate a full week of autonomous arena fights, loot drops, and NPC supply/demand price swings in 10 seconds.',
+  );
+  const [openReasoningId, setOpenReasoningId] = useState<string | null>('hanzo-dojo');
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -113,6 +119,27 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
     const match = nearArenaEngine.createImmediateAgentMatch(selectedFighter.tokenId);
     setArenaState({ ...nearArenaEngine.getState() });
     onWatchAgentFight(match);
+  };
+
+  const handleRunFastForwardSim = () => {
+    if (isFastForwarding) return;
+    setIsFastForwarding(true);
+    setSimStep(0);
+    let currentTick = 0;
+
+    const timer = setInterval(() => {
+      currentTick += 1;
+      const res = nearArenaEngine.simulateEconomyDayTick();
+      setSimStep(currentTick);
+      setSimHeadline(res.headline);
+      setArenaState({ ...nearArenaEngine.getState() });
+
+      if (currentTick >= 7) {
+        clearInterval(timer);
+        setIsFastForwarding(false);
+        showToast('⏩ Simulated 7 Days of Arena Combat & NPC Merchant Trading!');
+      }
+    }, 1400);
   };
 
   return (
@@ -776,75 +803,349 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
         )}
 
         {/* ============================================================
-            TAB 3: MASTER HANZO'S DOJO & WARRIOR BAZAAR
+            TAB 3: MASTER HANZO'S DOJO, BLACKSMITH KENJI & WARRIOR BAZAAR
            ============================================================ */}
         {activeTab === 'DOJO_MARKET' && (
           <div className="space-y-8">
-            {/* Grandmaster Hanzo's Autonomous Dojo */}
-            <div className="bg-gradient-to-br from-amber-950/40 via-black to-black border-2 border-shin-gold/50 rounded-2xl p-6">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-white/10 pb-4 mb-5">
-                <div>
-                  <span className="text-[10px] font-cinzel font-bold uppercase bg-shin-gold/20 text-shin-gold px-3 py-0.5 rounded-full border border-shin-gold/40">
-                    Living Sensei Economy • Supply &amp; Demand Pricing
+            {/* FAST-FORWARD 7-DAY ECONOMY SIMULATOR + PLAYER NEP-245 SATCHEL */}
+            <div className="bg-gradient-to-r from-purple-950/50 via-black to-amber-950/30 border-2 border-purple-500/40 rounded-2xl p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+              <div className="space-y-1.5 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                    NEP-245 Multi-Token Economy • Supply &amp; Demand Pricing
                   </span>
-                  <h2 className="text-xl md:text-3xl font-cinzel font-black text-white mt-2">
-                    🏮 {arenaState.npcDojo.npcName}
-                  </h2>
-                  <p className="text-xs text-gray-300 mt-1">
-                    Sensei Treasury:{' '}
-                    <span className="text-emerald-400 font-mono font-bold">
-                      {arenaState.npcDojo.treasuryBalanceNear.toFixed(2)} NEAR
-                    </span>{' '}
-                    • Warriors Trained: <strong className="text-white">{arenaState.npcDojo.totalTrainingsCompleted}</strong>
-                    {showNearUnderHood && (
-                      <span className="text-shin-gold font-mono ml-2">
-                        ({arenaState.npcDojo.npcWalletId})
-                      </span>
-                    )}
-                  </p>
-                </div>
-
-                <div className="bg-black/80 border border-shin-gold/50 rounded-xl px-5 py-3 text-center shrink-0">
-                  <div className="text-[10px] text-gray-400 uppercase">Current Session Fee</div>
-                  <div className="text-2xl font-mono font-bold text-shin-gold">
-                    {arenaState.npcDojo.currentDynamicCostNear.toFixed(2)} NEAR
-                  </div>
-                  <div className="text-[9px] text-gray-500">
-                    Rises automatically with arena demand
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <p className="text-xs md:text-sm text-gray-300 max-w-2xl">
-                  Put <strong className="text-white">{selectedFighter?.title}</strong> through
-                  Grandmaster Hanzo&apos;s intense dojo trials to permanently boost{' '}
-                  <span className="text-shin-gold font-bold">
-                    +1 Level, +3 ATK, +3 DEF, and +2 SPD
+                  <span className="text-[10px] font-mono text-gray-400">
+                    Total Simulated Days: <strong className="text-white">{arenaState.simulatedDaysElapsed || 0}</strong>
                   </span>
-                  .
-                </p>
-                {selectedFighter && (
-                  <button
-                    onClick={() => {
-                      try {
-                        nearArenaEngine.trainFighterAtNpcDojo(selectedFighter.tokenId, true);
-                        setArenaState({ ...nearArenaEngine.getState() });
-                        showToast(
-                          `🏮 ${selectedFighter.title} completed Dojo Trials! Reached Level ${
-                            selectedFighter.powerLevel + 1
-                          }!`,
-                        );
-                      } catch (e: any) {
-                        showToast(e.message);
-                      }
-                    }}
-                    className="px-6 py-3.5 bg-shin-gold text-black font-cinzel font-black text-xs uppercase tracking-widest rounded-xl hover:bg-yellow-400 transition-all shrink-0 cursor-pointer shadow-[0_0_20px_rgba(251,191,36,0.4)]"
-                  >
-                    ⚡ Train {selectedFighter.title} ({arenaState.npcDojo.currentDynamicCostNear.toFixed(2)} NEAR)
-                  </button>
+                  {showNearUnderHood && (
+                    <span className="text-[10px] font-mono text-shin-gold">
+                      Config: client/app/config/npcMerchantConfig.ts
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-lg md:text-xl font-cinzel font-black text-white">
+                  ⏩ Fast-Forward Economy Simulator (1 Week of Autonomous Trading)
+                </h2>
+                <p className="text-xs text-gray-300 font-sans">{simHeadline}</p>
+                {isFastForwarding && (
+                  <div className="w-full max-w-md h-2 bg-black/80 rounded-full overflow-hidden border border-purple-500/40 mt-2">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-500 to-shin-gold transition-all duration-500"
+                      style={{ width: `${(simStep / 7) * 100}%` }}
+                    />
+                  </div>
                 )}
               </div>
+
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+                {/* Player Gathered NEP-245 Materials */}
+                <div className="bg-black/80 border border-white/15 rounded-xl px-3.5 py-2 flex items-center gap-3 text-xs font-mono">
+                  <div>
+                    <div className="text-[9px] text-gray-400 uppercase">⛏️ Tamahagane Steel</div>
+                    <div className="text-sm font-bold text-white">
+                      {arenaState.playerItems?.['material:tamahagane-steel'] ?? 0} units
+                    </div>
+                  </div>
+                  <div className="h-6 w-px bg-white/10" />
+                  <div>
+                    <div className="text-[9px] text-gray-400 uppercase">🔥 Spirit Ember</div>
+                    <div className="text-sm font-bold text-shin-gold">
+                      {arenaState.playerItems?.['material:spirit-ember'] ?? 0} units
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleRunFastForwardSim}
+                  disabled={isFastForwarding}
+                  className="px-5 py-3 bg-shin-gold text-black font-cinzel font-black text-xs uppercase tracking-widest rounded-xl hover:bg-yellow-400 transition-all cursor-pointer disabled:opacity-50 shadow-[0_0_20px_rgba(251,191,36,0.4)]"
+                >
+                  {isFastForwarding
+                    ? `⏩ Simulating Day ${simStep}/7...`
+                    : '⏩ Fast-Forward 7 Days'}
+                </button>
+              </div>
+            </div>
+
+            {/* AUTONOMOUS NPC MERCHANTS (GRANDMASTER HANZO & BLACKSMITH KENJI) */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {(arenaState.npcMerchants || []).map((merchant) => {
+                const isReasoningOpen = openReasoningId === merchant.merchantId;
+                return (
+                  <div
+                    key={merchant.merchantId}
+                    className={`rounded-2xl border-2 p-5 flex flex-col justify-between transition-all ${
+                      merchant.isShopOpen
+                        ? 'bg-gradient-to-br from-gray-950 via-black to-amber-950/20 border-shin-gold/40'
+                        : 'bg-gradient-to-br from-red-950/40 via-black to-black border-red-500/70 shadow-[0_0_30px_rgba(239,68,68,0.25)]'
+                    }`}
+                  >
+                    <div>
+                      {/* Merchant Header */}
+                      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4 mb-4">
+                        <div className="flex items-center gap-3.5">
+                          <img
+                            src={merchant.avatarGif}
+                            alt={merchant.name}
+                            className="w-16 h-16 object-contain bg-black/80 rounded-xl p-1.5 border border-white/15"
+                            style={{ imageRendering: 'pixelated' }}
+                          />
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${
+                                  merchant.isShopOpen
+                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                    : 'bg-red-500/25 text-red-300 border-red-500/50 animate-pulse'
+                                }`}
+                              >
+                                {merchant.isShopOpen
+                                  ? '🟢 SHOP OPEN'
+                                  : '🔴 SHOP CLOSED (INSOLVENT / BROKE)'}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  setOpenReasoningId(
+                                    isReasoningOpen ? null : merchant.merchantId,
+                                  )
+                                }
+                                title={merchant.activeReasoning}
+                                className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 cursor-pointer"
+                              >
+                                🧠 {isReasoningOpen ? 'Hide' : 'Show'} NPC Reasoning
+                              </button>
+                            </div>
+                            <h3 className="text-lg md:text-xl font-cinzel font-black text-white mt-1">
+                              {merchant.name}
+                            </h3>
+                            <p className="text-[11px] text-gray-400">{merchant.specialty}</p>
+                            {showNearUnderHood && (
+                              <div className="text-[10px] font-mono text-shin-gold mt-0.5">
+                                Agent Wallet: {merchant.walletId}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* NPC Treasury & Investor Status */}
+                        <div className="bg-black/80 border border-white/15 rounded-xl px-3.5 py-2 text-right">
+                          <div className="text-[9px] text-gray-400 uppercase">NPC Wallet</div>
+                          <div
+                            className={`text-lg font-mono font-bold ${
+                              merchant.isShopOpen ? 'text-emerald-400' : 'text-red-400'
+                            }`}
+                          >
+                            {merchant.walletBalanceNear.toFixed(2)} NEAR
+                          </div>
+                          <div className="text-[9px] font-mono text-gray-400">
+                            Your LP Stake: {merchant.playerInvestmentNear.toFixed(1)}N (Earned:{' '}
+                            <span className="text-shin-gold">
+                              +{merchant.investorDividendsEarnedNear.toFixed(2)}N
+                            </span>
+                            )
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* NPC Active Reasoning Tooltip Box (`09-games.md`) */}
+                      {isReasoningOpen && (
+                        <div className="mb-4 bg-purple-950/35 border border-purple-500/40 rounded-xl p-3 text-xs font-mono text-purple-100">
+                          <div className="text-[10px] font-bold text-purple-300 uppercase mb-1 flex items-center justify-between">
+                            <span>🧠 Active NPC Agent Pricing &amp; Inventory Reasoning</span>
+                            <span>Trades: {merchant.totalTradesCount}</span>
+                          </div>
+                          <p className="leading-relaxed text-[11px]">{merchant.activeReasoning}</p>
+                        </div>
+                      )}
+
+                      {/* Insolvency Alert Banner when Shop Goes Broke */}
+                      {!merchant.isShopOpen && (
+                        <div className="mb-4 bg-red-950/60 border border-red-500/60 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <div className="text-xs text-red-200">
+                            <strong className="text-white block font-cinzel uppercase">
+                              ⚠️ Shop Closed — Merchant Went Broke!
+                            </strong>
+                            Heavy material sell-offs drained {merchant.name}&apos;s wallet below{' '}
+                            {merchant.insolvencyThresholdNear} NEAR. Invest NEAR to reopen the shop
+                            and earn {Math.round(merchant.investorDividendRate * 100)}% of future
+                            spreads!
+                          </div>
+                          <button
+                            onClick={() => {
+                              try {
+                                nearArenaEngine.investInNpcMerchant(merchant.merchantId, 5.0);
+                                setArenaState({ ...nearArenaEngine.getState() });
+                                showToast(
+                                  `💎 Invested 5 NEAR in ${merchant.name}! Shop RE-OPENED & scrolls restocked!`,
+                                );
+                              } catch (e: any) {
+                                showToast(e.message);
+                              }
+                            }}
+                            className="px-4 py-2.5 bg-shin-gold text-black font-cinzel font-black text-xs uppercase rounded-lg hover:bg-yellow-400 shrink-0 cursor-pointer"
+                          >
+                            + Invest 5 NEAR (Re-Open)
+                          </button>
+                        </div>
+                      )}
+
+                      {/* NEP-245 Inventory Table (Buy & Sell / Flood) */}
+                      <div className="space-y-2.5">
+                        {merchant.items.map((item) => {
+                          const playerOwnedQty = arenaState.playerItems?.[item.tokenId] ?? 0;
+                          return (
+                            <div
+                              key={item.tokenId}
+                              className="bg-black/75 border border-white/10 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                            >
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base">{item.icon}</span>
+                                  <span className="font-cinzel font-bold text-xs text-white">
+                                    {item.name}
+                                  </span>
+                                  <span
+                                    className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded ${
+                                      item.priceTrend === 'SURGING'
+                                        ? 'bg-red-500/20 text-red-300 border border-red-500/40'
+                                        : item.priceTrend === 'CHEAP_SURPLUS'
+                                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                          : 'bg-white/10 text-gray-300'
+                                    }`}
+                                  >
+                                    {item.priceTrend === 'SURGING'
+                                      ? '📈 SCARCE / HIGH DEMAND'
+                                      : item.priceTrend === 'CHEAP_SURPLUS'
+                                        ? '📉 FLOODED / CHEAP'
+                                        : '⚖️ BALANCED'}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] font-mono text-gray-400">
+                                  NPC Stock:{' '}
+                                  <strong className="text-white">
+                                    {item.stock}/{item.targetStock}
+                                  </strong>{' '}
+                                  • You Hold:{' '}
+                                  <strong className="text-shin-gold">{playerOwnedQty}x</strong>
+                                  {showNearUnderHood && (
+                                    <span className="text-purple-300 ml-2">({item.tokenId})</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                {/* Buy from NPC button */}
+                                <button
+                                  onClick={() => {
+                                    try {
+                                      nearArenaEngine.buyFromNpcMerchant(
+                                        merchant.merchantId,
+                                        item.tokenId,
+                                        1,
+                                        item.category === 'SCROLL'
+                                          ? selectedFighter?.tokenId
+                                          : undefined,
+                                      );
+                                      setArenaState({ ...nearArenaEngine.getState() });
+                                      showToast(
+                                        item.category === 'SCROLL' && selectedFighter
+                                          ? `📜 Bought ${item.name} & trained ${selectedFighter.title}!`
+                                          : `Bought 1x ${item.name} for ${item.askPriceNear.toFixed(2)} NEAR!`,
+                                      );
+                                    } catch (e: any) {
+                                      showToast(e.message);
+                                    }
+                                  }}
+                                  disabled={!merchant.isShopOpen || item.stock <= 0}
+                                  className="px-3 py-1.5 bg-shin-gold text-black font-cinzel font-black text-[10px] uppercase rounded-lg hover:bg-yellow-400 disabled:opacity-40 cursor-pointer"
+                                >
+                                  Buy ({item.askPriceNear.toFixed(2)}N)
+                                </button>
+
+                                {/* Sell 1x to NPC button */}
+                                <button
+                                  onClick={() => {
+                                    try {
+                                      nearArenaEngine.sellToNpcMerchant(
+                                        merchant.merchantId,
+                                        item.tokenId,
+                                        1,
+                                      );
+                                      setArenaState({ ...nearArenaEngine.getState() });
+                                      showToast(
+                                        `Sold 1x ${item.name} to ${merchant.name} for ${item.bidPriceNear.toFixed(2)} NEAR!`,
+                                      );
+                                    } catch (e: any) {
+                                      showToast(e.message);
+                                    }
+                                  }}
+                                  disabled={!merchant.isShopOpen || playerOwnedQty < 1}
+                                  className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 font-mono font-bold text-[10px] rounded-lg disabled:opacity-35 cursor-pointer"
+                                >
+                                  Sell 1x ({item.bidPriceNear.toFixed(2)}N)
+                                </button>
+
+                                {/* Flood 4x to test market crash / insolvency */}
+                                {item.category === 'MATERIAL' && (
+                                  <button
+                                    onClick={() => {
+                                      try {
+                                        const qty = Math.min(4, Math.max(1, playerOwnedQty));
+                                        nearArenaEngine.sellToNpcMerchant(
+                                          merchant.merchantId,
+                                          item.tokenId,
+                                          qty,
+                                        );
+                                        setArenaState({ ...nearArenaEngine.getState() });
+                                        showToast(
+                                          `📉 Flooded ${qty}x ${item.name} into ${merchant.name}'s shop!`,
+                                        );
+                                      } catch (e: any) {
+                                        showToast(e.message);
+                                      }
+                                    }}
+                                    disabled={!merchant.isShopOpen || playerOwnedQty < 1}
+                                    className="px-2.5 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 font-mono font-bold text-[10px] rounded-lg disabled:opacity-35 cursor-pointer"
+                                  >
+                                    Flood
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Footer: Invest in Merchant Liquidity */}
+                    <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                      <span className="text-gray-400">
+                        LP Backers earn{' '}
+                        <strong className="text-shin-gold">
+                          {Math.round(merchant.investorDividendRate * 100)}%
+                        </strong>{' '}
+                        of every scroll &amp; steel trade at this shop.
+                      </span>
+                      <button
+                        onClick={() => {
+                          try {
+                            nearArenaEngine.investInNpcMerchant(merchant.merchantId, 5.0);
+                            setArenaState({ ...nearArenaEngine.getState() });
+                            showToast(
+                              `💎 Invested 5.00 NEAR into ${merchant.name} (${merchant.walletId})!`,
+                            );
+                          } catch (e: any) {
+                            showToast(e.message);
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg font-mono font-bold text-[10px] cursor-pointer"
+                      >
+                        + Invest 5 NEAR in Shop
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Warrior Bazaar (Player-Owned Marketplace) */}

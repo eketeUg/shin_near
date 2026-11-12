@@ -67,7 +67,8 @@ pub struct ArenaMatchPool {
     pub winner_token_id: Option<String>,
 }
 
-/// Autonomous NPC Merchant / Dojo Master with its own wallet and self-adjusting bonding curve
+/// Autonomous NPC Merchant / Dojo Master with its own wallet, inventory stock,
+/// self-adjusting supply/demand pricing, and insolvency/investment state (`09-games.md`)
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct NpcDojoMaster {
@@ -75,6 +76,9 @@ pub struct NpcDojoMaster {
     pub treasury_balance_milli_near: u128,
     pub total_trainings_completed: u64,
     pub base_training_cost_milli_near: u128,
+    pub tamahagane_steel_stock: u64,
+    pub is_shop_open: bool,
+    pub total_investor_capital_milli_near: u128,
 }
 
 #[near_bindgen]
@@ -101,9 +105,12 @@ impl ShinArenaContract {
             matches: LookupMap::new(b"m"),
             npc_dojo: NpcDojoMaster {
                 npc_wallet_id: "hanzo-dojo-npc.shin-arena.testnet".to_string(),
-                treasury_balance_milli_near: 50_000, // 50 NEAR initial NPC liquidity
+                treasury_balance_milli_near: 12_000, // 12 NEAR initial NPC liquidity
                 total_trainings_completed: 0,
                 base_training_cost_milli_near: 500, // 0.5 NEAR base cost, scales with demand
+                tamahagane_steel_stock: 12,
+                is_shop_open: true,
+                total_investor_capital_milli_near: 0,
             },
             next_token_nonce: 1,
             mt_balances: LookupMap::new(b"b"),
@@ -402,6 +409,10 @@ impl ShinArenaContract {
 
     /// Purchase a NEP-245 Shinobi Scroll from Grandmaster Hanzo's Autonomous NPC Dojo (`hanzo-dojo-npc.shin-arena.testnet`)
     pub fn buy_dojo_scroll(&mut self, token_id: String, scroll_type: String) -> FighterNft {
+        assert!(
+            self.npc_dojo.is_shop_open,
+            "NPC Dojo Shop is currently CLOSED (Insolvent). Invest NEAR via invest_in_npc_dojo to reopen it!"
+        );
         let mut fighter = self.fighters.get(&token_id).expect("Fighter not found");
         let cost = self.get_dynamic_dojo_cost();
         assert!(
@@ -438,6 +449,57 @@ impl ShinArenaContract {
 
         self.fighters.insert(&token_id, &fighter);
         fighter
+    }
+
+    /// Sell gathered NEP-245 materials (`material:tamahagane-steel`) to the NPC Merchant.
+    /// If players flood the market with steel, the unit price drops; if the merchant's wallet
+    /// runs out of NEAR (< 800 milliNEAR), the merchant goes broke and closes shop until someone invests!
+    pub fn sell_material_to_npc_dojo(&mut self, quantity: u64) -> Promise {
+        assert!(
+            self.npc_dojo.is_shop_open,
+            "NPC Merchant is broke and shop is closed until recapitalized!"
+        );
+        let seller = env::predecessor_account_id();
+        let token_id = "material:tamahagane-steel".to_string();
+
+        // Transfer NEP-245 material from player to NPC wallet
+        self.internal_mt_transfer(
+            seller.as_str(),
+            &self.npc_dojo.npc_wallet_id.clone(),
+            &[token_id],
+            &[quantity as u128],
+            Some("Sold Tamahagane Shadow Steel to NPC Merchant"),
+        );
+
+        // Dynamic buyback pricing: price drops as stock floods above target (12 units)
+        let stock = self.npc_dojo.tamahagane_steel_stock.max(1) as u128;
+        let unit_price_milli = (600 * 12 / stock).clamp(100, 1_500);
+        let total_payout_milli = (unit_price_milli * quantity as u128)
+            .min(self.npc_dojo.treasury_balance_milli_near);
+
+        self.npc_dojo.tamahagane_steel_stock += quantity;
+        self.npc_dojo.treasury_balance_milli_near -= total_payout_milli;
+
+        // If merchant treasury falls below 0.8 NEAR, the merchant goes broke and closes shop!
+        if self.npc_dojo.treasury_balance_milli_near < 800 {
+            self.npc_dojo.is_shop_open = false;
+        }
+
+        Promise::new(seller).transfer(NearToken::from_millinear(total_payout_milli))
+    }
+
+    /// Invest NEAR into a broke (or active) NPC Merchant wallet to reopen its shop and earn investor dividends
+    #[payable]
+    pub fn invest_in_npc_dojo(&mut self) -> NpcDojoMaster {
+        let investment_milli = env::attached_deposit().as_millinear();
+        assert!(investment_milli >= 1_000, "Minimum investment is 1 NEAR");
+
+        self.npc_dojo.treasury_balance_milli_near += investment_milli;
+        self.npc_dojo.total_investor_capital_milli_near += investment_milli;
+        if self.npc_dojo.treasury_balance_milli_near >= 800 {
+            self.npc_dojo.is_shop_open = true;
+        }
+        self.npc_dojo.clone()
     }
 
     /// Player-Owned Fighter Market: List or Buy a trained Fighter NFT (along with its embedded wallet!)

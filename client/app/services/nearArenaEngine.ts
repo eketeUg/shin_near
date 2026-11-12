@@ -1,6 +1,12 @@
 'use client';
 
 import { KeyPair, providers, transactions, utils } from 'near-api-js';
+import {
+  NEP245_ITEM_CATALOG,
+  NPC_MERCHANT_CONFIGS,
+  computeDynamicItemPrices,
+  generateMerchantReasoning,
+} from '../config/npcMerchantConfig';
 
 export const NEAR_ARENA_CONTRACT_ID =
   process.env.NEXT_PUBLIC_NEAR_CONTRACT_ID || 'shin-arena.testnet';
@@ -114,6 +120,39 @@ export interface Nep245TokenBalance {
   holderAccountId: string;
 }
 
+export interface NpcMerchantLiveItem {
+  tokenId: string;
+  name: string;
+  category: 'MATERIAL' | 'SCROLL';
+  icon: string;
+  description: string;
+  stock: number;
+  targetStock: number;
+  basePriceNear: number;
+  askPriceNear: number;
+  bidPriceNear: number;
+  netDemandDelta: number;
+  priceTrend: 'SURGING' | 'CHEAP_SURPLUS' | 'BALANCED';
+}
+
+export interface NpcMerchantLiveState {
+  merchantId: 'hanzo-dojo' | 'kenji-forge';
+  name: string;
+  title: string;
+  walletId: string;
+  avatarGif: string;
+  specialty: string;
+  walletBalanceNear: number;
+  insolvencyThresholdNear: number;
+  isShopOpen: boolean;
+  playerInvestmentNear: number;
+  investorDividendsEarnedNear: number;
+  investorDividendRate: number;
+  totalTradesCount: number;
+  activeReasoning: string;
+  items: NpcMerchantLiveItem[];
+}
+
 export const COMBAT_DOCTRINES: {
   id: CombatDoctrineId;
   name: string;
@@ -156,7 +195,7 @@ export const COMBAT_DOCTRINES: {
   },
 ];
 
-const STORAGE_KEY = 'shin_near_arena_state_v3';
+const STORAGE_KEY = 'shin_near_arena_state_v4';
 
 function randomHex(len: number): string {
   try {
@@ -368,6 +407,9 @@ export interface ArenaPersistentState {
   activeMatches: ActiveArenaMatch[];
   ledger: ArenaLedgerTx[];
   npcDojo: NpcDojoState;
+  npcMerchants: NpcMerchantLiveState[];
+  playerItems: Record<string, number>;
+  simulatedDaysElapsed: number;
 }
 
 class NearArenaEngine {
@@ -383,7 +425,7 @@ class NearArenaEngine {
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
-          if (parsed && parsed.playerWallet && parsed.fighters) {
+          if (parsed && parsed.playerWallet && parsed.fighters && parsed.npcMerchants) {
             return parsed;
           }
         } catch (e) {
@@ -442,11 +484,20 @@ class NearArenaEngine {
       npcDojo: {
         npcName: 'Grandmaster Hanzo (Autonomous Shadow Dojo Sensei)',
         npcWalletId: 'hanzo-dojo-npc.shin-arena.testnet',
-        treasuryBalanceNear: 64.5,
+        treasuryBalanceNear: 12.0,
         totalTrainingsCompleted: 18,
         baseCostNear: 0.5,
-        currentDynamicCostNear: 0.95,
+        currentDynamicCostNear: 0.85,
       },
+      npcMerchants: this.buildInitialNpcMerchants(),
+      playerItems: {
+        'material:tamahagane-steel': 10,
+        'material:spirit-ember': 6,
+        'scroll:crimson-katana': 1,
+        'scroll:iron-posture': 0,
+        'scroll:shadow-step-mastery': 1,
+      },
+      simulatedDaysElapsed: 0,
       ledger: [
         {
           id: 'tx-init-1',
@@ -480,6 +531,79 @@ class NearArenaEngine {
 
     this.saveState(initial);
     return initial;
+  }
+
+  private buildInitialNpcMerchants(): NpcMerchantLiveState[] {
+    return NPC_MERCHANT_CONFIGS.map((cfg) => {
+      const items: NpcMerchantLiveItem[] = cfg.items.map((rule) => {
+        const cat = NEP245_ITEM_CATALOG[rule.tokenId];
+        const prices = computeDynamicItemPrices(rule, rule.initialStock, 0);
+        return {
+          tokenId: rule.tokenId,
+          name: cat?.name || rule.tokenId,
+          category: cat?.category || 'MATERIAL',
+          icon: cat?.icon || '📦',
+          description: cat?.description || '',
+          stock: rule.initialStock,
+          targetStock: rule.targetStock,
+          basePriceNear: rule.basePriceNear,
+          askPriceNear: prices.askPriceNear,
+          bidPriceNear: prices.bidPriceNear,
+          netDemandDelta: 0,
+          priceTrend: prices.priceTrend,
+        };
+      });
+
+      const activeReasoning = generateMerchantReasoning({
+        merchantName: cfg.name,
+        walletId: cfg.walletId,
+        walletBalanceNear: cfg.initialWalletNear,
+        insolvencyThresholdNear: cfg.insolvencyThresholdNear,
+        items,
+      });
+
+      return {
+        merchantId: cfg.merchantId,
+        name: cfg.name,
+        title: cfg.title,
+        walletId: cfg.walletId,
+        avatarGif: cfg.avatarGif,
+        specialty: cfg.specialty,
+        walletBalanceNear: cfg.initialWalletNear,
+        insolvencyThresholdNear: cfg.insolvencyThresholdNear,
+        isShopOpen: true,
+        playerInvestmentNear: 0,
+        investorDividendsEarnedNear: 0,
+        investorDividendRate: cfg.investorDividendRate,
+        totalTradesCount: 14,
+        activeReasoning,
+        items,
+      };
+    });
+  }
+
+  private refreshMerchantState(merchant: NpcMerchantLiveState, lastActionSummary?: string) {
+    const cfg = NPC_MERCHANT_CONFIGS.find((c) => c.merchantId === merchant.merchantId);
+    if (!cfg) return;
+
+    merchant.isShopOpen = merchant.walletBalanceNear >= merchant.insolvencyThresholdNear;
+    merchant.items.forEach((item) => {
+      const rule = cfg.items.find((r) => r.tokenId === item.tokenId);
+      if (!rule) return;
+      const prices = computeDynamicItemPrices(rule, item.stock, item.netDemandDelta);
+      item.askPriceNear = prices.askPriceNear;
+      item.bidPriceNear = prices.bidPriceNear;
+      item.priceTrend = prices.priceTrend;
+    });
+
+    merchant.activeReasoning = generateMerchantReasoning({
+      merchantName: merchant.name,
+      walletId: merchant.walletId,
+      walletBalanceNear: merchant.walletBalanceNear,
+      insolvencyThresholdNear: merchant.insolvencyThresholdNear,
+      items: merchant.items,
+      lastActionSummary,
+    });
   }
 
   private buildInitialMatches(fighters: FighterNftAsset[]): ActiveArenaMatch[] {
@@ -597,6 +721,22 @@ class NearArenaEngine {
         category: 'ARENA_CURRENCY',
         label: 'USDC (Arena Multi-Token)',
         balance: `${this.state.playerWallet.USDC.toFixed(2)} USDC`,
+        holderAccountId: playerAcct,
+      },
+      {
+        tokenId: 'material:tamahagane-steel',
+        standard: 'NEP-245',
+        category: 'DOJO_SCROLL',
+        label: 'Tamahagane Shadow Steel (Crafting/Trade)',
+        balance: `${this.state.playerItems?.['material:tamahagane-steel'] ?? 0} units`,
+        holderAccountId: playerAcct,
+      },
+      {
+        tokenId: 'material:spirit-ember',
+        standard: 'NEP-245',
+        category: 'DOJO_SCROLL',
+        label: 'Blood-Moon Spirit Ember (Scroll Ink)',
+        balance: `${this.state.playerItems?.['material:spirit-ember'] ?? 0} units`,
         holderAccountId: playerAcct,
       },
       {
@@ -930,6 +1070,327 @@ class NearArenaEngine {
   }
 
   /**
+   * Buy a NEP-245 item (Scroll or Material) from an NPC Merchant (`hanzo-dojo` or `kenji-forge`).
+   * Buying reduces NPC stock and increases demand, pushing the item's price UP.
+   * If it is a Combat Scroll and `targetFighterTokenId` is provided, applies the stat boost immediately!
+   */
+  public buyFromNpcMerchant(
+    merchantId: 'hanzo-dojo' | 'kenji-forge',
+    tokenId: string,
+    quantity: number = 1,
+    targetFighterTokenId?: string,
+  ): NpcMerchantLiveState {
+    const merchant = this.state.npcMerchants.find((m) => m.merchantId === merchantId);
+    if (!merchant) throw new Error('NPC Merchant not found');
+    if (!merchant.isShopOpen) {
+      throw new Error(
+        `${merchant.name}'s shop is CLOSED (Insolvent at ${merchant.walletBalanceNear.toFixed(2)} NEAR). Invest NEAR to reopen it!`,
+      );
+    }
+
+    const item = merchant.items.find((i) => i.tokenId === tokenId);
+    if (!item) throw new Error('Item not carried by this merchant');
+    if (item.stock < quantity) {
+      throw new Error(`Insufficient stock (${item.stock} left). Sell materials or wait for restock.`);
+    }
+
+    const totalCost = Number((item.askPriceNear * quantity).toFixed(2));
+    if (this.state.playerWallet.NEAR < totalCost) {
+      throw new Error(
+        `Insufficient NEAR (${this.state.playerWallet.NEAR.toFixed(2)} NEAR). Need ${totalCost.toFixed(2)} NEAR.`,
+      );
+    }
+
+    this.state.playerWallet.NEAR = Number((this.state.playerWallet.NEAR - totalCost).toFixed(2));
+    merchant.walletBalanceNear = Number((merchant.walletBalanceNear + totalCost).toFixed(2));
+    item.stock = Math.max(0, item.stock - quantity);
+    item.netDemandDelta = Math.min(8, item.netDemandDelta + quantity);
+    merchant.totalTradesCount += 1;
+
+    // Pay investor dividend if player has invested in this NPC merchant
+    if (merchant.playerInvestmentNear > 0) {
+      const dividend = Number((totalCost * merchant.investorDividendRate * 0.25).toFixed(2));
+      if (dividend > 0 && merchant.walletBalanceNear > dividend + merchant.insolvencyThresholdNear) {
+        merchant.walletBalanceNear = Number((merchant.walletBalanceNear - dividend).toFixed(2));
+        merchant.investorDividendsEarnedNear = Number(
+          (merchant.investorDividendsEarnedNear + dividend).toFixed(2),
+        );
+        this.state.playerWallet.NEAR = Number((this.state.playerWallet.NEAR + dividend).toFixed(2));
+      }
+    }
+
+    const catalogEntry = NEP245_ITEM_CATALOG[tokenId];
+    let appliedSummary = '';
+    if (catalogEntry?.statBoost && targetFighterTokenId) {
+      const fighter = this.state.fighters.find((f) => f.tokenId === targetFighterTokenId);
+      if (fighter) {
+        fighter.powerLevel += (catalogEntry.statBoost.powerLevel || 1) * quantity;
+        fighter.atk = Math.min(99, fighter.atk + (catalogEntry.statBoost.atk || 0) * quantity);
+        fighter.def = Math.min(99, fighter.def + (catalogEntry.statBoost.def || 0) * quantity);
+        fighter.spd = Math.min(99, fighter.spd + (catalogEntry.statBoost.spd || 0) * quantity);
+        appliedSummary = ` -> Applied to ${fighter.title} (Now Lv.${fighter.powerLevel})!`;
+      }
+    } else {
+      this.state.playerItems[tokenId] = (this.state.playerItems[tokenId] || 0) + quantity;
+    }
+
+    this.refreshMerchantState(
+      merchant,
+      `Sold ${quantity}x ${item.name} for ${totalCost.toFixed(2)} NEAR.`,
+    );
+
+    if (merchantId === 'hanzo-dojo') {
+      this.state.npcDojo.treasuryBalanceNear = merchant.walletBalanceNear;
+      this.state.npcDojo.totalTrainingsCompleted += quantity;
+      this.state.npcDojo.currentDynamicCostNear = merchant.items[0]?.askPriceNear || 0.85;
+    }
+
+    this.state.ledger.unshift({
+      id: 'tx-buy-' + Date.now(),
+      txHash: makeTxHash(),
+      type: 'NPC_DOJO_TRAIN',
+      summary: `NEP-245 mt_transfer: Bought ${quantity}x ${tokenId} from ${merchant.walletId} for ${totalCost.toFixed(2)} NEAR${appliedSummary}`,
+      amountNear: totalCost,
+      actorWallet: this.state.playerWallet.accountId,
+      timestamp: Date.now(),
+    });
+
+    this.saveState();
+    return merchant;
+  }
+
+  /**
+   * Sell NEP-245 materials/scrolls back to an NPC Merchant (`hanzo-dojo` or `kenji-forge`).
+   * Flooding the merchant with an item drives its price DOWN and drains the merchant's NEAR wallet.
+   * If the merchant's wallet drops below `insolvencyThresholdNear`, the merchant goes BROKE and closes shop!
+   */
+  public sellToNpcMerchant(
+    merchantId: 'hanzo-dojo' | 'kenji-forge',
+    tokenId: string,
+    quantity: number = 1,
+  ): NpcMerchantLiveState {
+    const merchant = this.state.npcMerchants.find((m) => m.merchantId === merchantId);
+    if (!merchant) throw new Error('NPC Merchant not found');
+    if (!merchant.isShopOpen) {
+      throw new Error(
+        `${merchant.name}'s shop is CLOSED (Broke at ${merchant.walletBalanceNear.toFixed(2)} NEAR)! Invest NEAR to reopen it.`,
+      );
+    }
+
+    const ownedQty = this.state.playerItems[tokenId] || 0;
+    if (ownedQty < quantity) {
+      throw new Error(
+        `You only hold ${ownedQty}x ${tokenId}. Fight in the arena or run the 7-Day Simulator to gather more!`,
+      );
+    }
+
+    const item = merchant.items.find((i) => i.tokenId === tokenId);
+    if (!item) throw new Error(`${merchant.name} does not trade ${tokenId}`);
+
+    const desiredPayout = Number((item.bidPriceNear * quantity).toFixed(2));
+    const actualPayout = Number(Math.min(merchant.walletBalanceNear, desiredPayout).toFixed(2));
+
+    this.state.playerItems[tokenId] = ownedQty - quantity;
+    item.stock += quantity;
+    item.netDemandDelta = Math.max(-8, item.netDemandDelta - quantity);
+    merchant.walletBalanceNear = Number(
+      Math.max(0, merchant.walletBalanceNear - actualPayout).toFixed(2),
+    );
+    this.state.playerWallet.NEAR = Number((this.state.playerWallet.NEAR + actualPayout).toFixed(2));
+    merchant.totalTradesCount += 1;
+
+    this.refreshMerchantState(
+      merchant,
+      `Bought ${quantity}x ${item.name} from warrior for ${actualPayout.toFixed(2)} NEAR.`,
+    );
+
+    if (merchantId === 'hanzo-dojo') {
+      this.state.npcDojo.treasuryBalanceNear = merchant.walletBalanceNear;
+    }
+
+    const brokeNotice = !merchant.isShopOpen
+      ? ` ⚠️ ${merchant.name} WENT BROKE (${merchant.walletBalanceNear.toFixed(2)} NEAR) & CLOSED SHOP!`
+      : '';
+
+    this.state.ledger.unshift({
+      id: 'tx-sell-' + Date.now(),
+      txHash: makeTxHash(),
+      type: 'MARKET_TRADE',
+      summary: `NEP-245 mt_transfer: Sold ${quantity}x ${tokenId} to ${merchant.walletId} for ${actualPayout.toFixed(2)} NEAR (New Bid: ${item.bidPriceNear.toFixed(2)} NEAR)${brokeNotice}`,
+      amountNear: actualPayout,
+      actorWallet: merchant.walletId,
+      timestamp: Date.now(),
+    });
+
+    this.saveState();
+    return merchant;
+  }
+
+  /**
+   * Invest NEAR into an NPC Merchant's wallet (`hanzo-dojo-npc.shin-arena.testnet` or `kenji-forge-npc.shin-arena.testnet`).
+   * Re-opens a broke shop immediately and entitles the player to a dividend on all subsequent shop trades!
+   */
+  public investInNpcMerchant(
+    merchantId: 'hanzo-dojo' | 'kenji-forge',
+    amountNear: number = 5.0,
+  ): NpcMerchantLiveState {
+    const merchant = this.state.npcMerchants.find((m) => m.merchantId === merchantId);
+    if (!merchant) throw new Error('NPC Merchant not found');
+    if (this.state.playerWallet.NEAR < amountNear) {
+      throw new Error(
+        `Insufficient NEAR (${this.state.playerWallet.NEAR.toFixed(2)} NEAR). Click + Top Up first!`,
+      );
+    }
+
+    const wasClosed = !merchant.isShopOpen;
+    this.state.playerWallet.NEAR = Number((this.state.playerWallet.NEAR - amountNear).toFixed(2));
+    merchant.walletBalanceNear = Number((merchant.walletBalanceNear + amountNear).toFixed(2));
+    merchant.playerInvestmentNear = Number((merchant.playerInvestmentNear + amountNear).toFixed(2));
+
+    // Restock depleted scrolls using new capital
+    merchant.items.forEach((item) => {
+      if (item.category === 'SCROLL' && item.stock < item.targetStock) {
+        item.stock = item.targetStock;
+      }
+    });
+
+    this.refreshMerchantState(
+      merchant,
+      wasClosed
+        ? `Recapitalized with +${amountNear.toFixed(2)} NEAR from ${this.state.playerWallet.accountId}! Shop RE-OPENED and scrolls restocked.`
+        : `Received +${amountNear.toFixed(2)} NEAR liquidity investment from ${this.state.playerWallet.accountId}.`,
+    );
+
+    if (merchantId === 'hanzo-dojo') {
+      this.state.npcDojo.treasuryBalanceNear = merchant.walletBalanceNear;
+    }
+
+    this.state.ledger.unshift({
+      id: 'tx-invest-' + Date.now(),
+      txHash: makeTxHash(),
+      type: 'AGENT_FUND',
+      summary: `Invested ${amountNear.toFixed(2)} NEAR into NPC Merchant ${merchant.walletId} (${wasClosed ? 'RE-OPENED BROKE SHOP' : 'Liquidity Boost'} • ${Math.round(merchant.investorDividendRate * 100)}% LP Share)`,
+      amountNear,
+      actorWallet: merchant.walletId,
+      timestamp: Date.now(),
+    });
+
+    this.saveState();
+    return merchant;
+  }
+
+  /**
+   * Simulates 1 Full Day of Autonomous Arena Fights, Loot Drops, and NPC Supply/Demand Trading (`09-games.md` Fast-Forward Mode).
+   * Calling this 7 times over ~15–30 seconds simulates an entire week of economic evolution!
+   */
+  public simulateEconomyDayTick(): {
+    dayNumber: number;
+    headline: string;
+  } {
+    this.state.simulatedDaysElapsed = (this.state.simulatedDaysElapsed || 0) + 1;
+    const day = this.state.simulatedDaysElapsed;
+
+    // 1. Resolve an autonomous arena fight and award NEP-245 battle drops to the player
+    if (this.state.activeMatches.length > 0) {
+      const m = this.state.activeMatches[0];
+      const p1Score = m.p1.atk + m.p1.def + m.p1.spd + Math.random() * 40;
+      const p2Score = m.p2.atk + m.p2.def + m.p2.spd + Math.random() * 40;
+      this.settleMatch(m.matchId, p1Score >= p2Score ? 'p1' : 'p2');
+    }
+
+    // Award battle material drops to player inventory
+    this.state.playerItems['material:tamahagane-steel'] =
+      (this.state.playerItems['material:tamahagane-steel'] || 0) + 2;
+    this.state.playerItems['material:spirit-ember'] =
+      (this.state.playerItems['material:spirit-ember'] || 0) + 1;
+
+    // 2. Simulate autonomous clan warriors trading with Grandmaster Hanzo & Blacksmith Kenji
+    const hanzo = this.state.npcMerchants.find((m) => m.merchantId === 'hanzo-dojo');
+    const kenji = this.state.npcMerchants.find((m) => m.merchantId === 'kenji-forge');
+    let headline = `Day ${day}: Autonomous fighters battled & traded NEP-245 items.`;
+
+    if (kenji && kenji.isShopOpen) {
+      const steel = kenji.items.find((i) => i.tokenId === 'material:tamahagane-steel');
+      if (steel) {
+        // On odd days, warriors flood Kenji with salvaged steel
+        if (day % 2 === 1) {
+          const dumpQty = 5;
+          const payout = Number(
+            Math.min(kenji.walletBalanceNear, steel.bidPriceNear * dumpQty).toFixed(2),
+          );
+          steel.stock += dumpQty;
+          steel.netDemandDelta = Math.max(-8, steel.netDemandDelta - 3);
+          kenji.walletBalanceNear = Number(
+            Math.max(0, kenji.walletBalanceNear - payout).toFixed(2),
+          );
+          kenji.totalTradesCount += dumpQty;
+          this.refreshMerchantState(
+            kenji,
+            `Day ${day}: Arena salvagers flooded ${dumpQty}x Tamahagane Steel into my forge for ${payout.toFixed(2)} NEAR.`,
+          );
+          headline = !kenji.isShopOpen
+            ? `Day ${day}: Heavy steel sell-offs drained Blacksmith Kenji's wallet (${kenji.walletBalanceNear.toFixed(2)} NEAR) — Kenji's Forge went BROKE and closed shop!`
+            : `Day ${day}: Salvagers flooded Kenji's Forge with +${dumpQty} Tamahagane Steel — steel price dropped to ${steel.bidPriceNear.toFixed(2)} NEAR!`;
+        } else {
+          // On even days, samurai agents buy Crimson Katana scrolls from Kenji
+          const katana = kenji.items.find((i) => i.tokenId === 'scroll:crimson-katana');
+          if (katana && katana.stock > 0) {
+            const buyQty = Math.min(2, katana.stock);
+            const rev = Number((katana.askPriceNear * buyQty).toFixed(2));
+            katana.stock -= buyQty;
+            katana.netDemandDelta = Math.min(8, katana.netDemandDelta + 2);
+            kenji.walletBalanceNear = Number((kenji.walletBalanceNear + rev).toFixed(2));
+            this.refreshMerchantState(
+              kenji,
+              `Day ${day}: Samurai Agents bought ${buyQty}x Crimson Katana Scrolls for ${rev.toFixed(2)} NEAR.`,
+            );
+          }
+        }
+      }
+    }
+
+    if (hanzo && hanzo.isShopOpen) {
+      const targetScroll = hanzo.items[day % 3];
+      if (targetScroll && targetScroll.stock > 0) {
+        const rev = targetScroll.askPriceNear;
+        targetScroll.stock = Math.max(0, targetScroll.stock - 1);
+        targetScroll.netDemandDelta = Math.min(8, targetScroll.netDemandDelta + 1);
+        hanzo.walletBalanceNear = Number((hanzo.walletBalanceNear + rev).toFixed(2));
+        hanzo.totalTradesCount += 1;
+
+        if (hanzo.playerInvestmentNear > 0) {
+          const div = Number((rev * hanzo.investorDividendRate * 0.3).toFixed(2));
+          hanzo.investorDividendsEarnedNear = Number(
+            (hanzo.investorDividendsEarnedNear + div).toFixed(2),
+          );
+          this.state.playerWallet.NEAR = Number((this.state.playerWallet.NEAR + div).toFixed(2));
+        }
+
+        this.refreshMerchantState(
+          hanzo,
+          `Day ${day}: Autonomous Fighter Agent bought 1x ${targetScroll.name} for ${rev.toFixed(2)} NEAR.`,
+        );
+        if (kenji && kenji.isShopOpen && day % 2 === 0) {
+          headline = `Day ${day}: High arena demand for ${targetScroll.name} pushed Hanzo's ask price to ${targetScroll.askPriceNear.toFixed(2)} NEAR!`;
+        }
+      }
+    }
+
+    this.state.ledger.unshift({
+      id: `tx-sim-day-${day}-${Date.now()}`,
+      txHash: makeTxHash(),
+      type: 'MARKET_TRADE',
+      summary: `[Fast-Forward Sim] ${headline}`,
+      amountNear: 0,
+      actorWallet: 'shin-arena.testnet',
+      timestamp: Date.now(),
+    });
+
+    this.saveState();
+    return { dayNumber: day, headline };
+  }
+
+  /**
    * Place a 1-Click Spectator Pari-Mutuel Bet on an active match (Zero Popups)
    */
   public placeSpectatorBet(
@@ -1076,6 +1537,15 @@ class NearArenaEngine {
     loser.losses += 1;
     loser.winStreak = 0;
     loser.elo = Math.max(800, loser.elo - 18);
+
+    // Award NEP-245 battle material drops if player owns a participating fighter
+    if (!winner.isNpc || !loser.isNpc) {
+      this.state.playerItems = this.state.playerItems || {};
+      this.state.playerItems['material:tamahagane-steel'] =
+        (this.state.playerItems['material:tamahagane-steel'] || 0) + 2;
+      this.state.playerItems['material:spirit-ember'] =
+        (this.state.playerItems['material:spirit-ember'] || 0) + 1;
+    }
 
     // Check if the player won any Spectator Pari-Mutuel bets on this match!
     const winningSidePool =
