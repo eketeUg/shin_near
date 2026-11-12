@@ -27,14 +27,16 @@ const SpectatorGameCanvas = ({ matchData }: { matchData: any }) => {
         let isLoaded = false;
 
         if (typeof window !== 'undefined' && !gameRef.current) {
-            const container = document.getElementById('spectator-game-root');
-            const targetRatio = container ? container.clientWidth / container.clientHeight : (window.innerWidth / window.innerHeight);
-            const gameWidth = Math.max(1280, 600 * targetRatio);
+            const safeRatio =
+                window.innerWidth > window.innerHeight
+                    ? window.innerWidth / Math.max(1, window.innerHeight)
+                    : 16 / 9;
+            const gameWidth = Math.min(1600, Math.max(1280, Math.round(600 * safeRatio)));
 
             const config: Phaser.Types.Core.GameConfig = {
                 type: Phaser.CANVAS,
                 parent: 'spectator-game-root',
-                width: gameWidth, 
+                width: gameWidth,
                 height: 600,
                 scale: {
                     mode: Phaser.Scale.FIT,
@@ -43,7 +45,7 @@ const SpectatorGameCanvas = ({ matchData }: { matchData: any }) => {
                 physics: {
                     default: 'arcade',
                     arcade: {
-                        gravity: { y: 0, x: 0 }, // Handled entirely by host state updates
+                        gravity: { y: 0, x: 0 },
                         debug: false,
                     },
                 },
@@ -55,6 +57,12 @@ const SpectatorGameCanvas = ({ matchData }: { matchData: any }) => {
             gameRef.current.scene.add('SpectatorScene', SpectatorScene, false);
         }
 
+        const handleResize = () => {
+            if (gameRef.current?.scale) {
+                gameRef.current.scale.refresh();
+            }
+        };
+
         const handleLoadComplete = () => {
             isLoaded = true;
             if (matchData && gameRef.current) {
@@ -62,9 +70,13 @@ const SpectatorGameCanvas = ({ matchData }: { matchData: any }) => {
             }
         };
 
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
         window.addEventListener('phaserLoadComplete', handleLoadComplete);
 
         return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('orientationchange', handleResize);
             window.removeEventListener('phaserLoadComplete', handleLoadComplete);
             if (gameRef.current) {
                 gameRef.current.destroy(true);
@@ -92,23 +104,27 @@ const SpectatorGameCanvas = ({ matchData }: { matchData: any }) => {
 
     return (
         <div className="fixed top-0 left-0 w-screen h-[100dvh] bg-black flex items-center justify-center overflow-hidden">
-            <div className="
+            <div
+                className="
                 relative 
                 w-full h-full 
                 md:w-[1280px] md:h-[600px] 
                 md:max-w-[95vw] md:max-h-[90dvh]
                 md:rounded-xl md:shadow-2xl
                 overflow-hidden
-                landscape:block portrait:hidden md:portrait:block
-            ">
-                <div id="spectator-game-root" className="w-full h-full" />
+            "
+            >
+                <div
+                    id="spectator-game-root"
+                    className="w-full h-full portrait:pb-28 md:portrait:pb-0"
+                />
                 <ControlsOverlay isSpectator={true} isInteractiveClient={matchData?.isInteractiveClient} />
                 
                 {/* HUD Overlay for Spectator Data (read-only) */}
                 {!matchData?.isInteractiveClient && (
-                    <div className="absolute top-6 left-1/2 -translate-x-1/2 flex justify-between text-white drop-shadow-md z-40 bg-black/60 px-6 py-2 border border-red-900 rounded-full">
-                         <span className="text-red-500 font-cinzel tracking-[0.3em] font-black text-sm flex items-center gap-3">
-                             <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></div>
+                    <div className="absolute top-14 sm:top-6 left-1/2 -translate-x-1/2 flex justify-between text-white drop-shadow-md z-40 bg-black/60 px-4 sm:px-6 py-1.5 sm:py-2 border border-red-900 rounded-full">
+                         <span className="text-red-500 font-cinzel tracking-[0.2em] sm:tracking-[0.3em] font-black text-[10px] sm:text-sm flex items-center gap-2">
+                             <div className="w-2.5 h-2.5 bg-red-600 rounded-full animate-pulse"></div>
                              LIVE BROADCAST
                          </span>
                     </div>
@@ -117,25 +133,13 @@ const SpectatorGameCanvas = ({ matchData }: { matchData: any }) => {
                 {/* Spectator Loading Overlay */}
                 {!isGameLoaded && (
                     <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 text-white backdrop-blur-md">
-                        <h2 className="text-2xl font-cinzel tracking-widest text-shin-red mb-4 animate-pulse">CONNECTING TO ARENA</h2>
-                        <div className="w-64 h-1 bg-gray-900 overflow-hidden border border-gray-800">
+                        <h2 className="text-xl sm:text-2xl font-cinzel tracking-widest text-shin-red mb-4 animate-pulse">CONNECTING TO ARENA</h2>
+                        <div className="w-56 sm:w-64 h-1 bg-gray-900 overflow-hidden border border-gray-800">
                             <div className="h-full bg-shin-red transition-all duration-200" style={{ width: `${loadProgress}%` }} />
                         </div>
                         <p className="mt-2 text-xs text-gray-500 font-mono tracking-widest">{loadProgress}%</p>
                     </div>
                 )}
-            </div>
-
-            <div className="
-                fixed inset-0 z-50 flex flex-col items-center justify-center 
-                bg-black text-white p-8 text-center
-                landscape:hidden md:hidden
-            ">
-                <div className="animate-pulse">
-                    <h1 className="text-3xl font-black font-cinzel text-shin-red mb-4">ROTATE DEVICE</h1>
-                    <p className="text-gray-400 text-sm mb-8 tracking-widest uppercase"> Landscape Mode Required</p>
-                    <div className="text-6xl text-shin-gold">⟳</div>
-                </div>
             </div>
         </div>
     );

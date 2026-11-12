@@ -74,7 +74,8 @@ const ControlsOverlay = ({
             setIsTouchDevice(
                 'ontouchstart' in window ||
                     navigator.maxTouchPoints > 0 ||
-                    window.matchMedia('(pointer: coarse)').matches,
+                    window.matchMedia('(pointer: coarse)').matches ||
+                    window.innerWidth < 1024,
             );
         };
         checkTouch();
@@ -333,15 +334,15 @@ const ControlsOverlay = ({
                 </div>
 
                 {/* CENTER CLOCK & FIGHT POT */}
-                <div className="flex flex-col items-center pointer-events-auto mx-2">
+                <div className="flex flex-col items-center pointer-events-auto mx-1 sm:mx-2 shrink-0">
                     {isAgentOrSpectator && (
-                        <div className="mb-1 px-3 py-0.5 bg-shin-gold/20 border border-shin-gold/60 rounded-full text-[10px] text-shin-gold font-cinzel font-black tracking-widest uppercase flex items-center gap-1.5 shadow-[0_0_15px_rgba(251,191,36,0.3)]">
-                            <Flame size={12} />
-                            <span>FIGHT POT: {(arenaMatch?.fighterPoolNear ?? 4.0).toFixed(1)} NEAR</span>
+                        <div className="mb-1 px-2 sm:px-3 py-0.5 bg-shin-gold/20 border border-shin-gold/60 rounded-full text-[8px] sm:text-[10px] text-shin-gold font-cinzel font-black tracking-wider sm:tracking-widest uppercase flex items-center gap-1 shadow-[0_0_15px_rgba(251,191,36,0.3)]">
+                            <Flame size={10} />
+                            <span>POT: {(arenaMatch?.fighterPoolNear ?? 4.0).toFixed(1)}N</span>
                         </div>
                     )}
-                    <div className="bg-gradient-to-b from-gray-900 to-black border-2 border-shin-gold px-4 py-1 rounded-xl shadow-[0_0_25px_rgba(0,0,0,0.9)]">
-                        <span className="font-cinzel font-black text-2xl md:text-4xl text-white tracking-wider">
+                    <div className="bg-gradient-to-b from-gray-900 to-black border-2 border-shin-gold px-2.5 sm:px-4 py-0.5 sm:py-1 rounded-xl shadow-[0_0_25px_rgba(0,0,0,0.9)]">
+                        <span className="font-cinzel font-black text-lg sm:text-2xl md:text-4xl text-white tracking-wider">
                             {matchTime}
                         </span>
                     </div>
@@ -356,7 +357,7 @@ const ControlsOverlay = ({
                                     }),
                                 );
                             }}
-                            className="mt-1 px-2.5 py-0.5 bg-black/80 border border-white/20 rounded text-[9px] font-cinzel text-gray-300 hover:text-white hover:border-shin-gold uppercase tracking-widest cursor-pointer"
+                            className="mt-1 px-2 py-0.5 bg-black/80 border border-white/20 rounded text-[8px] sm:text-[9px] font-cinzel text-gray-300 hover:text-white hover:border-shin-gold uppercase tracking-widest cursor-pointer"
                         >
                             {isPaused ? 'RESUME' : 'PAUSE'}
                         </button>
@@ -434,14 +435,14 @@ const ControlsOverlay = ({
             )}
 
             {/* =================================================================
-                MOBILE TOUCH CONTROLS (With Glowing ⚡ SPIRIT Button)
+                MOBILE TOUCH CONTROLS (Joystick + Jump + Guard + Spirit Strike + Slash)
                ================================================================= */}
             {isTouchDevice && !isAgentOrSpectator && (
                 <div
-                    className="touch-controls absolute w-24 h-24 bg-white/10 rounded-full backdrop-blur-sm pointer-events-auto touch-none flex items-center justify-center border-2 border-white/20"
+                    className="touch-controls absolute w-24 h-24 sm:w-28 sm:h-28 bg-white/10 rounded-full backdrop-blur-sm pointer-events-auto touch-none flex items-center justify-center border-2 border-white/25 shadow-[0_0_20px_rgba(0,0,0,0.6)]"
                     style={{
-                        bottom: 'max(1.5rem, env(safe-area-inset-bottom))',
-                        left: 'max(1.5rem, env(safe-area-inset-left))',
+                        bottom: 'max(1.25rem, env(safe-area-inset-bottom))',
+                        left: 'max(1rem, env(safe-area-inset-left))',
                     }}
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
@@ -450,7 +451,7 @@ const ControlsOverlay = ({
                     ref={joystickRef}
                 >
                     <div
-                        className="w-12 h-12 bg-white/50 rounded-full shadow-lg transform transition-transform duration-75"
+                        className="w-12 h-12 bg-white/60 rounded-full shadow-lg transform transition-transform duration-75"
                         style={{ transform: `translate(${joystickPos.x}px, ${joystickPos.y}px)` }}
                     />
                 </div>
@@ -460,15 +461,51 @@ const ControlsOverlay = ({
                 <div
                     className="touch-controls absolute pointer-events-auto select-none"
                     style={{
-                        bottom: 'max(1.5rem, env(safe-area-inset-bottom))',
-                        right: 'max(1.5rem, env(safe-area-inset-right))',
-                        width: '190px',
-                        height: '130px',
+                        bottom: 'max(1.25rem, env(safe-area-inset-bottom))',
+                        right: 'max(1rem, env(safe-area-inset-right))',
+                        width: '196px',
+                        height: '146px',
                     }}
                 >
+                    {/* Dedicated Jump Button */}
+                    <button
+                        className="absolute top-0 right-1 w-[52px] h-[52px] rounded-full bg-blue-500/25 text-blue-300 border-2 border-blue-400/60 active:scale-95 flex flex-col items-center justify-center backdrop-blur-sm text-[10px] font-cinzel font-black"
+                        onTouchStart={() => {
+                            window.dispatchEvent(
+                                new CustomEvent('joystickInput', {
+                                    detail: { left: false, right: false, up: true, down: false },
+                                }),
+                            );
+                            setTimeout(() => {
+                                window.dispatchEvent(
+                                    new CustomEvent('joystickInput', {
+                                        detail: { left: false, right: false, up: false, down: false },
+                                    }),
+                                );
+                            }, 200);
+                        }}
+                        onClick={() => {
+                            window.dispatchEvent(
+                                new CustomEvent('joystickInput', {
+                                    detail: { left: false, right: false, up: true, down: false },
+                                }),
+                            );
+                            setTimeout(() => {
+                                window.dispatchEvent(
+                                    new CustomEvent('joystickInput', {
+                                        detail: { left: false, right: false, up: false, down: false },
+                                    }),
+                                );
+                            }, 200);
+                        }}
+                    >
+                        <span>⬆️</span>
+                        <span className="text-[8px]">JUMP</span>
+                    </button>
+
                     {/* Shield Block Button */}
                     <button
-                        className="absolute bottom-0 left-0 w-[64px] h-[64px] rounded-full bg-emerald-500/25 text-emerald-400 border-2 border-emerald-500/60 active:scale-95 flex items-center justify-center backdrop-blur-sm"
+                        className="absolute bottom-0 left-0 w-[62px] h-[62px] rounded-full bg-emerald-500/25 text-emerald-400 border-2 border-emerald-500/60 active:scale-95 flex items-center justify-center backdrop-blur-sm"
                         onTouchStart={() =>
                             window.dispatchEvent(
                                 new CustomEvent('playerAction', { detail: { action: 'block_start' } }),
@@ -484,13 +521,23 @@ const ControlsOverlay = ({
                                 new CustomEvent('playerAction', { detail: { action: 'block_end' } }),
                             )
                         }
+                        onMouseDown={() =>
+                            window.dispatchEvent(
+                                new CustomEvent('playerAction', { detail: { action: 'block_start' } }),
+                            )
+                        }
+                        onMouseUp={() =>
+                            window.dispatchEvent(
+                                new CustomEvent('playerAction', { detail: { action: 'block_end' } }),
+                            )
+                        }
                     >
-                        <Shield size={28} />
+                        <Shield size={26} />
                     </button>
 
                     {/* Spirit Dash-Strike Button */}
                     <button
-                        className={`absolute top-0 left-6 w-[60px] h-[60px] rounded-full border-2 active:scale-95 flex items-center justify-center backdrop-blur-sm transition-all ${
+                        className={`absolute top-1 left-7 w-[58px] h-[58px] rounded-full border-2 active:scale-95 flex items-center justify-center backdrop-blur-sm transition-all ${
                             p1Spirit.spirit >= 50
                                 ? 'bg-shin-gold text-black border-white shadow-[0_0_20px_rgba(251,191,36,0.9)] animate-pulse'
                                 : 'bg-white/10 text-gray-500 border-white/20'
@@ -500,20 +547,30 @@ const ControlsOverlay = ({
                                 new CustomEvent('playerAction', { detail: { action: 'special' } }),
                             )
                         }
+                        onClick={() =>
+                            window.dispatchEvent(
+                                new CustomEvent('playerAction', { detail: { action: 'special' } }),
+                            )
+                        }
                     >
-                        <Zap size={26} />
+                        <Zap size={24} />
                     </button>
 
                     {/* Attack Combo Button */}
                     <button
-                        className="absolute bottom-2 right-0 w-[74px] h-[74px] rounded-full bg-shin-red/30 text-red-400 border-2 border-shin-red active:scale-95 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,42,42,0.5)]"
+                        className="absolute bottom-1 right-0 w-[72px] h-[72px] rounded-full bg-shin-red/30 text-red-400 border-2 border-shin-red active:scale-95 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,42,42,0.5)]"
                         onTouchStart={() =>
                             window.dispatchEvent(
                                 new CustomEvent('playerAction', { detail: { action: 'attack' } }),
                             )
                         }
+                        onClick={() =>
+                            window.dispatchEvent(
+                                new CustomEvent('playerAction', { detail: { action: 'attack' } }),
+                            )
+                        }
                     >
-                        <Swords size={32} />
+                        <Swords size={30} />
                     </button>
                 </div>
             )}
@@ -522,42 +579,66 @@ const ControlsOverlay = ({
                 CROWD POT BACKING BAR (Bottom Dock during Colosseum / Spectating)
                ================================================================= */}
             {isAgentOrSpectator && !gameOver && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[96%] max-w-4xl bg-black/90 border-2 border-shin-gold/40 rounded-2xl px-4 py-3 pointer-events-auto backdrop-blur-md shadow-[0_0_30px_rgba(0,0,0,0.95)] z-40">
+                <div
+                    className="absolute left-1/2 -translate-x-1/2 w-[96%] max-w-4xl bg-black/90 border-2 border-shin-gold/40 rounded-2xl px-3 sm:px-4 py-2 sm:py-3 pointer-events-auto backdrop-blur-md shadow-[0_0_30px_rgba(0,0,0,0.95)] z-40"
+                    style={{ bottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+                >
                     {betFeedback && (
-                        <div className="text-center text-xs font-cinzel font-bold text-shin-gold bg-shin-gold/15 border border-shin-gold/40 py-1 px-3 rounded-lg mb-2 animate-pulse">
+                        <div className="text-center text-[10px] sm:text-xs font-cinzel font-bold text-shin-gold bg-shin-gold/15 border border-shin-gold/40 py-1 px-2 rounded-lg mb-1.5 animate-pulse">
                             {betFeedback}
                         </div>
                     )}
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-3">
-                        {/* Back Left Corner */}
-                        <button
-                            onClick={() => handleQuickSpectatorBet('p1')}
-                            className="w-full md:w-auto flex-1 arcade-skew bg-gradient-to-r from-amber-950/90 to-black hover:from-amber-800 border-l-4 border-y border-r border-l-shin-gold border-white/20 px-4 py-2.5 flex items-center justify-between transition-all cursor-pointer group"
-                        >
-                            <div className="arcade-unskew text-left">
-                                <div className="text-[10px] text-shin-gold font-cinzel font-black uppercase tracking-wider">
-                                    BACK {p1Name.slice(0, 14)}
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-2 sm:gap-3">
+                        {/* Mobile/Desktop Row for P1 & P2 Backing Buttons */}
+                        <div className="grid grid-cols-2 md:flex md:flex-1 w-full items-center justify-between gap-2 sm:gap-3">
+                            {/* Back Left Corner */}
+                            <button
+                                onClick={() => handleQuickSpectatorBet('p1')}
+                                className="w-full md:flex-1 arcade-skew bg-gradient-to-r from-amber-950/90 to-black hover:from-amber-800 border-l-4 border-y border-r border-l-shin-gold border-white/20 px-2.5 sm:px-4 py-2 flex items-center justify-between transition-all cursor-pointer group"
+                            >
+                                <div className="arcade-unskew text-left truncate pr-1">
+                                    <div className="text-[9px] sm:text-[10px] text-shin-gold font-cinzel font-black uppercase tracking-wider truncate">
+                                        BACK {p1Name.slice(0, 12)}
+                                    </div>
+                                    <div className="text-[10px] sm:text-xs text-white font-mono">
+                                        {p1SpecPool.toFixed(1)}N ({p1Odds}x)
+                                    </div>
                                 </div>
-                                <div className="text-xs text-white font-mono">
-                                    Pot: {p1SpecPool.toFixed(1)} NEAR ({p1Odds}x Payout)
+                                <span className="arcade-unskew bg-shin-gold text-black font-cinzel font-black text-[10px] sm:text-xs px-2 sm:px-3 py-1 rounded shrink-0">
+                                    +{betAmount}N
+                                </span>
+                            </button>
+
+                            {/* Back Right Corner */}
+                            <button
+                                onClick={() => handleQuickSpectatorBet('p2')}
+                                className="w-full md:flex-1 arcade-skew-right bg-gradient-to-l from-red-950/90 to-black hover:from-red-800 border-r-4 border-y border-l border-r-shin-red border-white/20 px-2.5 sm:px-4 py-2 flex items-center justify-between transition-all cursor-pointer group"
+                            >
+                                <span className="arcade-unskew-right bg-shin-red text-white font-cinzel font-black text-[10px] sm:text-xs px-2 sm:px-3 py-1 rounded shrink-0">
+                                    +{betAmount}N
+                                </span>
+                                <div className="arcade-unskew-right text-right truncate pl-1">
+                                    <div className="text-[9px] sm:text-[10px] text-red-400 font-cinzel font-black uppercase tracking-wider truncate">
+                                        BACK {p2Name.slice(0, 12)}
+                                    </div>
+                                    <div className="text-[10px] sm:text-xs text-white font-mono">
+                                        {p2SpecPool.toFixed(1)}N ({p2Odds}x)
+                                    </div>
                                 </div>
-                            </div>
-                            <span className="arcade-unskew bg-shin-gold text-black font-cinzel font-black text-xs px-3 py-1 rounded group-hover:scale-105 transition-transform">
-                                +{betAmount} NEAR
-                            </span>
-                        </button>
+                            </button>
+                        </div>
 
                         {/* Center Chip Selector */}
-                        <div className="flex flex-col items-center px-2 shrink-0">
-                            <div className="text-[10px] text-gray-300 font-cinzel uppercase tracking-widest mb-1">
-                                Crowd Backing (<span className="text-shin-gold font-mono">{walletNear.toFixed(1)} NEAR</span>)
+                        <div className="flex items-center justify-between md:flex-col w-full md:w-auto px-1 shrink-0 gap-2">
+                            <div className="text-[9px] sm:text-[10px] text-gray-300 font-cinzel uppercase tracking-wider">
+                                Chest: <span className="text-shin-gold font-mono">{walletNear.toFixed(1)}N</span>
                             </div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1">
                                 {[0.5, 1, 2, 5].map((amt) => (
                                     <button
                                         key={amt}
                                         onClick={() => setBetAmount(amt)}
-                                        className={`px-2.5 py-1 rounded text-xs font-mono font-bold border transition-all cursor-pointer ${
+                                        className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded text-[10px] sm:text-xs font-mono font-bold border transition-all cursor-pointer ${
                                             betAmount === amt
                                                 ? 'bg-shin-gold text-black border-shin-gold'
                                                 : 'bg-black/60 text-gray-400 border-white/10 hover:border-white/30'
@@ -568,30 +649,12 @@ const ControlsOverlay = ({
                                 ))}
                                 <button
                                     onClick={() => window.dispatchEvent(new CustomEvent('exitMatch'))}
-                                    className="ml-2 px-3 py-1 rounded text-[10px] font-cinzel font-bold uppercase tracking-wider bg-white/10 hover:bg-shin-red text-gray-200 hover:text-white border border-white/15 cursor-pointer"
+                                    className="ml-1 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded text-[9px] sm:text-[10px] font-cinzel font-bold uppercase tracking-wider bg-white/10 hover:bg-shin-red text-gray-200 hover:text-white border border-white/15 cursor-pointer"
                                 >
-                                    Leave Pit
+                                    Exit
                                 </button>
                             </div>
                         </div>
-
-                        {/* Back Right Corner */}
-                        <button
-                            onClick={() => handleQuickSpectatorBet('p2')}
-                            className="w-full md:w-auto flex-1 arcade-skew-right bg-gradient-to-l from-red-950/90 to-black hover:from-red-800 border-r-4 border-y border-l border-r-shin-red border-white/20 px-4 py-2.5 flex items-center justify-between transition-all cursor-pointer group"
-                        >
-                            <span className="arcade-unskew-right bg-shin-red text-white font-cinzel font-black text-xs px-3 py-1 rounded group-hover:scale-105 transition-transform">
-                                +{betAmount} NEAR
-                            </span>
-                            <div className="arcade-unskew-right text-right">
-                                <div className="text-[10px] text-red-400 font-cinzel font-black uppercase tracking-wider">
-                                    BACK {p2Name.slice(0, 14)}
-                                </div>
-                                <div className="text-xs text-white font-mono">
-                                    Pot: {p2SpecPool.toFixed(1)} NEAR ({p2Odds}x Payout)
-                                </div>
-                            </div>
-                        </button>
                     </div>
                 </div>
             )}

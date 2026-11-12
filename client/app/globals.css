@@ -96,6 +96,21 @@ html, body {
   transform: skewX(-10deg);
 }
 
+@media (max-width: 640px) {
+  .arcade-skew {
+    transform: skewX(-4deg);
+  }
+  .arcade-unskew {
+    transform: skewX(4deg);
+  }
+  .arcade-skew-right {
+    transform: skewX(4deg);
+  }
+  .arcade-unskew-right {
+    transform: skewX(-4deg);
+  }
+}
+
 h1, h2, h3, .font-cinzel {
   font-family: var(--font-cinzel), serif;
 }
@@ -128,7 +143,7 @@ h1, h2, h3, .font-cinzel {
   scrollbar-width: none;
 }
 
-@media (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .touch-controls {
     display: none !important;
   }

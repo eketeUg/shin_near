@@ -24,14 +24,16 @@ const GameCanvas = () => {
 
     useEffect(() => {
         if (typeof window !== 'undefined' && !gameRef.current) {
-            const container = document.getElementById('game-root');
-            const targetRatio = container ? container.clientWidth / container.clientHeight : (window.innerWidth / window.innerHeight);
-            const gameWidth = Math.max(1280, 600 * targetRatio);
+            const safeRatio =
+                window.innerWidth > window.innerHeight
+                    ? window.innerWidth / Math.max(1, window.innerHeight)
+                    : 16 / 9;
+            const gameWidth = Math.min(1600, Math.max(1280, Math.round(600 * safeRatio)));
 
             const config: Phaser.Types.Core.GameConfig = {
                 type: Phaser.CANVAS,
-                parent: 'game-root', // Attach the canvas to our container
-                width: gameWidth, 
+                parent: 'game-root',
+                width: gameWidth,
                 height: 600,
                 scale: {
                     mode: Phaser.Scale.FIT,
@@ -41,29 +43,37 @@ const GameCanvas = () => {
                     default: 'arcade',
                     arcade: {
                         gravity: { y: 600, x: 0 },
-                        debug: false, // You can turn this off later
+                        debug: false,
                     },
                 },
             };
 
             gameRef.current = new Phaser.Game(config);
 
-            // Manually add scenes and only start Preloader immediately
             gameRef.current.scene.add('Preloader', Preloader, true);
             gameRef.current.scene.add('GameScene', GameScene, false);
         }
 
+        const handleResize = () => {
+            if (gameRef.current?.scale) {
+                gameRef.current.scale.refresh();
+            }
+        };
+
         const handleStartGame = (e: Event) => {
             const customEvent = e as CustomEvent;
             if (gameRef.current) {
-                // Pass the selection details (mode, p1, p2) to the GameScene's init() method
                 gameRef.current.scene.start('GameScene', customEvent.detail);
             }
         };
 
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
         window.addEventListener('startGameScene', handleStartGame);
 
         return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('orientationchange', handleResize);
             window.removeEventListener('startGameScene', handleStartGame);
             if (gameRef.current) {
                 gameRef.current.destroy(true);
@@ -74,32 +84,22 @@ const GameCanvas = () => {
 
     return (
         <div className="fixed top-0 left-0 w-screen h-[100dvh] bg-black flex items-center justify-center overflow-hidden">
-            
-            {/* Main Game Wrapper */}
-            <div className="
+            {/* Main Game Wrapper — Works in both Mobile Portrait & Mobile Landscape */}
+            <div
+                className="
                 relative 
                 w-full h-full 
                 md:w-[1280px] md:h-[600px] 
                 md:max-w-[95vw] md:max-h-[90dvh]
                 md:rounded-xl md:shadow-2xl
                 overflow-hidden
-                landscape:block portrait:hidden md:portrait:block
-            ">
-                <div id="game-root" className="w-full h-full absolute inset-0 bg-gray-900" />
+            "
+            >
+                <div
+                    id="game-root"
+                    className="w-full h-full absolute inset-0 bg-gray-950 portrait:pb-28 md:portrait:pb-0"
+                />
                 <ControlsOverlay />
-            </div>
-
-            {/* Portrait Warning (Mobile Only) */}
-            <div className="
-                fixed inset-0 z-50 flex flex-col items-center justify-center 
-                bg-black text-white p-8 text-center
-                landscape:hidden md:hidden
-            ">
-                <div className="animate-pulse">
-                    <h1 className="text-3xl font-black font-cinzel text-shin-red mb-4">ROTATE DEVICE</h1>
-                    <p className="text-gray-400 text-sm mb-8 tracking-widest uppercase"> Landscape Mode Required</p>
-                    <div className="text-6xl text-shin-gold">⟳</div>
-                </div>
             </div>
         </div>
     );

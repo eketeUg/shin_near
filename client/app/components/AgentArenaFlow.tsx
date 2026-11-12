@@ -155,53 +155,53 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       {/* =====================================================================
           TOP BAR (Game-First War Chest + Optional NEAR Judge Inspector Switch)
          ===================================================================== */}
-      <div className="sticky top-0 z-50 bg-black/90 border-b border-white/10 px-4 md:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4 backdrop-blur-md">
-        <div className="flex items-center gap-4">
+      <div className="sticky top-0 z-50 bg-black/90 border-b border-white/10 px-3 sm:px-6 md:px-8 py-2.5 sm:py-3.5 flex flex-wrap items-center justify-between gap-2 sm:gap-4 backdrop-blur-md">
+        <div className="flex items-center gap-2 sm:gap-4">
           <button
             onClick={onBack}
-            className="text-gray-400 hover:text-white font-cinzel font-bold text-xs uppercase tracking-widest flex items-center gap-1.5 cursor-pointer"
+            className="text-gray-400 hover:text-white font-cinzel font-bold text-[10px] sm:text-xs uppercase tracking-widest flex items-center gap-1 cursor-pointer"
           >
-            <span>←</span> Title Hall
+            <span>←</span> <span className="hidden xs:inline">Title</span> Hall
           </button>
-          <div className="h-5 w-px bg-white/15" />
+          <div className="h-4 w-px bg-white/15" />
           <div>
-            <h1 className="text-lg md:text-2xl font-cinzel font-black tracking-[0.2em] text-white uppercase flex items-center gap-2.5">
-              <Flame size={20} className="text-shin-red" />
-              <span>THE SHADOW COLOSSEUM</span>
+            <h1 className="text-sm sm:text-lg md:text-2xl font-cinzel font-black tracking-[0.12em] sm:tracking-[0.2em] text-white uppercase flex items-center gap-1.5 sm:gap-2.5">
+              <Flame size={16} className="text-shin-red shrink-0" />
+              <span>SHADOW COLOSSEUM</span>
             </h1>
           </div>
         </div>
 
         {/* Right: War Chest + NEAR Judge View Switch */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Toggle NEAR Under-the-Hood details for Judges */}
           <button
             onClick={() => setShowNearUnderHood(!showNearUnderHood)}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-mono border flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer ${
               showNearUnderHood
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
                 : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
             }`}
             title="Toggle NEAR Sub-Account & Contract Inspector"
           >
-            <Terminal size={13} />
-            <span>{showNearUnderHood ? 'NEAR View: ON' : 'NEAR View'}</span>
+            <Terminal size={12} />
+            <span>{showNearUnderHood ? 'NEAR: ON' : 'NEAR View'}</span>
           </button>
 
           {/* Player War Chest */}
-          <div className="bg-white/5 border border-shin-gold/40 rounded-xl px-3.5 py-1.5 flex items-center gap-3">
-            <Coins size={16} className="text-shin-gold" />
+          <div className="bg-white/5 border border-shin-gold/40 rounded-xl px-2.5 sm:px-3.5 py-1 sm:py-1.5 flex items-center gap-2 sm:gap-3">
+            <Coins size={14} className="text-shin-gold shrink-0" />
             <div>
-              <div className="text-[9px] text-gray-400 uppercase tracking-wider">
-                {showNearUnderHood ? arenaState.playerWallet.accountId : 'Your War Chest'}
+              <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider truncate max-w-[90px] sm:max-w-none">
+                {showNearUnderHood ? arenaState.playerWallet.accountId : 'War Chest'}
               </div>
-              <div className="text-xs md:text-sm font-mono font-bold text-shin-gold">
-                {arenaState.playerWallet.NEAR.toFixed(2)} NEAR
+              <div className="text-[11px] sm:text-sm font-mono font-bold text-shin-gold">
+                {arenaState.playerWallet.NEAR.toFixed(1)} NEAR
               </div>
             </div>
             <button
               onClick={handleFaucetTopUp}
-              className="px-2.5 py-1 bg-shin-gold text-black rounded text-[10px] font-cinzel font-black uppercase tracking-wider hover:bg-yellow-400 transition-all cursor-pointer"
+              className="px-2 py-1 bg-shin-gold text-black rounded text-[9px] sm:text-[10px] font-cinzel font-black uppercase tracking-wider hover:bg-yellow-400 transition-all cursor-pointer"
             >
               + Refill
             </button>
@@ -209,7 +209,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
 
           <button
             onClick={onHome}
-            className="text-gray-400 hover:text-shin-red font-cinzel font-bold text-xs uppercase tracking-widest px-3 py-2 border border-white/10 rounded-lg cursor-pointer"
+            className="text-gray-400 hover:text-shin-red font-cinzel font-bold text-xs uppercase tracking-widest px-2.5 py-1.5 border border-white/10 rounded-lg cursor-pointer"
           >
             ✕
           </button>
@@ -219,17 +219,17 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       {/* =====================================================================
           ARCADE NAVIGATION BLADES
          ===================================================================== */}
-      <div className="px-4 md:px-8 pt-5 pb-2 max-w-7xl mx-auto w-full flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2.5">
+      <div className="px-3 sm:px-6 md:px-8 pt-3 sm:pt-5 pb-2 max-w-7xl mx-auto w-full flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 w-full lg:w-auto">
           {[
-            { id: 'LIVE_ARENA', label: '🔥 Colosseum Pit (Live Fights)', icon: Flame },
+            { id: 'LIVE_ARENA', label: '🔥 Colosseum Pit', icon: Flame },
             {
               id: 'MY_AGENTS',
-              label: `⚔ Champion Barracks (${ownedFighters.length})`,
+              label: `⚔ Barracks (${ownedFighters.length})`,
               icon: Shield,
             },
-            { id: 'DOJO_MARKET', label: "🏮 Master Hanzo's Dojo & Bazaar", icon: Store },
-            { id: 'LEDGER', label: '📜 Battle Chronicle', icon: ScrollText },
+            { id: 'DOJO_MARKET', label: "🏮 Dojo & Bazaar", icon: Store },
+            { id: 'LEDGER', label: '📜 Chronicle', icon: ScrollText },
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -237,14 +237,14 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`arcade-skew px-5 py-2.5 font-cinzel text-xs font-black tracking-wider uppercase border transition-all cursor-pointer ${
+                className={`arcade-skew px-3.5 sm:px-5 py-2 sm:py-2.5 font-cinzel text-[11px] sm:text-xs font-black tracking-wider uppercase border transition-all shrink-0 cursor-pointer ${
                   active
                     ? 'bg-shin-red text-white border-white shadow-[0_0_20px_rgba(255,42,42,0.5)]'
-                    : 'bg-white/5 text-gray-400 border-white/15 hover:border-shin-gold/50 hover:text-white'
+                    : 'bg-white/5 text-gray-300 border-white/15 hover:border-shin-gold/50 hover:text-white'
                 }`}
               >
-                <div className="arcade-unskew flex items-center gap-2">
-                  <Icon size={15} />
+                <div className="arcade-unskew flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
+                  <Icon size={14} />
                   <span>{tab.label}</span>
                 </div>
               </button>
@@ -254,9 +254,9 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
 
         <button
           onClick={handleSpawnMyAgentMatch}
-          className="arcade-skew px-6 py-2.5 bg-shin-gold text-black font-cinzel font-black text-xs tracking-widest uppercase hover:bg-yellow-400 transition-all shadow-[0_0_25px_rgba(251,191,36,0.45)] cursor-pointer"
+          className="w-full lg:w-auto arcade-skew px-5 py-2.5 bg-shin-gold text-black font-cinzel font-black text-xs tracking-widest uppercase hover:bg-yellow-400 transition-all shadow-[0_0_25px_rgba(251,191,36,0.45)] cursor-pointer"
         >
-          <div className="arcade-unskew flex items-center gap-2">
+          <div className="arcade-unskew flex items-center justify-center gap-2">
             <Play size={14} fill="currentColor" />
             <span>Send {selectedFighter?.title || 'Champion'} Into Pit Now</span>
           </div>
