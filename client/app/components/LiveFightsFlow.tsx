@@ -85,7 +85,7 @@ const LiveFightsFlow: React.FC<LiveFightsFlowProps> = ({ onWatchMatch, onBack, o
                   {m.p1.agentWalletId}
                 </span>
               </div>
-              <div className="text-xl font-black text-gray-600 w-2/12 text-center font-cinzel">
+              <div className="text-xl font-black text-shin-gold/80 w-2/12 text-center font-cinzel">
                 VS
               </div>
               <div className="text-center w-5/12 flex flex-col items-center">

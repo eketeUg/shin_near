@@ -375,8 +375,8 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
                     />
                   ) : null;
                 })() : (
-                  <div className="w-24 h-24 border-2 border-dashed border-gray-700 rounded-full flex items-center justify-center animate-pulse">
-                    <span className="font-cinzel text-xs text-gray-600">SELECT</span>
+                  <div className="w-24 h-24 border-2 border-dashed border-gray-500 rounded-full flex items-center justify-center animate-pulse">
+                    <span className="font-cinzel text-xs text-gray-300">SELECT</span>
                   </div>
                 )}
               </div>
@@ -387,7 +387,7 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
 
             {/* VS badge */}
             <div className="flex flex-col items-center pb-8 shrink-0">
-              <span className="text-4xl md:text-6xl text-gray-600 font-cinzel italic tracking-widest drop-shadow-lg select-none">VS</span>
+              <span className="text-4xl md:text-6xl text-shin-gold/80 font-cinzel italic tracking-widest drop-shadow-lg select-none">VS</span>
             </div>
 
             {/* P2 slot */}
@@ -411,8 +411,8 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
                     />
                   ) : null;
                 })() : (
-                  <div className="w-24 h-24 border-2 border-dashed border-gray-700 rounded-full flex items-center justify-center animate-pulse">
-                    <span className="font-cinzel text-xs text-gray-600">{mode === 'PVE' ? 'AUTO' : 'WAITING'}</span>
+                  <div className="w-24 h-24 border-2 border-dashed border-gray-500 rounded-full flex items-center justify-center animate-pulse">
+                    <span className="font-cinzel text-xs text-gray-300">{mode === 'PVE' ? 'AUTO' : 'WAITING'}</span>
                   </div>
                 )}
               </div>
@@ -470,7 +470,7 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
                   }`}
                   style={{ minHeight: '160px' }}
                 >
-                  <span className={`absolute top-2 font-cinzel text-xs md:text-base uppercase tracking-widest text-center leading-tight ${isOwned ? 'text-gray-300 font-bold' : 'text-gray-600 group-hover:text-shin-gold'} z-20`}>
+                  <span className={`absolute top-2 font-cinzel text-xs md:text-base uppercase tracking-widest text-center leading-tight ${isOwned ? 'text-white font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]' : 'text-gray-300 group-hover:text-shin-gold'} z-20`}>
                     {char.name}
                   </span>
                   <img

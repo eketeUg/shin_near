@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@theme {
+  --color-shin-red: #ff2a2a;
+  --color-shin-gold: #fbbf24;
+  --color-shin-dark: #09090b;
+}
+
 :root {
   --background: #050505;
   --foreground: #ededed;
@@ -96,6 +102,10 @@ h1, h2, h3, .font-cinzel {
 
 .text-shin-red { color: var(--shin-red); }
 .text-shin-gold { color: var(--shin-gold); }
+.bg-shin-red { background-color: var(--shin-red); }
+.bg-shin-gold { background-color: var(--shin-gold); }
+.border-shin-red { border-color: var(--shin-red); }
+.border-shin-gold { border-color: var(--shin-gold); }
 
 .glow-text {
   text-shadow: 0 0 14px rgba(255, 42, 42, 0.75);

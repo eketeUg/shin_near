@@ -404,7 +404,7 @@ const ControlsOverlay = ({
                     key={p1Combo.key}
                     className="absolute left-6 top-28 md:top-32 z-30 animate-combo-pop pointer-events-none"
                 >
-                    <div className="arcade-skew bg-gradient-to-r from-shin-gold via-amber-500 to-transparent px-4 py-1.5 border-l-4 border-white shadow-[0_0_25px_rgba(251,191,36,0.6)]">
+                    <div className="arcade-skew bg-gradient-to-r from-shin-gold via-amber-400 to-amber-500/95 px-4 py-1.5 border-l-4 border-white shadow-[0_0_25px_rgba(251,191,36,0.6)]">
                         <div className="arcade-unskew font-cinzel font-black text-xl md:text-3xl text-black tracking-wider uppercase">
                             {p1Combo.isSpecial ? '⚡ SPIRIT STRIKE!' : `${p1Combo.count} HIT COMBO!`}
                         </div>
