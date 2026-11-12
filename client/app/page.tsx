@@ -40,14 +40,17 @@ export default function Home() {
 
   const [wager, setWager] = useState<{ token: string; amount: number } | null>(null);
   const [balances, setBalances] = useState({ NEAR: 25, USDC: 100, USDT: 50 });
+  const [pendingPlayerFight, setPendingPlayerFight] = useState<any | null>(null);
   const [orientationPreference, setOrientationPreference] = useState<
     'AUTO_HYBRID' | 'FORCE_LANDSCAPE' | 'FORCE_PORTRAIT'
   >('AUTO_HYBRID');
 
-  const isInCombatOrSpectating = isGameStarted || isSpectating;
-  const isForceLandscapeActive =
-    orientationPreference === 'FORCE_LANDSCAPE' ||
-    (orientationPreference === 'AUTO_HYBRID' && isInCombatOrSpectating);
+  const isForceLandscapeActive = orientationPreference === 'FORCE_LANDSCAPE';
+
+  const isMobilePortraitViewport = () => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 900 && window.innerHeight > window.innerWidth;
+  };
 
   const applyNativeOrientation = (target: 'landscape' | 'portrait' | 'unlock') => {
     try {
@@ -69,16 +72,70 @@ export default function Home() {
     } else {
       applyNativeOrientation('unlock');
     }
-    // Notify Phaser canvases to recalculate dimensions after CSS rotation settles
     const t = setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
     return () => clearTimeout(t);
   }, [isForceLandscapeActive, orientationPreference]);
+
+  const executeFightStart = (fightDetail: any) => {
+    setPendingPlayerFight(null);
+    setIsGameStarted(true);
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+      window.dispatchEvent(
+        new CustomEvent('startGameScene', {
+          detail: fightDetail,
+        }),
+      );
+    }, 60);
+  };
+
+  const startPlayerFightWithLandscapeGate = (fightDetail: any) => {
+    // Request fullscreen and landscape lock on supported Android browsers
+    try {
+      if (typeof window !== 'undefined' && window.innerWidth <= 900) {
+        document.documentElement.requestFullscreen?.().catch(() => {});
+        applyNativeOrientation('landscape');
+      }
+    } catch {}
+
+    if (isMobilePortraitViewport() && orientationPreference !== 'FORCE_LANDSCAPE') {
+      setPendingPlayerFight(fightDetail);
+    } else {
+      executeFightStart(fightDetail);
+    }
+  };
+
+  // Automatically unlock the Rotate-to-Landscape gate the exact moment the user turns their phone sideways
+  useEffect(() => {
+    if (!pendingPlayerFight) return;
+
+    const checkOrientationUnlocked = () => {
+      if (typeof window !== 'undefined' && window.innerWidth > window.innerHeight) {
+        executeFightStart(pendingPlayerFight);
+      }
+    };
+
+    checkOrientationUnlocked();
+    window.addEventListener('resize', checkOrientationUnlocked);
+    window.addEventListener('orientationchange', checkOrientationUnlocked);
+    const orientationObj = typeof screen !== 'undefined' ? (screen as any)?.orientation : null;
+    orientationObj?.addEventListener?.('change', checkOrientationUnlocked);
+
+    return () => {
+      window.removeEventListener('resize', checkOrientationUnlocked);
+      window.removeEventListener('orientationchange', checkOrientationUnlocked);
+      orientationObj?.removeEventListener?.('change', checkOrientationUnlocked);
+    };
+  }, [pendingPlayerFight]);
 
   const handleToggleMobileOrientation = () => {
     const nextIsLandscape = !isForceLandscapeActive;
     if (nextIsLandscape) {
       setOrientationPreference('FORCE_LANDSCAPE');
       applyNativeOrientation('landscape');
+      if (pendingPlayerFight) {
+        executeFightStart(pendingPlayerFight);
+      }
     } else {
       setOrientationPreference('FORCE_PORTRAIT');
       applyNativeOrientation('portrait');
@@ -199,24 +256,20 @@ export default function Home() {
   ) => {
     setShowPreGameFlow(false);
     setReturnToAgentArenaAfterFight(false);
-    setIsGameStarted(true);
-    window.dispatchEvent(
-      new CustomEvent('startGameScene', {
-        detail: {
-          mode,
-          p1,
-          p2,
-          p1Name: username,
-          p2Name: mode === 'PVE' ? 'Master Shadow' : 'Challenger',
-          difficulty: difficulty === 'EASY' ? 'EASY' : 'HARD',
-          rounds: 1,
-        },
-      }),
-    );
+    startPlayerFightWithLandscapeGate({
+      mode,
+      p1,
+      p2,
+      p1Name: username,
+      p2Name: mode === 'PVE' ? 'Master Shadow' : 'Challenger',
+      difficulty: difficulty === 'EASY' ? 'EASY' : 'HARD',
+      rounds: 1,
+    });
   };
 
   const handleHome = () => {
     setLastMenuModal(null);
+    setPendingPlayerFight(null);
     setShowPreGameFlow(false);
     setShowMintFlow(false);
     setShowLiveFights(false);
@@ -286,6 +339,7 @@ export default function Home() {
       {!isLoading &&
         !isGameStarted &&
         !isSpectating &&
+        !pendingPlayerFight &&
         !showPreGameFlow &&
         !showMintFlow &&
         !showLiveFights &&
@@ -399,25 +453,75 @@ export default function Home() {
           }}
           onMatchFound={(matchData) => {
             setShowMatchmaking(false);
-            setIsGameStarted(true);
-            window.dispatchEvent(
-              new CustomEvent('startGameScene', {
-                detail: {
-                  mode: matchData.isAgentFallback ? 'PVE' : 'PVP',
-                  p1: matchData.p1Type,
-                  p2: matchData.p2Type,
-                  p1Name: username,
-                  p2Name: matchData.p2Name || 'Challenger',
-                  difficulty: 'HARD',
-                  rounds: 1,
-                  isOnlineHost: !!matchData.isHost,
-                  matchId: matchData.matchId,
-                  wager,
-                },
-              }),
-            );
+            startPlayerFightWithLandscapeGate({
+              mode: matchData.isAgentFallback ? 'PVE' : 'PVP',
+              p1: matchData.p1Type,
+              p2: matchData.p2Type,
+              p1Name: username,
+              p2Name: matchData.p2Name || 'Challenger',
+              difficulty: 'HARD',
+              rounds: 1,
+              isOnlineHost: !!matchData.isHost,
+              matchId: matchData.matchId,
+              wager,
+            });
           }}
         />
+      )}
+
+      {/* Pre-Arena Rotate Phone to Landscape Gate (for player-controlled PVE/PVP fights) */}
+      {!isLoading && pendingPlayerFight && (
+        <div className="fixed inset-0 z-[95] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200">
+          <div className="max-w-sm w-full bg-gray-950/90 border-2 border-shin-gold rounded-2xl p-6 shadow-[0_0_45px_rgba(251,191,36,0.28)] flex flex-col items-center">
+            {/* Animated Rotating Phone Illustration */}
+            <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
+              <div className="w-12 h-20 rounded-xl border-2 border-shin-gold bg-black/80 flex flex-col items-center justify-between py-2 shadow-[0_0_20px_rgba(251,191,36,0.4)] animate-[spin_2.4s_ease-in-out_infinite]">
+                <div className="w-4 h-0.5 rounded-full bg-shin-gold/60" />
+                <span className="text-shin-gold text-base">⚔️</span>
+                <div className="w-2 h-2 rounded-full border border-shin-gold/70" />
+              </div>
+            </div>
+
+            <span className="px-2.5 py-0.5 rounded-full bg-shin-red/20 border border-shin-red/40 text-shin-red font-mono text-[10px] uppercase tracking-widest mb-2">
+              Combat Controls Ready
+            </span>
+
+            <h2 className="text-xl font-cinzel font-black text-white uppercase tracking-wider mb-2">
+              Rotate Phone to{' '}
+              <span className="text-shin-gold">Landscape</span>
+            </h2>
+
+            <p className="text-xs text-gray-300 font-sans leading-relaxed mb-5">
+              Turn your phone sideways to collapse the browser bar and unlock full widescreen space for your thumb joystick and combat techniques.
+              <span className="block mt-1.5 text-shin-gold font-mono text-[11px]">
+                The arena opens automatically as soon as you rotate!
+              </span>
+            </p>
+
+            <div className="w-full space-y-2.5">
+              <button
+                onClick={() => {
+                  setOrientationPreference('FORCE_LANDSCAPE');
+                  applyNativeOrientation('landscape');
+                  executeFightStart(pendingPlayerFight);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-shin-gold/15 hover:bg-shin-gold/25 border border-shin-gold/50 text-shin-gold font-cinzel font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+              >
+                🔄 Orientation Locked? Force Landscape & Enter
+              </button>
+
+              <button
+                onClick={() => {
+                  setPendingPlayerFight(null);
+                  setShowPreGameFlow(true);
+                }}
+                className="w-full py-2 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white font-mono text-[11px] uppercase tracking-wider transition-all cursor-pointer"
+              >
+                ← Back to Character Select
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Live Fights Flow */}
