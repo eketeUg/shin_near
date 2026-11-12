@@ -1281,7 +1281,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
               </span>
             </div>
 
-            <div className="space-y-2.5 max-h-[60dvh] overflow-y-auto pr-2">
+            <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-2">
               {arenaState.ledger.map((tx) => (
                 <div
                   key={tx.id}

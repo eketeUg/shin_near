@@ -27,10 +27,9 @@ const SpectatorGameCanvas = ({ matchData }: { matchData: any }) => {
         let isLoaded = false;
 
         if (typeof window !== 'undefined' && !gameRef.current) {
-            const safeRatio =
-                window.innerWidth > window.innerHeight
-                    ? window.innerWidth / Math.max(1, window.innerHeight)
-                    : 16 / 9;
+            const longEdge = Math.max(window.innerWidth, window.innerHeight);
+            const shortEdge = Math.max(1, Math.min(window.innerWidth, window.innerHeight));
+            const safeRatio = longEdge / shortEdge;
             const gameWidth = Math.min(1600, Math.max(1280, Math.round(600 * safeRatio)));
 
             const config: Phaser.Types.Core.GameConfig = {
@@ -103,20 +102,20 @@ const SpectatorGameCanvas = ({ matchData }: { matchData: any }) => {
     }, []);
 
     return (
-        <div className="fixed top-0 left-0 w-screen h-[100dvh] bg-black flex items-center justify-center overflow-hidden">
+        <div className="fixed inset-0 w-full h-full bg-black flex items-center justify-center overflow-hidden">
             <div
                 className="
                 relative 
                 w-full h-full 
-                md:w-[1280px] md:h-[600px] 
-                md:max-w-[95vw] md:max-h-[90dvh]
-                md:rounded-xl md:shadow-2xl
+                lg:w-[1280px] lg:h-[600px] 
+                lg:max-w-[95vw] lg:max-h-[90dvh]
+                lg:rounded-xl lg:shadow-2xl
                 overflow-hidden
             "
             >
                 <div
                     id="spectator-game-root"
-                    className="w-full h-full portrait:pb-28 md:portrait:pb-0"
+                    className="w-full h-full"
                 />
                 <ControlsOverlay isSpectator={true} isInteractiveClient={matchData?.isInteractiveClient} />
                 

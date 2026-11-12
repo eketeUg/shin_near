@@ -538,7 +538,7 @@ const MainMenu = ({
             <div
               className={`${
                 activeModal === 'profile' || activeModal === 'judge' ? 'max-w-3xl' : 'max-w-md'
-              } bg-gray-950 border-2 border-shin-red rounded-2xl p-6 md:p-8 w-full relative animate-in zoom-in-95 duration-200 shadow-[0_0_35px_rgba(255,42,42,0.3)] max-h-[90dvh] overflow-y-auto`}
+              } bg-gray-950 border-2 border-shin-red rounded-2xl p-4 sm:p-6 md:p-8 w-full relative animate-in zoom-in-95 duration-200 shadow-[0_0_35px_rgba(255,42,42,0.3)] max-h-[90%] overflow-y-auto`}
             >
               {activeModal !== 'profile' && (
                 <button

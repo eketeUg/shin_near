@@ -75,7 +75,7 @@ const ControlsOverlay = ({
                 'ontouchstart' in window ||
                     navigator.maxTouchPoints > 0 ||
                     window.matchMedia('(pointer: coarse)').matches ||
-                    window.innerWidth < 1024,
+                    Math.min(window.innerWidth, window.innerHeight) < 900,
             );
         };
         checkTouch();
@@ -216,8 +216,18 @@ const ControlsOverlay = ({
     const handleTouchMove = (e: React.TouchEvent) => {
         if (!joystickActive) return;
         const touch = e.touches[0];
-        const dx = touch.clientX - joyStartPos.current.x;
-        const dy = touch.clientY - joyStartPos.current.y;
+        const rawDx = touch.clientX - joyStartPos.current.x;
+        const rawDy = touch.clientY - joyStartPos.current.y;
+
+        // If the phone is physically held in portrait and auto-rotated 90deg clockwise into landscape,
+        // map physical screen axes (+Y down, +X right) to rotated landscape axes (+X right, +Y down).
+        const isAutoRotatedPortrait =
+            typeof window !== 'undefined' &&
+            window.innerHeight > window.innerWidth &&
+            window.innerWidth <= 900;
+        const dx = isAutoRotatedPortrait ? rawDy : rawDx;
+        const dy = isAutoRotatedPortrait ? -rawDx : rawDy;
+
         const radius = 30;
         const distance = Math.min(Math.sqrt(dx * dx + dy * dy), radius);
         const angle = Math.atan2(dy, dx);

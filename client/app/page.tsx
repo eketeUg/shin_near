@@ -200,8 +200,25 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    const tryLockLandscape = () => {
+      try {
+        const orientation = (screen as any)?.orientation;
+        if (orientation && typeof orientation.lock === 'function') {
+          orientation.lock('landscape').catch(() => {});
+        }
+      } catch {}
+    };
+    window.addEventListener('touchstart', tryLockLandscape, { once: true });
+    window.addEventListener('click', tryLockLandscape, { once: true });
+    return () => {
+      window.removeEventListener('touchstart', tryLockLandscape);
+      window.removeEventListener('click', tryLockLandscape);
+    };
+  }, []);
+
   return (
-    <main className="relative min-h-[100dvh] w-full">
+    <main className="mobile-landscape-shell relative">
       {/* Loading Screen */}
       {isLoading && <LoadingScreen onComplete={handleLoadComplete} />}
 

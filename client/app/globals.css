@@ -148,3 +148,29 @@ h1, h2, h3, .font-cinzel {
     display: none !important;
   }
 }
+
+/* ============================================================================
+   AUTO-LANDSCAPE MOBILE CONSOLE SHELL
+   Automatically rotates the entire game into widescreen landscape when a mobile
+   phone is held in portrait mode (just like native mobile fighting games).
+   ============================================================================ */
+.mobile-landscape-shell {
+  position: fixed;
+  inset: 0;
+  width: 100dvw;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+@media screen and (max-width: 900px) and (orientation: portrait) {
+  .mobile-landscape-shell {
+    position: fixed;
+    top: 0;
+    left: 100dvw;
+    width: 100dvh !important;
+    height: 100dvw !important;
+    transform: rotate(90deg);
+    transform-origin: top left;
+    overflow: hidden;
+  }
+}

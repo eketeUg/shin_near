@@ -45,7 +45,7 @@ const SpectateScreen: React.FC<SpectateScreenProps> = ({ onClose, onWatchLive })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
-      <div className="bg-black border border-shin-gold rounded-2xl p-6 md:p-8 w-full max-w-4xl relative animate-in zoom-in-95 duration-200 shadow-[0_0_25px_rgba(212,175,55,0.3)] flex flex-col max-h-[88dvh]">
+      <div className="bg-black border border-shin-gold rounded-2xl p-4 sm:p-6 md:p-8 w-full max-w-4xl relative animate-in zoom-in-95 duration-200 shadow-[0_0_25px_rgba(212,175,55,0.3)] flex flex-col max-h-[88%]">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-shin-gold hover:text-white transition-colors text-xl font-bold cursor-pointer"
