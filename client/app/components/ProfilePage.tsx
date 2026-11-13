@@ -15,8 +15,11 @@ import {
   ExternalLink,
   Bot,
   Coins,
+  Swords,
+  Zap,
 } from 'lucide-react';
 import { nearArenaEngine } from '../services/nearArenaEngine';
+import { Roster } from './PreGameFlow';
 
 interface ProfilePageProps {
   user: any;
@@ -71,8 +74,13 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
+  const getCharGif = (charId: string) => {
+    const found = Roster.find((r) => r.id === charId);
+    return found?.gif || '/sprites/fighter.gif';
+  };
+
   return (
-    <div className="flex flex-col w-full max-w-2xl mx-auto animate-in fade-in zoom-in duration-300">
+    <div className="flex flex-col w-full max-w-3xl mx-auto animate-in fade-in zoom-in duration-300">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 border-b border-shin-red/20 pb-4">
         <div className="flex items-center gap-4">
@@ -202,19 +210,99 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
             <div className="text-[10px] font-cinzel text-shin-gold uppercase tracking-widest flex items-center gap-1.5">
               <Bot size={13} /> Owned Fighter Sub-Account Wallets
             </div>
-            <div className="space-y-1.5 max-h-28 overflow-y-auto">
-              {ownedFighters.map((f) => (
-                <div
-                  key={f.tokenId}
-                  className="flex items-center justify-between text-xs font-mono bg-black/50 px-2.5 py-1.5 rounded border border-white/5"
-                >
-                  <span className="text-white truncate">{f.title} (Lv.{f.powerLevel})</span>
-                  <span className="text-emerald-400 font-bold">{f.vaultBalanceNear.toFixed(2)} NEAR</span>
-                </div>
-              ))}
-            </div>
+            {ownedFighters.length === 0 ? (
+              <div className="text-xs font-mono text-gray-500 py-2">
+                No fighter sub-accounts active yet.
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-28 overflow-y-auto">
+                {ownedFighters.map((f) => (
+                  <div
+                    key={f.tokenId}
+                    className="flex items-center justify-between text-xs font-mono bg-black/50 px-2.5 py-1.5 rounded border border-white/5"
+                  >
+                    <span className="text-white truncate">{f.title} (Lv.{f.powerLevel})</span>
+                    <span className="text-emerald-400 font-bold">{f.vaultBalanceNear.toFixed(2)} NEAR</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* User's Fighter NFTs */}
+      <div className="mt-5 bg-white/5 border border-white/10 p-4 rounded-xl">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs font-cinzel text-shin-gold uppercase tracking-widest flex items-center gap-2 font-bold">
+            <Swords size={14} /> My Fighter NFTs ({ownedFighters.length})
+          </div>
+          <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider">
+            On-Chain • shin-arena-28d.testnet
+          </span>
+        </div>
+
+        {ownedFighters.length === 0 ? (
+          <div className="bg-black/40 border border-white/5 rounded-xl p-6 text-center">
+            <p className="text-xs font-mono text-gray-400">
+              No Fighter NFTs owned on-chain yet.
+            </p>
+            <p className="text-[11px] font-mono text-gray-500 mt-1">
+              Mint a fighter in the Arena to see your NFT roster, stats, and War Chest here.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
+            {ownedFighters.map((f) => (
+              <div
+                key={f.tokenId}
+                className="bg-black/50 border border-white/10 hover:border-shin-gold/50 rounded-xl p-3 flex items-center gap-3 transition-colors"
+              >
+                <img
+                  src={getCharGif(f.charId)}
+                  alt={f.name}
+                  className="w-16 h-16 object-contain bg-black/70 rounded-lg p-1 border border-white/10 shrink-0"
+                  style={{ imageRendering: 'pixelated' }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-cinzel font-bold text-sm text-white truncate">
+                      {f.title}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold bg-shin-gold text-black px-1.5 py-0.5 rounded shrink-0">
+                      LV.{f.powerLevel}
+                    </span>
+                  </div>
+                  <div className="text-[10px] font-mono text-gray-500 truncate mt-0.5">
+                    ID: {f.tokenId}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1.5 text-[10px] font-mono text-gray-300">
+                    <span>ATK {f.atk}</span>
+                    <span>•</span>
+                    <span>DEF {f.def}</span>
+                    <span>•</span>
+                    <span>SPD {f.spd}</span>
+                    <span>•</span>
+                    <span className="text-shin-gold">ELO {f.elo}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5 text-[10px] font-mono">
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <Coins size={11} /> {f.vaultBalanceNear.toFixed(2)} NEAR
+                    </span>
+                    <span className="text-gray-400">
+                      {f.wins}W - {f.losses}L
+                      {f.isAgentActive && (
+                        <span className="ml-1.5 text-emerald-400 inline-flex items-center gap-0.5">
+                          <Zap size={10} /> AI
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mt-6 flex justify-center">
