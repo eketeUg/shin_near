@@ -42,7 +42,10 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
   const ownedFighters = arenaState.fighters.filter((f) => !f.isNpc);
   const totalWins = ownedFighters.reduce((acc, f) => acc + f.wins, 0);
   const totalLosses = ownedFighters.reduce((acc, f) => acc + f.losses, 0);
-  const bestElo = ownedFighters.reduce((max, f) => Math.max(max, f.elo), 1080);
+  const bestElo =
+    ownedFighters.length > 0
+      ? ownedFighters.reduce((max, f) => Math.max(max, f.elo), 1000)
+      : 0;
 
   const handleUpdateUsername = () => {
     if (!newUsername.trim()) return;

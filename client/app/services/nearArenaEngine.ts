@@ -354,7 +354,7 @@ export const AGENT_PERSONALITY_ARCHETYPES: {
   },
 ];
 
-const STORAGE_KEY = 'shin_near_arena_state_v5';
+const STORAGE_KEY = 'shin_near_arena_state_v6';
 
 function randomHex(len: number): string {
   try {
@@ -632,6 +632,8 @@ class NearArenaEngine {
 
   private loadOrInitState(): ArenaPersistentState {
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('shin_near_arena_state_v4');
+      localStorage.removeItem('shin_near_arena_state_v5');
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         try {
