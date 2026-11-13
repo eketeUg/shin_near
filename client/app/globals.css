@@ -206,3 +206,12 @@ h1, h2, h3, .font-cinzel {
 .animate-rotate-phone {
   animation: rotatePhoneToLandscape 2.6s ease-in-out infinite;
 }
+
+/* Scale down Tailwind rem-based UI elements on short mobile landscape screens (~360-430px tall)
+   without affecting the Phaser pixel canvas */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 540px),
+       (orientation: landscape) and (max-height: 460px) {
+  html {
+    font-size: 12px;
+  }
+}
