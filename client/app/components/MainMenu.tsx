@@ -29,6 +29,8 @@ interface MainMenuProps {
   initialModal?: 'controls' | 'about' | 'settings' | 'lobby' | 'auth' | 'gamemode' | 'profile' | 'judge' | null;
   onStart: (user: any, mode: 'PVE' | 'PVP') => void;
   onWatchLive: (match?: any) => void;
+  onOpenDojoLobby?: () => void;
+  onOpenTournaments?: () => void;
   onOpenColosseum?: (initialTab?: 'LIVE_ARENA' | 'MY_AGENTS' | 'DOJO_MARKET' | 'LEDGER') => void;
   onAwakenWarrior?: (charId?: CharacterId) => void;
   isMuted: boolean;
@@ -39,6 +41,8 @@ const MainMenu = ({
   initialModal = null,
   onStart,
   onWatchLive,
+  onOpenDojoLobby,
+  onOpenTournaments,
   onOpenColosseum,
   onAwakenWarrior,
   isMuted,
@@ -326,18 +330,46 @@ const MainMenu = ({
               </div>
             </button>
 
-            {/* BLADE 4: AWAKEN NEW WARRIOR & SPECTATE */}
-            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 pt-1">
+            {/* BLADE 4: DOJO SOCIAL LOBBY, TOURNAMENTS, AWAKEN WARRIOR & SPECTATE TV */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              <button
+                onClick={() => {
+                  playClickSound();
+                  onOpenDojoLobby?.();
+                }}
+                onMouseEnter={playHoverSound}
+                className="arcade-skew bg-black/80 hover:bg-emerald-500/20 border border-emerald-400/50 hover:border-emerald-400 px-2.5 py-2.5 sm:py-3 transition-all cursor-pointer group"
+              >
+                <div className="arcade-unskew flex items-center justify-center gap-1.5 font-cinzel font-bold text-[10px] sm:text-[11px] tracking-wider text-emerald-300 group-hover:text-white uppercase">
+                  <UserIcon size={13} />
+                  <span>Dojo Chat Lobby</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  playClickSound();
+                  onOpenTournaments?.();
+                }}
+                onMouseEnter={playHoverSound}
+                className="arcade-skew bg-black/80 hover:bg-purple-500/20 border border-purple-400/50 hover:border-purple-400 px-2.5 py-2.5 sm:py-3 transition-all cursor-pointer group"
+              >
+                <div className="arcade-unskew flex items-center justify-center gap-1.5 font-cinzel font-bold text-[10px] sm:text-[11px] tracking-wider text-purple-300 group-hover:text-white uppercase">
+                  <Trophy size={13} />
+                  <span>Tournaments</span>
+                </div>
+              </button>
+
               <button
                 onClick={() => {
                   playClickSound();
                   onAwakenWarrior?.('kunoichi');
                 }}
                 onMouseEnter={playHoverSound}
-                className="arcade-skew bg-black/70 hover:bg-shin-gold/20 border border-shin-gold/40 hover:border-shin-gold px-3 sm:px-4 py-2.5 sm:py-3 transition-all cursor-pointer group"
+                className="arcade-skew bg-black/80 hover:bg-shin-gold/20 border border-shin-gold/40 hover:border-shin-gold px-2.5 py-2.5 sm:py-3 transition-all cursor-pointer group"
               >
-                <div className="arcade-unskew flex items-center justify-center gap-1.5 sm:gap-2 font-cinzel font-bold text-[10px] sm:text-xs tracking-wider sm:tracking-widest text-shin-gold group-hover:text-white uppercase">
-                  <Sparkles size={14} />
+                <div className="arcade-unskew flex items-center justify-center gap-1.5 font-cinzel font-bold text-[10px] sm:text-[11px] tracking-wider text-shin-gold group-hover:text-white uppercase">
+                  <Sparkles size={13} />
                   <span>Awaken Warrior</span>
                 </div>
               </button>
@@ -348,11 +380,11 @@ const MainMenu = ({
                   onWatchLive();
                 }}
                 onMouseEnter={playHoverSound}
-                className="arcade-skew bg-black/70 hover:bg-blue-500/20 border border-blue-400/40 hover:border-blue-400 px-3 sm:px-4 py-2.5 sm:py-3 transition-all cursor-pointer group"
+                className="arcade-skew bg-black/80 hover:bg-blue-500/20 border border-blue-400/40 hover:border-blue-400 px-2.5 py-2.5 sm:py-3 transition-all cursor-pointer group"
               >
-                <div className="arcade-unskew flex items-center justify-center gap-1.5 sm:gap-2 font-cinzel font-bold text-[10px] sm:text-xs tracking-wider sm:tracking-widest text-blue-300 group-hover:text-white uppercase">
-                  <Eye size={14} />
-                  <span>Dojo Lobby &amp; Cups</span>
+                <div className="arcade-unskew flex items-center justify-center gap-1.5 font-cinzel font-bold text-[10px] sm:text-[11px] tracking-wider text-blue-300 group-hover:text-white uppercase">
+                  <Eye size={13} />
+                  <span>Spectate TV</span>
                 </div>
               </button>
             </div>

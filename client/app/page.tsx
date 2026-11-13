@@ -7,6 +7,8 @@ import MainMenu from './components/MainMenu';
 import PreGameFlow, { GameMode, CharacterId } from './components/PreGameFlow';
 import MintFighterFlow from './components/MintFighterFlow';
 import LiveFightsFlow from './components/LiveFightsFlow';
+import DojoLobbyFlow from './components/DojoLobbyFlow';
+import TournamentsFlow from './components/TournamentsFlow';
 import SpectatorGameCanvasWrapper from './components/SpectatorGameCanvasWrapper';
 import MatchmakingScreen from './components/MatchmakingScreen';
 import AgentArenaFlow from './components/AgentArenaFlow';
@@ -19,6 +21,8 @@ export default function Home() {
   const [showPreGameFlow, setShowPreGameFlow] = useState(false);
   const [showMintFlow, setShowMintFlow] = useState(false);
   const [showLiveFights, setShowLiveFights] = useState(false);
+  const [showDojoLobby, setShowDojoLobby] = useState(false);
+  const [showTournaments, setShowTournaments] = useState(false);
   const [showAgentArena, setShowAgentArena] = useState(false);
   const [agentArenaInitialTab, setAgentArenaInitialTab] = useState<
     'LIVE_ARENA' | 'MY_AGENTS' | 'DOJO_MARKET' | 'LEDGER'
@@ -274,6 +278,8 @@ export default function Home() {
     setShowPreGameFlow(false);
     setShowMintFlow(false);
     setShowLiveFights(false);
+    setShowDojoLobby(false);
+    setShowTournaments(false);
     setShowAgentArena(false);
     setShowMatchmaking(false);
     setReturnToAgentArenaAfterFight(false);
@@ -344,6 +350,8 @@ export default function Home() {
         !showPreGameFlow &&
         !showMintFlow &&
         !showLiveFights &&
+        !showDojoLobby &&
+        !showTournaments &&
         !showAgentArena &&
         !showMatchmaking && (
           <MainMenu
@@ -359,6 +367,12 @@ export default function Home() {
                 setLastMenuModal('lobby');
                 setShowLiveFights(true);
               }
+            }}
+            onOpenDojoLobby={() => {
+              setShowDojoLobby(true);
+            }}
+            onOpenTournaments={() => {
+              setShowTournaments(true);
             }}
             onOpenColosseum={(tab = 'LIVE_ARENA') => {
               setAgentArenaInitialTab(tab);
@@ -528,20 +542,42 @@ export default function Home() {
         </div>
       )}
 
-      {/* Live Fights Flow */}
-      {!isLoading && showLiveFights && (
-        <LiveFightsFlow
-          onWatchMatch={(matchData: any) => {
-            setShowLiveFights(false);
-            if (matchData && matchData.p1 && matchData.p2) {
-              launchAgentArenaFight(matchData);
-            } else {
-              setSpectatingMatch(matchData);
-              setIsSpectating(true);
-            }
+      {/* Dedicated Dojo Social Messenger & Lobby */}
+      {!isLoading && showDojoLobby && (
+        <DojoLobbyFlow
+          onStartAgreedDuel={(duelConfig) => {
+            setShowDojoLobby(false);
+            startPlayerFightWithLandscapeGate({
+              mode: 'PVE',
+              p1: duelConfig.p1Char,
+              p2: duelConfig.p2Char,
+              p1Name: username,
+              p2Name: duelConfig.p2Name,
+              difficulty: 'HARD',
+              rounds: 1,
+              wager:
+                duelConfig.wagerNear > 0
+                  ? { token: 'NEAR', amount: duelConfig.wagerNear }
+                  : null,
+            });
           }}
-          onStartDirectDuel={(duelConfig) => {
-            setShowLiveFights(false);
+          onJoinRoomCode={(code, wagerNear) => {
+            setShowDojoLobby(false);
+            setMatchmakingP1Char((ownedChars[0] as CharacterId) || 'fighter');
+            setWager(wagerNear > 0 ? { token: 'NEAR', amount: wagerNear } : null);
+            setMatchmakingRoomCode(code);
+            setShowMatchmaking(true);
+          }}
+          onBack={() => setShowDojoLobby(false)}
+          onHome={handleHome}
+        />
+      )}
+
+      {/* Dedicated Daily & Continuous Agent Tournaments Flow */}
+      {!isLoading && showTournaments && (
+        <TournamentsFlow
+          onStartTournamentDuel={(duelConfig) => {
+            setShowTournaments(false);
             startPlayerFightWithLandscapeGate({
               mode: 'PVE',
               p1: duelConfig.p1Char,
@@ -554,12 +590,22 @@ export default function Home() {
               isTournamentBout: duelConfig.isTournamentBout,
             });
           }}
-          onJoinRoomCode={(code, wagerNear) => {
+          onBack={() => setShowTournaments(false)}
+          onHome={handleHome}
+        />
+      )}
+
+      {/* Live Fights Flow (Spectate TV) */}
+      {!isLoading && showLiveFights && (
+        <LiveFightsFlow
+          onWatchMatch={(matchData: any) => {
             setShowLiveFights(false);
-            setMatchmakingP1Char((ownedChars[0] as CharacterId) || 'fighter');
-            setWager(wagerNear > 0 ? { token: 'NEAR', amount: wagerNear } : null);
-            setMatchmakingRoomCode(code);
-            setShowMatchmaking(true);
+            if (matchData && matchData.p1 && matchData.p2) {
+              launchAgentArenaFight(matchData);
+            } else {
+              setSpectatingMatch(matchData);
+              setIsSpectating(true);
+            }
           }}
           onBack={() => setShowLiveFights(false)}
           onHome={handleHome}

@@ -45,16 +45,40 @@ export interface LobbyChatMessage {
   senderCharId?: string;
   archetypeBadge?: string;
   recipientName?: string;
+  recipientAccountId?: string; // undefined = Global Dojo Lounge, otherwise 1-on-1 DM thread
+  deliveryStatus?: 'DELIVERED_LIVE' | 'QUEUED_OFFLINE' | 'READ_ON_WAKE';
   text: string;
   timestamp: number;
   challengeOffer?: {
+    proposalId: string;
     challengerId: string;
     challengerName: string;
     challengerCharId: string;
     targetId: string;
     targetName: string;
-    wagerNear: number;
+    targetCharId: string;
+    wagerNear: number; // 0 = Free Match
+    status: 'PENDING' | 'ACCEPTED' | 'COUNTERED' | 'DECLINED';
+    counterWagerNear?: number;
   };
+}
+
+export interface DojoSocialContact {
+  contactId: string;
+  username: string;
+  accountId: string;
+  userType: 'HUMAN' | 'AGENT';
+  charId: string;
+  isOnline: boolean;
+  lastSeenLabel: string;
+  statusBio: string;
+  elo: number;
+  wins: number;
+  losses: number;
+  preferredWagerNear: number;
+  agentTokenId?: string;
+  archetypeBadge?: string;
+  ownerName?: string;
 }
 
 export interface TournamentBracketMatch {
@@ -592,6 +616,7 @@ export interface ArenaPersistentState {
   playerItems: Record<string, number>;
   simulatedDaysElapsed: number;
   lobbyChat: LobbyChatMessage[];
+  socialContacts: DojoSocialContact[];
   humanDailyTournament: HumanDailyTournamentState;
   agentContinuousTournament: ContinuousAgentTournamentState;
 }
@@ -612,6 +637,9 @@ class NearArenaEngine {
           if (parsed && parsed.playerWallet && parsed.fighters && parsed.npcMerchants) {
             if (!parsed.lobbyChat) {
               parsed.lobbyChat = [];
+            }
+            if (!parsed.socialContacts) {
+              parsed.socialContacts = this.buildInitialSocialContacts();
             }
             if (!parsed.humanDailyTournament) {
               parsed.humanDailyTournament = this.buildInitialHumanTournament(
@@ -738,6 +766,7 @@ class NearArenaEngine {
           timestamp: Date.now() - 18000,
         },
       ],
+      socialContacts: this.buildInitialSocialContacts(),
       humanDailyTournament: this.buildInitialHumanTournament(defaultUsername, playerAccountId),
       agentContinuousTournament: this.buildInitialAgentTournament(fighters, 1),
       ledger: [
@@ -920,6 +949,67 @@ class NearArenaEngine {
         status: 'BETTING_OPEN',
         createdAt: Date.now() - 10000,
         txHash: makeTxHash(),
+      },
+    ];
+  }
+
+  private buildInitialSocialContacts(): DojoSocialContact[] {
+    return [
+      {
+        contactId: 'human-hanzo',
+        username: 'Hanzo_Slayer',
+        accountId: 'hanzoslayer.shin-arena.testnet',
+        userType: 'HUMAN',
+        charId: 'shinobi',
+        isOnline: true,
+        lastSeenLabel: 'Active now',
+        statusBio: 'Looking for 1 NEAR Shinobi mirror match or Free sparring!',
+        elo: 1260,
+        wins: 19,
+        losses: 7,
+        preferredWagerNear: 1.0,
+      },
+      {
+        contactId: 'human-kaede',
+        username: 'Kaede_Blade',
+        accountId: 'kaede.shin-arena.testnet',
+        userType: 'HUMAN',
+        charId: 'kunoichi',
+        isOnline: true,
+        lastSeenLabel: 'Active now',
+        statusBio: 'Warming up for the Blood-Moon Open Cup. DM to negotiate wager!',
+        elo: 1315,
+        wins: 24,
+        losses: 9,
+        preferredWagerNear: 2.0,
+      },
+      {
+        contactId: 'human-ryu',
+        username: 'Ryu_Ronin',
+        accountId: 'ryuronin.shin-arena.testnet',
+        userType: 'HUMAN',
+        charId: 'samurai',
+        isOnline: false,
+        lastSeenLabel: 'Last seen 18m ago',
+        statusBio: 'Away at Kenji’s Forge. Leave a DM and I’ll duel when I’m back online!',
+        elo: 1190,
+        wins: 11,
+        losses: 6,
+        preferredWagerNear: 0.5,
+      },
+      {
+        contactId: 'human-sora',
+        username: 'Sora_Monk',
+        accountId: 'soramonk.shin-arena.testnet',
+        userType: 'HUMAN',
+        charId: 'ninja_monk',
+        isOnline: false,
+        lastSeenLabel: 'Last seen 1h ago',
+        statusBio: 'Offline meditating. Message me to schedule a 2 NEAR duel.',
+        elo: 1235,
+        wins: 15,
+        losses: 8,
+        preferredWagerNear: 2.0,
       },
     ];
   }
@@ -2100,12 +2190,322 @@ class NearArenaEngine {
       this.state.lobbyChat.push(agentReply);
     }
 
-    if (this.state.lobbyChat.length > 40) {
-      this.state.lobbyChat = this.state.lobbyChat.slice(-40);
+    if (this.state.lobbyChat.length > 80) {
+      this.state.lobbyChat = this.state.lobbyChat.slice(-80);
     }
 
     this.saveState();
     return { userMsg, agentReply };
+  }
+
+  /**
+   * Returns unified directory of all searchable Humans + Autonomous NEAR Fighter Agents
+   * with their live online/offline status, records, and wallet addresses.
+   */
+  public getSocialDirectory(): DojoSocialContact[] {
+    if (!this.state.socialContacts) {
+      this.state.socialContacts = this.buildInitialSocialContacts();
+    }
+    const agentContacts: DojoSocialContact[] = this.state.fighters.map((f) => {
+      const archMeta = AGENT_PERSONALITY_ARCHETYPES.find(
+        (a) => a.id === f.personality?.archetype,
+      );
+      return {
+        contactId: `agent-${f.tokenId}`,
+        username: f.title,
+        accountId: f.agentWalletId,
+        userType: 'AGENT',
+        charId: f.charId,
+        isOnline: f.isAgentActive,
+        lastSeenLabel: f.isAgentActive ? 'Autonomous 24/7 Online' : 'Resting in Barracks',
+        statusBio:
+          f.personality?.greetingLine ||
+          'Autonomous NEAR Fighter Agent ready for wagered duels.',
+        elo: f.elo,
+        wins: f.wins,
+        losses: f.losses,
+        preferredWagerNear: f.personality?.minWagerNear ?? f.wagerPerFightNear,
+        agentTokenId: f.tokenId,
+        archetypeBadge: archMeta?.badge || '⛩️ BUSHIDO',
+        ownerName: f.ownerName,
+      };
+    });
+
+    return [...this.state.socialContacts, ...agentContacts];
+  }
+
+  /**
+   * Send a Direct Message (or Global Lounge message) to any Human or Agent (Online or Offline).
+   * - If the recipient is OFFLINE, the message is stored with `QUEUED_OFFLINE` status so they see it when they come online!
+   * - If the recipient is ONLINE, they receive it immediately (`DELIVERED_LIVE`) and reply in real time.
+   */
+  public sendDirectMessage(params: {
+    recipientAccountId?: string; // omit for Global Dojo Lounge
+    text: string;
+  }): { sentMsg: LobbyChatMessage; autoReply?: LobbyChatMessage } {
+    if (!this.state.lobbyChat) {
+      this.state.lobbyChat = [];
+    }
+    const player = this.state.playerWallet;
+    const directory = this.getSocialDirectory();
+    const target = params.recipientAccountId
+      ? directory.find((c) => c.accountId === params.recipientAccountId)
+      : undefined;
+
+    if (!target) {
+      const res = this.postLobbyChatMessage({ text: params.text });
+      return { sentMsg: res.userMsg, autoReply: res.agentReply };
+    }
+
+    const deliveryStatus = target.isOnline ? 'DELIVERED_LIVE' : 'QUEUED_OFFLINE';
+
+    const sentMsg: LobbyChatMessage = {
+      id: 'dm-' + Date.now(),
+      senderName: player.username,
+      senderAccountId: player.accountId,
+      senderType: 'HUMAN',
+      senderCharId: 'fighter',
+      recipientName: target.username,
+      recipientAccountId: target.accountId,
+      deliveryStatus,
+      text: params.text.trim(),
+      timestamp: Date.now(),
+    };
+    this.state.lobbyChat.push(sentMsg);
+
+    let autoReply: LobbyChatMessage | undefined;
+
+    if (target.isOnline) {
+      if (target.userType === 'AGENT' && target.agentTokenId) {
+        const fighter = this.state.fighters.find((f) => f.tokenId === target.agentTokenId);
+        const p = fighter?.personality;
+        const lower = params.text.toLowerCase();
+        let replyText =
+          p?.greetingLine || 'My blade is ready. Send a Fight Request card to lock our wager!';
+        if (lower.includes('free') || lower.includes('0 near')) {
+          replyText =
+            (p?.minWagerNear || 0) > 0
+              ? `I usually fight for at least ${p?.minWagerNear} NEAR, ${player.username}, but send a Fight Request card if you want to negotiate!`
+              : `A free sparring match? Send the Fight Request card and let's test your stance!`;
+        } else if (
+          lower.includes('fight') ||
+          lower.includes('duel') ||
+          lower.includes('wager') ||
+          lower.includes('near')
+        ) {
+          replyText = `${p?.challengeAcceptLine || 'I accept your terms!'} Use the "⚔️ Send Fight Request" button below to propose the exact NEAR stake or Free Match.`;
+        }
+        autoReply = {
+          id: 'dm-reply-' + (Date.now() + 1),
+          senderName: target.username,
+          senderAccountId: target.accountId,
+          senderType: 'AGENT',
+          senderCharId: target.charId,
+          archetypeBadge: target.archetypeBadge,
+          recipientName: player.username,
+          recipientAccountId: player.accountId,
+          deliveryStatus: 'DELIVERED_LIVE',
+          text: replyText,
+          timestamp: Date.now() + 250,
+        };
+        this.state.lobbyChat.push(autoReply);
+      } else if (target.userType === 'HUMAN') {
+        const lower = params.text.toLowerCase();
+        let replyText = `Yo ${player.username}! I'm online right now. Want to run a ${target.preferredWagerNear} NEAR wager match or a Free Match? Send me a Fight Request card!`;
+        if (lower.includes('free')) {
+          replyText = `Sure, I'm down for a Free Match (0 NEAR) to warm up! Click "⚔️ Send Fight Request" and select Free Match.`;
+        } else if (lower.includes('wager') || lower.includes('near') || lower.includes('fight')) {
+          replyText = `Let's do it! Send the Fight Request card with the NEAR amount and I'll accept right here in chat.`;
+        }
+        autoReply = {
+          id: 'dm-reply-' + (Date.now() + 1),
+          senderName: target.username,
+          senderAccountId: target.accountId,
+          senderType: 'HUMAN',
+          senderCharId: target.charId,
+          recipientName: player.username,
+          recipientAccountId: player.accountId,
+          deliveryStatus: 'DELIVERED_LIVE',
+          text: replyText,
+          timestamp: Date.now() + 300,
+        };
+        this.state.lobbyChat.push(autoReply);
+      }
+    }
+
+    this.saveState();
+    return { sentMsg, autoReply };
+  }
+
+  /**
+   * Toggles an offline Human or resting Agent to ONLINE, delivering all queued offline messages
+   * (`QUEUED_OFFLINE` -> `READ_ON_WAKE`) and triggering an immediate reply to their missed messages!
+   */
+  public toggleContactOnlineStatus(accountId: string): DojoSocialContact | undefined {
+    if (!this.state.socialContacts) {
+      this.state.socialContacts = this.buildInitialSocialContacts();
+    }
+    const player = this.state.playerWallet;
+    const humanContact = this.state.socialContacts.find((c) => c.accountId === accountId);
+    const agentFighter = this.state.fighters.find((f) => f.agentWalletId === accountId);
+
+    let nowOnline = false;
+    let targetName = '';
+    let targetCharId = 'shinobi';
+    let targetType: 'HUMAN' | 'AGENT' = 'HUMAN';
+
+    if (humanContact) {
+      humanContact.isOnline = !humanContact.isOnline;
+      humanContact.lastSeenLabel = humanContact.isOnline ? 'Active now' : 'Last seen just now';
+      nowOnline = humanContact.isOnline;
+      targetName = humanContact.username;
+      targetCharId = humanContact.charId;
+      targetType = 'HUMAN';
+    } else if (agentFighter) {
+      agentFighter.isAgentActive = !agentFighter.isAgentActive;
+      nowOnline = agentFighter.isAgentActive;
+      targetName = agentFighter.title;
+      targetCharId = agentFighter.charId;
+      targetType = 'AGENT';
+    }
+
+    // If they just came online, mark all queued offline messages sent to them as READ_ON_WAKE and reply!
+    if (nowOnline) {
+      let hadQueuedMessages = false;
+      (this.state.lobbyChat || []).forEach((m) => {
+        if (
+          m.recipientAccountId === accountId &&
+          m.deliveryStatus === 'QUEUED_OFFLINE'
+        ) {
+          m.deliveryStatus = 'READ_ON_WAKE';
+          hadQueuedMessages = true;
+        }
+      });
+
+      if (hadQueuedMessages) {
+        this.state.lobbyChat.push({
+          id: 'dm-wake-' + Date.now(),
+          senderName: targetName,
+          senderAccountId: accountId,
+          senderType: targetType,
+          senderCharId: targetCharId,
+          recipientName: player.username,
+          recipientAccountId: player.accountId,
+          deliveryStatus: 'DELIVERED_LIVE',
+          text: `Hey @${player.username}! Just came back online and saw your messages. I'm ready — send a Fight Request card if you want to duel now!`,
+          timestamp: Date.now(),
+        });
+      }
+    }
+
+    this.saveState();
+    return this.getSocialDirectory().find((c) => c.accountId === accountId);
+  }
+
+  /**
+   * Sends an interactive Fight Request & Wager Proposal Card inside a 1-on-1 chat thread.
+   * Both users must be online. Supports Free Match (0 NEAR) or Wagered Match (e.g. 0.5, 1, 2, 5 NEAR).
+   */
+  public sendChatFightProposal(params: {
+    targetAccountId: string;
+    wagerNear: number; // 0 = Free Match
+  }): LobbyChatMessage {
+    const directory = this.getSocialDirectory();
+    const target = directory.find((c) => c.accountId === params.targetAccountId);
+    if (!target) {
+      throw new Error('Warrior not found in directory');
+    }
+    if (!target.isOnline) {
+      throw new Error(
+        `${target.username} is currently offline. Send them a message first or wait until they are online to request a live fight!`,
+      );
+    }
+
+    const player = this.state.playerWallet;
+    const myCharId = this.state.fighters.find((f) => !f.isNpc)?.charId || 'fighter';
+    const proposalId = 'prop-' + Date.now();
+
+    // Check if the recipient automatically accepts or counters the wager
+    let initialStatus: 'PENDING' | 'ACCEPTED' | 'COUNTERED' = 'ACCEPTED';
+    let counterWagerNear: number | undefined;
+
+    if (target.userType === 'AGENT' && target.preferredWagerNear > params.wagerNear && params.wagerNear > 0) {
+      initialStatus = 'COUNTERED';
+      counterWagerNear = target.preferredWagerNear;
+    }
+
+    const proposalMsg: LobbyChatMessage = {
+      id: 'chat-prop-' + Date.now(),
+      senderName: player.username,
+      senderAccountId: player.accountId,
+      senderType: 'HUMAN',
+      senderCharId: myCharId,
+      recipientName: target.username,
+      recipientAccountId: target.accountId,
+      deliveryStatus: 'DELIVERED_LIVE',
+      text:
+        params.wagerNear > 0
+          ? `⚔️ Sent a ${params.wagerNear} NEAR Wager Fight Request to ${target.username}`
+          : `⚔️ Sent a Free Match (0 NEAR) Sparring Request to ${target.username}`,
+      timestamp: Date.now(),
+      challengeOffer: {
+        proposalId,
+        challengerId: player.accountId,
+        challengerName: player.username,
+        challengerCharId: myCharId,
+        targetId: target.accountId,
+        targetName: target.username,
+        targetCharId: target.charId,
+        wagerNear: params.wagerNear,
+        status: initialStatus,
+        counterWagerNear,
+      },
+    };
+
+    this.state.lobbyChat.push(proposalMsg);
+
+    // Add an in-chat response message from the opponent explaining their agreement or counter-offer
+    const replyMsg: LobbyChatMessage = {
+      id: 'chat-prop-reply-' + (Date.now() + 1),
+      senderName: target.username,
+      senderAccountId: target.accountId,
+      senderType: target.userType,
+      senderCharId: target.charId,
+      archetypeBadge: target.archetypeBadge,
+      recipientName: player.username,
+      recipientAccountId: player.accountId,
+      deliveryStatus: 'DELIVERED_LIVE',
+      text:
+        initialStatus === 'COUNTERED'
+          ? `I counter-propose ${counterWagerNear} NEAR! Click "Accept Counter (${counterWagerNear} NEAR)" on the card above or adjust the stake.`
+          : params.wagerNear > 0
+          ? `Deal! I agreed to your ${params.wagerNear} NEAR wager. Click "⚔️ Enter Arena & Fight Now" on the card above!`
+          : `Deal! I agreed to a Free Match (0 NEAR). Click "⚔️ Enter Arena & Fight Now" on the card above!`,
+      timestamp: Date.now() + 150,
+    };
+    this.state.lobbyChat.push(replyMsg);
+
+    this.saveState();
+    return proposalMsg;
+  }
+
+  /**
+   * Update an existing in-chat Fight Proposal (e.g. accept a counter-offer or change wager)
+   */
+  public updateChatFightProposal(
+    proposalId: string,
+    newWagerNear: number,
+    newStatus: 'ACCEPTED' | 'DECLINED',
+  ): LobbyChatMessage | undefined {
+    const msg = (this.state.lobbyChat || []).find(
+      (m) => m.challengeOffer?.proposalId === proposalId,
+    );
+    if (msg && msg.challengeOffer) {
+      msg.challengeOffer.wagerNear = newWagerNear;
+      msg.challengeOffer.status = newStatus;
+      this.saveState();
+    }
+    return msg;
   }
 
   /**
