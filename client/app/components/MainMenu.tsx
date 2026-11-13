@@ -89,6 +89,9 @@ const MainMenu = ({
           const name = parsed.username || parsed.userName || 'Warrior';
           setUsername(name);
           nearArenaEngine.syncUsername(name, parsed.walletAddress);
+          if (!parsed.isGuest && parsed.walletAddress) {
+            void nearArenaEngine.syncOnChainState(parsed.walletAddress);
+          }
           setIsAuthLoading(false);
           return;
         }
@@ -103,6 +106,9 @@ const MainMenu = ({
           const name = authedUser.username || authedUser.userName || 'Warrior';
           setUsername(name);
           nearArenaEngine.syncUsername(name, authedUser.walletAddress);
+          if (authedUser.walletAddress) {
+            void nearArenaEngine.syncOnChainState(authedUser.walletAddress);
+          }
           return;
         }
         // Not logged in yet: keep home screen clean with Login button (no auto guest_... name)
@@ -132,10 +138,14 @@ const MainMenu = ({
 
   const handleQuickTopUp = () => {
     playClickSound();
-    nearArenaEngine.claimFaucetOrIntentSwap(15, 50);
+    if (!currentUser || currentUser.isGuest) {
+      setActiveModal('auth');
+      return;
+    }
+    nearArenaEngine.claimFaucetOrIntentSwap();
     setArenaState({ ...nearArenaEngine.getState() });
-    setTopUpFeedback('+15 NEAR added to War Chest!');
-    setTimeout(() => setTopUpFeedback(null), 2500);
+    setTopUpFeedback('Requesting 0.25 NEAR on-chain...');
+    setTimeout(() => setTopUpFeedback(null), 3000);
   };
 
   return (
@@ -600,6 +610,9 @@ const MainMenu = ({
                   const name = user.username || user.userName || 'Warrior';
                   setUsername(name);
                   nearArenaEngine.syncUsername(name, user.walletAddress);
+                  if (!user.isGuest && user.walletAddress) {
+                    void nearArenaEngine.syncOnChainState(user.walletAddress);
+                  }
                   setArenaState({ ...nearArenaEngine.getState() });
                   setActiveModal(null);
                   if (pendingFightMode) {

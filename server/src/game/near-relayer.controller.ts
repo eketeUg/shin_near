@@ -75,4 +75,35 @@ export class NearRelayerController {
       body.gas || '60000000000000',
     );
   }
+
+  @Post('drip')
+  async dripTestnetNear(
+    @Req() req: Request,
+    @Body() body: { receiverId?: string },
+  ) {
+    const token = req.cookies?.['jwt'] as string | undefined;
+    if (!token) {
+      return {
+        ok: false,
+        simulated: true,
+        error: 'Login with Google or Email to claim Testnet NEAR',
+      };
+    }
+    let payload: any;
+    try {
+      payload = this.jwtService.verify(token);
+    } catch {
+      return {
+        ok: false,
+        simulated: true,
+        error: 'Session expired. Please sign in again.',
+      };
+    }
+
+    const target = body?.receiverId || payload?.walletAddress;
+    if (!target) {
+      return { ok: false, simulated: true, error: 'No walletAddress found' };
+    }
+    return this.nearRelayer.dripTestnetNear(target, '0.25');
+  }
 }

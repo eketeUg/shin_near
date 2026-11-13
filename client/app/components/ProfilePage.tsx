@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   User,
   Mail,
@@ -33,6 +33,12 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
   const [copySuccess, setCopySuccess] = useState(false);
 
   const nearAccount = arenaState.playerWallet.accountId;
+
+  useEffect(() => {
+    if (!user?.isGuest && nearAccount) {
+      void nearArenaEngine.syncOnChainState(nearAccount);
+    }
+  }, [nearAccount, user?.isGuest]);
   const ownedFighters = arenaState.fighters.filter((f) => !f.isNpc);
   const totalWins = ownedFighters.reduce((acc, f) => acc + f.wins, 0);
   const totalLosses = ownedFighters.reduce((acc, f) => acc + f.losses, 0);
@@ -41,7 +47,7 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
   const handleUpdateUsername = () => {
     if (!newUsername.trim()) return;
     localStorage.setItem('shin_username', newUsername.trim());
-    const wallet = nearArenaEngine.syncUsername(newUsername.trim());
+    const wallet = nearArenaEngine.syncUsername(newUsername.trim(), user?.walletAddress);
     const updated = {
       ...user,
       username: newUsername.trim(),

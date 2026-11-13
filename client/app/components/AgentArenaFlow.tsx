@@ -100,7 +100,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
   };
 
   const handleFaucetTopUp = () => {
-    nearArenaEngine.claimFaucetOrIntentSwap(15, 50);
+    nearArenaEngine.claimFaucetOrIntentSwap();
     setArenaState({ ...nearArenaEngine.getState() });
     showToast('+15 NEAR added to your War Chest!');
   };

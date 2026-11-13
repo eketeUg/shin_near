@@ -238,4 +238,86 @@ export class NearRelayerService implements OnModuleInit {
       };
     }
   }
+
+  /**
+   * Sends a small real Testnet NEAR drip to a newly onboarded user's implicit account
+   * (only if their current on-chain balance is below 0.1 NEAR).
+   */
+  async dripTestnetNear(
+    receiverId: string,
+    amountNear: string = '0.25',
+  ): Promise<NearRelayResult> {
+    if (!this.relayerAccount) {
+      return {
+        ok: false,
+        simulated: true,
+        contractId: this.contractId,
+        relayerAccountId: this.relayerAccountId,
+        methodName: 'sendMoney',
+        txHash: '',
+        explorerUrl: '',
+        error: 'NEAR relayer key is not loaded',
+      };
+    }
+
+    try {
+      // Check current balance first to prevent repeated drips
+      let currentNear = 0;
+      try {
+        const acct: any = await this.provider.query({
+          request_type: 'view_account',
+          finality: 'final',
+          account_id: receiverId,
+        });
+        if (acct?.amount) {
+          currentNear = Number(utils.format.formatNearAmount(acct.amount, 4).replace(/,/g, ''));
+        }
+      } catch {
+        currentNear = 0; // Account not yet initialized on-chain (0 NEAR)
+      }
+
+      if (currentNear >= 0.1) {
+        return {
+          ok: false,
+          simulated: false,
+          contractId: this.contractId,
+          relayerAccountId: this.relayerAccountId,
+          methodName: 'sendMoney',
+          txHash: '',
+          explorerUrl: '',
+          error: `Account already funded (${currentNear.toFixed(4)} NEAR)`,
+        };
+      }
+
+      const yocto = BigInt(utils.format.parseNearAmount(amountNear) || '0');
+      const outcome: any = await this.relayerAccount.sendMoney(receiverId, yocto);
+      const txHash: string =
+        outcome?.transaction?.hash || outcome?.transaction_outcome?.id || '';
+      const explorerUrl = txHash
+        ? `https://testnet.nearblocks.io/txns/${txHash}`
+        : '';
+
+      this.logger.log(`[NEAR DRIP] Sent ${amountNear} NEAR to ${receiverId} -> ${txHash}`);
+      return {
+        ok: true,
+        simulated: false,
+        contractId: this.contractId,
+        relayerAccountId: this.relayerAccountId,
+        methodName: 'sendMoney',
+        txHash,
+        explorerUrl,
+      };
+    } catch (err: any) {
+      return {
+        ok: false,
+        simulated: true,
+        contractId: this.contractId,
+        relayerAccountId: this.relayerAccountId,
+        methodName: 'sendMoney',
+        txHash: '',
+        explorerUrl: '',
+        error: err?.message || String(err),
+      };
+    }
+  }
 }

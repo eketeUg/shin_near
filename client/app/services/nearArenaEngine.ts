@@ -705,17 +705,18 @@ class NearArenaEngine {
       marketPriceNear: 0,
     };
 
-    const fighters = [starterFighter, ...INITIAL_NPCS];
+    const fighters = [...INITIAL_NPCS];
     const activeMatches = this.buildInitialMatches(fighters);
+    const defaultImplicit = randomHex(64);
 
     const initial: ArenaPersistentState = {
       playerWallet: {
-        accountId: playerAccountId,
-        implicitHex: randomHex(64),
+        accountId: defaultImplicit,
+        implicitHex: defaultImplicit,
         username: defaultUsername,
-        NEAR: 25.0,
-        USDC: 100.0,
-        USDT: 50.0,
+        NEAR: 0,
+        USDC: 0,
+        USDT: 0,
       },
       fighters,
       activeMatches,
@@ -729,9 +730,9 @@ class NearArenaEngine {
       },
       npcMerchants: this.buildInitialNpcMerchants(),
       playerItems: {
-        'material:tamahagane-steel': 10,
-        'material:spirit-ember': 6,
-        'scroll:crimson-katana': 1,
+        'material:tamahagane-steel': 0,
+        'material:spirit-ember': 0,
+        'scroll:crimson-katana': 0,
         'scroll:iron-posture': 0,
         'scroll:shadow-step-mastery': 1,
       },
@@ -1327,23 +1328,90 @@ class NearArenaEngine {
   }
 
   /**
-   * 1-Click Gasless Testnet Faucet / NEAR Intents Deposit (Zero Popups)
+   * Fetch real live NEAR Testnet balances & contract state for an authenticated wallet.
    */
-  public claimFaucetOrIntentSwap(nearAmount: number = 15, usdcAmount: number = 50): ArenaLedgerTx {
-    this.state.playerWallet.NEAR = Number((this.state.playerWallet.NEAR + nearAmount).toFixed(2));
-    this.state.playerWallet.USDC = Number((this.state.playerWallet.USDC + usdcAmount).toFixed(2));
+  public async syncOnChainState(walletAddress?: string): Promise<PlayerWalletState> {
+    const targetAddr = walletAddress?.trim() || this.state.playerWallet.accountId;
+    if (typeof window === 'undefined' || !targetAddr) {
+      return this.state.playerWallet;
+    }
 
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    try {
+      const balRes = await fetch(`${serverUrl}/api/wallet/balance/${encodeURIComponent(targetAddr)}`);
+      if (balRes.ok) {
+        const balData = await balRes.json();
+        const nearVal = Number(balData?.NEAR?.balance ?? 0);
+        const usdcVal = Number(balData?.USDC?.balance ?? 0);
+        const usdtVal = Number(balData?.USDT?.balance ?? 0);
+        this.state.playerWallet.NEAR = Number.isFinite(nearVal) ? nearVal : 0;
+        this.state.playerWallet.USDC = Number.isFinite(usdcVal) ? usdcVal : 0;
+        this.state.playerWallet.USDT = Number.isFinite(usdtVal) ? usdtVal : 0;
+      }
+
+      const costRes = await fetch(
+        `${serverUrl}/api/near/view?method=get_dynamic_dojo_cost`,
+      );
+      if (costRes.ok) {
+        const costData = await costRes.json();
+        if (costData?.ok && typeof costData?.result === 'number') {
+          this.state.npcDojo.currentDynamicCostNear = Number(
+            (costData.result / 1000).toFixed(3),
+          );
+        }
+      }
+
+      this.saveState();
+    } catch {
+      // Keep current state if backend is unreachable
+    }
+    return this.state.playerWallet;
+  }
+
+  /**
+   * Claim a real Testnet NEAR starter drip (0.25 NEAR) via the NestJS Relayer for authenticated users.
+   */
+  public claimFaucetOrIntentSwap(): ArenaLedgerTx {
+    const ledgerId = 'tx-drip-' + Date.now();
     const tx: ArenaLedgerTx = {
-      id: 'tx-' + Date.now(),
+      id: ledgerId,
       txHash: makeTxHash(),
       type: 'INTENTS_SWAP',
-      summary: `NEAR Intents Cross-Chain Top-Up: +${nearAmount} NEAR & +${usdcAmount} USDC credited to ${this.state.playerWallet.accountId} (Gasless)`,
-      amountNear: nearAmount,
+      summary: `Requesting 0.25 Testnet NEAR drip to ${this.state.playerWallet.accountId}...`,
+      amountNear: 0.25,
       actorWallet: this.state.playerWallet.accountId,
       timestamp: Date.now(),
     };
     this.state.ledger.unshift(tx);
     this.saveState();
+
+    if (typeof window !== 'undefined') {
+      const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+      fetch(`${serverUrl}/api/near/drip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ receiverId: this.state.playerWallet.accountId }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          const entry = this.state.ledger.find((t) => t.id === ledgerId);
+          if (data?.ok && data?.txHash) {
+            if (entry) {
+              entry.txHash = data.txHash;
+              entry.explorerUrl = data.explorerUrl;
+              entry.onChain = true;
+              entry.summary = `Funded +0.25 Testnet NEAR to ${this.state.playerWallet.accountId}`;
+            }
+            this.saveState();
+            void this.syncOnChainState(this.state.playerWallet.accountId);
+          } else if (data?.error && entry) {
+            entry.summary = data.error;
+            this.saveState();
+          }
+        })
+        .catch(() => {});
+    }
     return tx;
   }
 
