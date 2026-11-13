@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
+import { UsersService } from '../users/users.service';
+import { WalletService } from '../wallet/wallet.service';
 import { NearRelayerService } from './near-relayer.service';
 
 @Controller('near')
@@ -8,6 +10,8 @@ export class NearRelayerController {
   constructor(
     private readonly nearRelayer: NearRelayerService,
     private readonly jwtService: JwtService,
+    private readonly usersService: UsersService,
+    private readonly walletService: WalletService,
   ) {}
 
   @Get('status')
@@ -58,8 +62,9 @@ export class NearRelayerController {
         error: 'Login with Google or Email to execute on-chain NEAR transactions',
       };
     }
+    let payload: any;
     try {
-      this.jwtService.verify(token);
+      payload = this.jwtService.verify(token);
     } catch {
       return {
         ok: false,
@@ -68,11 +73,41 @@ export class NearRelayerController {
       };
     }
 
+    // Sign directly from the user's own funded NEAR wallet when balance >= 0.1 NEAR
+    let customSigner: { accountId: string; privateKey: string } | undefined;
+    try {
+      const dbUser = payload?.sub
+        ? await this.usersService.findById(payload.sub)
+        : null;
+      if (dbUser?.walletAddress && dbUser?.walletDetails) {
+        const bal = await this.walletService.getNearBalance(dbUser.walletAddress);
+        if ((bal?.balance ?? 0) >= 0.1) {
+          const pin =
+            process.env.DEFAULT_WALLET_PIN ||
+            process.env.JWT_SECRET ||
+            'shin_arena_default_wallet_pin';
+          const decrypted = this.walletService.decryptSVMWallet(
+            pin,
+            dbUser.walletDetails,
+          );
+          if (decrypted?.privateKey) {
+            customSigner = {
+              accountId: dbUser.walletAddress,
+              privateKey: decrypted.privateKey,
+            };
+          }
+        }
+      }
+    } catch {
+      // Fallback to relayer if user wallet decryption/balance lookup fails
+    }
+
     return this.nearRelayer.callMethod(
       body.methodName,
       body.args || {},
       body.attachedDepositNear || '0',
       body.gas || '60000000000000',
+      customSigner,
     );
   }
 

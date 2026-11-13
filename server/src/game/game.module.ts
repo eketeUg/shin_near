@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { UsersModule } from '../users/users.module';
+import { WalletModule } from '../wallet/wallet.module';
 import { GameGateway } from './game.gateway';
 import { GameService } from './game.service';
 import { NearRelayerController } from './near-relayer.controller';
 import { NearRelayerService } from './near-relayer.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, UsersModule, WalletModule],
   controllers: [NearRelayerController],
   providers: [GameGateway, GameService, NearRelayerService],
   exports: [NearRelayerService],

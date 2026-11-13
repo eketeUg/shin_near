@@ -136,6 +136,7 @@ export class NearRelayerService implements OnModuleInit {
     args: Record<string, unknown> = {},
     attachedDepositNear = '0',
     gas = '60000000000000',
+    customSigner?: { accountId: string; privateKey: string },
   ): Promise<NearRelayResult> {
     if (!ALLOWED_WRITE_METHODS.has(methodName)) {
       return Promise.resolve({
@@ -148,6 +149,16 @@ export class NearRelayerService implements OnModuleInit {
         explorerUrl: '',
         error: `Method ${methodName} is not in the relayer allowlist`,
       });
+    }
+
+    if (customSigner) {
+      return this.executeFunctionCall(
+        methodName,
+        args,
+        attachedDepositNear,
+        gas,
+        customSigner,
+      );
     }
 
     // Serialize nonces per relayer access key
@@ -163,17 +174,46 @@ export class NearRelayerService implements OnModuleInit {
     args: Record<string, unknown>,
     attachedDepositNear: string,
     gas: string,
+    customSigner?: { accountId: string; privateKey: string },
   ): Promise<NearRelayResult> {
-    if (!this.relayerAccount) {
+    let signer = this.relayerAccount;
+    let signerId = this.relayerAccountId;
+
+    if (customSigner) {
+      try {
+        const keyStore = new keyStores.InMemoryKeyStore();
+        const formattedKey = customSigner.privateKey.startsWith('ed25519:')
+          ? customSigner.privateKey
+          : `ed25519:${customSigner.privateKey}`;
+        await keyStore.setKey(
+          this.networkId,
+          customSigner.accountId,
+          KeyPair.fromString(formattedKey as KeyPairString),
+        );
+        const near = await connect({
+          networkId: this.networkId,
+          nodeUrl: this.rpcUrl,
+          keyStore,
+        } as unknown as Parameters<typeof connect>[0]);
+        signer = await near.account(customSigner.accountId);
+        signerId = customSigner.accountId;
+      } catch (err: any) {
+        this.logger.warn(
+          `Custom signer init failed for ${customSigner.accountId}, falling back to relayer: ${err?.message || err}`,
+        );
+      }
+    }
+
+    if (!signer) {
       return {
         ok: false,
         simulated: true,
         contractId: this.contractId,
-        relayerAccountId: this.relayerAccountId,
+        relayerAccountId: signerId,
         methodName,
         txHash: '',
         explorerUrl: '',
-        error: 'NEAR relayer key is not loaded',
+        error: 'NEAR signer key is not loaded',
       };
     }
 
@@ -181,7 +221,7 @@ export class NearRelayerService implements OnModuleInit {
       const depositYocto = BigInt(
         utils.format.parseNearAmount(attachedDepositNear) || '0',
       );
-      const outcome: any = await this.relayerAccount.functionCall({
+      const outcome: any = await signer.functionCall({
         contractId: this.contractId,
         methodName,
         args,

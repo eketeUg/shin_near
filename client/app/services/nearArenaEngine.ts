@@ -1202,18 +1202,25 @@ class NearArenaEngine {
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
+        const entry = this.state.ledger.find((tx) => tx.id === ledgerId);
         if (data?.ok && data?.txHash) {
-          const entry = this.state.ledger.find((tx) => tx.id === ledgerId);
           if (entry) {
             entry.txHash = data.txHash;
             entry.explorerUrl = data.explorerUrl;
             entry.onChain = true;
             this.saveState();
           }
+          void this.syncOnChainState(this.state.playerWallet.accountId);
+        } else if (data?.error) {
+          console.warn(`[NEAR RELAY] ${methodName} not recorded on-chain:`, data.error);
+          if (entry) {
+            entry.summary = `${entry.summary} [Off-chain: ${data.error}]`;
+            this.saveState();
+          }
         }
       })
-      .catch(() => {
-        // Standalone client mode fallback: keep optimistic local ledger entry
+      .catch((err) => {
+        console.warn(`[NEAR RELAY] ${methodName} network error:`, err);
       });
   }
 
