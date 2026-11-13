@@ -9,7 +9,7 @@ import {
 } from '../config/npcMerchantConfig';
 
 export const NEAR_ARENA_CONTRACT_ID =
-  process.env.NEXT_PUBLIC_NEAR_CONTRACT_ID || 'shin-arena.testnet';
+  process.env.NEXT_PUBLIC_NEAR_CONTRACT_ID || 'shin-arena-28d.testnet';
 export const NEAR_RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_NEAR_RPC_URL || 'https://rpc.testnet.near.org';
 

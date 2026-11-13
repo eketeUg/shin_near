@@ -12,7 +12,7 @@ import { GameService } from './game.service';
 import { createHash } from 'crypto';
 
 const NEAR_ARENA_CONTRACT_ID =
-  process.env.NEAR_CONTRACT_ID || 'shin-arena.testnet';
+  process.env.NEAR_CONTRACT_ID || 'shin-arena-28d.testnet';
 const NEAR_RPC_URL =
   process.env.NEAR_RPC_URL || 'https://rpc.testnet.near.org';
 
