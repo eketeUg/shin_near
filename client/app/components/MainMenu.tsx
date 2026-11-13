@@ -56,6 +56,7 @@ const MainMenu = ({
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [arenaState, setArenaState] = useState(() => nearArenaEngine.getState());
   const [championIdx, setChampionIdx] = useState(0);
+  const [previewIdx, setPreviewIdx] = useState(0);
   const [topUpFeedback, setTopUpFeedback] = useState<string | null>(null);
   const [pendingFightMode, setPendingFightMode] = useState<'PVE' | 'PVP' | null>(null);
 
@@ -129,6 +130,15 @@ const MainMenu = ({
     ownedChampions.length > 0
       ? ownedChampions[championIdx % ownedChampions.length]
       : null;
+  const previewFighter = Roster[previewIdx % Roster.length];
+
+  useEffect(() => {
+    if (ownedChampions.length > 0) return;
+    const timer = setInterval(() => {
+      setPreviewIdx((prev) => (prev + 1) % Roster.length);
+    }, 2500);
+    return () => clearInterval(timer);
+  }, [ownedChampions.length]);
 
   const getCharGif = (charId: string) => {
     const found = Roster.find((r) => r.id === charId);
@@ -599,27 +609,52 @@ const MainMenu = ({
                 Recruit an on-chain NEP-245 Fighter NFT to unlock your autonomous Agent Vault, ELO progression, and Dojo training.
               </p>
 
-              <div className="relative h-48 flex items-end justify-center bg-gradient-to-t from-shin-gold/10 via-black/40 to-transparent rounded-xl border border-dashed border-shin-gold/30 mb-5 overflow-hidden">
+              <div className="relative h-52 flex items-end justify-center bg-gradient-to-t from-shin-gold/15 via-black/40 to-transparent rounded-xl border border-dashed border-shin-gold/30 mb-5 overflow-hidden">
+                <button
+                  onClick={() => {
+                    playClickSound();
+                    setPreviewIdx((prev) => (prev - 1 + Roster.length) % Roster.length);
+                  }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/70 border border-white/20 hover:border-shin-gold flex items-center justify-center text-white z-20 cursor-pointer"
+                  title="Previous Fighter"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={() => {
+                    playClickSound();
+                    setPreviewIdx((prev) => (prev + 1) % Roster.length);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/70 border border-white/20 hover:border-shin-gold flex items-center justify-center text-white z-20 cursor-pointer"
+                  title="Next Fighter"
+                >
+                  <ChevronRight size={16} />
+                </button>
+
                 <img
-                  src="/assets/Shin_gifs/Shinobi_AllActions.gif"
-                  alt="Recruit Warrior"
-                  className="w-40 h-40 object-contain scale-125 origin-bottom opacity-35 grayscale contrast-125"
+                  key={previewFighter.id}
+                  src={`/assets/Shin_gifs/${previewFighter.gif}`}
+                  alt={previewFighter.name}
+                  className="w-44 h-44 object-contain scale-125 origin-bottom animate-float-idle z-10"
                   style={{ imageRendering: 'pixelated' }}
                 />
-                <span className="absolute top-3 px-3 py-1 rounded-full bg-black/80 border border-white/15 text-[10px] font-mono text-gray-300 uppercase tracking-wider">
-                  0 Warriors Owned
+                <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/80 border border-shin-gold/40 text-[10px] font-cinzel text-shin-gold uppercase tracking-wider">
+                  {previewFighter.name}
+                </span>
+                <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/80 border border-white/15 text-[10px] font-mono text-gray-300 uppercase tracking-wider">
+                  {previewIdx + 1}/{Roster.length} • 0 Owned
                 </span>
               </div>
 
               <button
-                  onClick={() => {
-                    playClickSound();
-                    onAwakenWarrior?.();
-                  }}
+                onClick={() => {
+                  playClickSound();
+                  onAwakenWarrior?.(previewFighter.id);
+                }}
                 className="w-full py-3.5 px-4 bg-shin-gold hover:bg-yellow-400 text-black font-cinzel font-black text-xs uppercase tracking-widest rounded-xl shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Plus size={15} />
-                <span>Recruit Your First Warrior</span>
+                <span>Recruit {previewFighter.name}</span>
               </button>
             </div>
           </div>
