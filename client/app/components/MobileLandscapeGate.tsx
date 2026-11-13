@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-
 interface MobileLandscapeGateProps {
   forceLandscapeCss?: boolean;
   onForceLandscapeCss?: () => void;
@@ -11,32 +9,31 @@ export default function MobileLandscapeGate({
   forceLandscapeCss = false,
   onForceLandscapeCss,
 }: MobileLandscapeGateProps) {
-  const [statusHint, setStatusHint] = useState<string | null>(null);
-
   if (forceLandscapeCss) {
     return null;
   }
 
-  const tryLockLandscape = () => {
-    const orientation = (screen as any)?.orientation;
-    if (orientation && typeof orientation.lock === 'function') {
-      return orientation.lock('landscape').catch(() => null);
-    }
-    return Promise.resolve(null);
-  };
-
   const handleGoFullscreen = () => {
-    setStatusHint('Switching to landscape fullscreen...');
-
     const el = document.documentElement as HTMLElement & {
       webkitRequestFullscreen?: () => Promise<void> | void;
     };
 
-    const onFullscreenDone = () => {
-      document.removeEventListener('fullscreenchange', onFullscreenDone);
-      tryLockLandscape();
+    const tryLockOrFallback = async () => {
+      try {
+        const orientation = (screen as any)?.orientation;
+        if (orientation && typeof orientation.lock === 'function') {
+          await orientation.lock('landscape');
+          return;
+        }
+      } catch {
+        // Browser blocked native orientation lock (e.g. iOS Safari or desktop mobile emulation)
+      }
+
+      // If still in portrait after attempting native lock, rotate the app shell via CSS immediately
+      if (typeof window !== 'undefined' && window.innerHeight > window.innerWidth) {
+        onForceLandscapeCss?.();
+      }
     };
-    document.addEventListener('fullscreenchange', onFullscreenDone, { once: true });
 
     try {
       let fsPromise: Promise<void> | void = undefined;
@@ -46,23 +43,24 @@ export default function MobileLandscapeGate({
         fsPromise = el.webkitRequestFullscreen();
       }
 
-      // Call orientation.lock synchronously within the user gesture AND after fullscreen resolves
-      tryLockLandscape();
       if (fsPromise && typeof (fsPromise as Promise<void>).then === 'function') {
         (fsPromise as Promise<void>)
-          .then(() => tryLockLandscape())
-          .catch(() => {});
+          .then(() => tryLockOrFallback())
+          .catch(() => tryLockOrFallback());
+      } else {
+        void tryLockOrFallback();
       }
     } catch {
-      // Ignore browser blocks (e.g. iOS Safari requires physical rotation)
+      void tryLockOrFallback();
     }
 
-    // If the browser didn't rotate within 700ms (e.g. iOS Safari or OS rotation lock), tell the user clearly
+    // Safety net: if the browser neither rotated natively nor resolved fullscreen within 450ms,
+    // activate CSS landscape so a single tap always works.
     setTimeout(() => {
       if (typeof window !== 'undefined' && window.innerHeight > window.innerWidth) {
-        setStatusHint('Turn your phone sideways — or tap "Continue anyway" below.');
+        onForceLandscapeCss?.();
       }
-    }, 700);
+    }, 450);
   };
 
   return (
@@ -97,26 +95,12 @@ export default function MobileLandscapeGate({
       </p>
 
       <button
+        type="button"
         onClick={handleGoFullscreen}
         className="px-7 py-3 rounded-xl bg-shin-gold hover:bg-amber-300 active:scale-95 text-black font-cinzel font-bold text-sm tracking-wide shadow-[0_0_25px_rgba(251,191,36,0.3)] transition-all cursor-pointer"
       >
         Go full screen
       </button>
-
-      {statusHint && (
-        <p className="mt-4 text-xs font-mono text-amber-300/90 max-w-xs">
-          {statusHint}
-        </p>
-      )}
-
-      {onForceLandscapeCss && (
-        <button
-          onClick={onForceLandscapeCss}
-          className="mt-4 text-[11px] font-mono text-gray-400 hover:text-gray-200 underline underline-offset-4 cursor-pointer"
-        >
-          Rotation locked? Continue anyway
-        </button>
-      )}
     </div>
   );
 }
