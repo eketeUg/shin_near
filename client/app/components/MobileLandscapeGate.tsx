@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
 interface MobileLandscapeGateProps {
   forceLandscapeCss?: boolean;
   onForceLandscapeCss?: () => void;
@@ -11,32 +9,7 @@ export default function MobileLandscapeGate({
   forceLandscapeCss = false,
   onForceLandscapeCss,
 }: MobileLandscapeGateProps) {
-  const [isMobilePortrait, setIsMobilePortrait] = useState(false);
-
-  useEffect(() => {
-    const check = () => {
-      if (typeof window === 'undefined') return;
-      const isTouchDevice =
-        window.matchMedia?.('(pointer: coarse)').matches ||
-        /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      const isPortrait = window.innerHeight > window.innerWidth;
-      setIsMobilePortrait(isTouchDevice && isPortrait);
-    };
-
-    check();
-    window.addEventListener('resize', check);
-    window.addEventListener('orientationchange', check);
-    const orientationObj = typeof screen !== 'undefined' ? (screen as any)?.orientation : null;
-    orientationObj?.addEventListener?.('change', check);
-
-    return () => {
-      window.removeEventListener('resize', check);
-      window.removeEventListener('orientationchange', check);
-      orientationObj?.removeEventListener?.('change', check);
-    };
-  }, []);
-
-  if (!isMobilePortrait || forceLandscapeCss) {
+  if (forceLandscapeCss) {
     return null;
   }
 
@@ -60,7 +33,7 @@ export default function MobileLandscapeGate({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-[#0a0807] flex flex-col items-center justify-center px-8 py-10 text-center select-none">
+    <div className="mobile-landscape-gate fixed inset-0 z-[9999] bg-[#0a0807] flex-col items-center justify-center px-8 py-10 text-center select-none">
       {/* Landscape Phone Icon */}
       <div className="mb-8 flex items-center justify-center">
         <div className="w-20 h-12 rounded-xl border-2 border-shin-gold/90 bg-black/60 flex items-center justify-end pr-2 shadow-[0_0_25px_rgba(251,191,36,0.2)]">
