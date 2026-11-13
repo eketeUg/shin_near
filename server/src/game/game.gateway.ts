@@ -9,6 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { GameService } from './game.service';
+import { NearRelayerService } from './near-relayer.service';
 import { createHash } from 'crypto';
 
 const NEAR_ARENA_CONTRACT_ID =
@@ -57,7 +58,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Active in-chat fight proposals (keyed by proposalId)
   private chatFightProposals = new Map<string, any>();
 
-  constructor(private readonly gameService: GameService) {}
+  constructor(
+    private readonly gameService: GameService,
+    private readonly nearRelayer: NearRelayerService,
+  ) {}
 
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
@@ -243,13 +247,32 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const match = this.activeMatches.get(matchId);
     if (!match) return;
 
-    const receiptHash = createHash('sha256')
+    let receiptHash = createHash('sha256')
       .update(`${matchId}:${winnerAccountId}:${Date.now()}`)
       .digest('hex')
       .slice(0, 44);
+    let explorerUrl = '';
+    let onChain = false;
+
+    // Attempt live NEAR Testnet contract settlement if fighter token IDs are tracked
+    const winnerTokenId =
+      match?.p1?.accountId === winnerAccountId
+        ? match?.p1?.tokenId
+        : match?.p2?.tokenId;
+    if (winnerTokenId) {
+      const relay = await this.nearRelayer.callMethod('settle_match', {
+        match_id: matchId,
+        winner_token_id: winnerTokenId,
+      });
+      if (relay.ok && relay.txHash) {
+        receiptHash = relay.txHash;
+        explorerUrl = relay.explorerUrl;
+        onChain = true;
+      }
+    }
 
     console.log(
-      `[NEAR REFEREE] Settling Match ${matchId} on ${NEAR_ARENA_CONTRACT_ID} (${NEAR_RPC_URL}) -> Winner: ${winnerAccountId} | Receipt: ${receiptHash}`,
+      `[NEAR REFEREE] Settling Match ${matchId} on ${NEAR_ARENA_CONTRACT_ID} (${NEAR_RPC_URL}) -> Winner: ${winnerAccountId} | Receipt: ${receiptHash} | OnChain: ${onChain}`,
     );
 
     this.activeMatches.delete(matchId);
@@ -262,6 +285,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       winnerAccountId,
       contractId: NEAR_ARENA_CONTRACT_ID,
       receiptHash,
+      explorerUrl,
+      onChain,
     });
   }
 

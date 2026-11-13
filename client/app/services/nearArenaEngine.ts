@@ -201,6 +201,8 @@ export interface ArenaLedgerTx {
   amountNear: number;
   actorWallet: string;
   timestamp: number;
+  explorerUrl?: string;
+  onChain?: boolean;
 }
 
 export interface NpcDojoState {
@@ -1166,6 +1168,40 @@ class NearArenaEngine {
     }
   }
 
+  /**
+   * Relay an on-chain transaction through the NestJS NEAR Testnet Relayer (`/api/near/call`)
+   * and upgrade the optimistic ledger entry with the real NEAR Testnet `txHash` once confirmed.
+   */
+  private relayOnChain(
+    ledgerId: string,
+    methodName: string,
+    args: Record<string, unknown>,
+    attachedDepositNear: string = '0',
+  ) {
+    if (typeof window === 'undefined') return;
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    fetch(`${serverUrl}/api/near/call`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ methodName, args, attachedDepositNear }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.ok && data?.txHash) {
+          const entry = this.state.ledger.find((tx) => tx.id === ledgerId);
+          if (entry) {
+            entry.txHash = data.txHash;
+            entry.explorerUrl = data.explorerUrl;
+            entry.onChain = true;
+            this.saveState();
+          }
+        }
+      })
+      .catch(() => {
+        // Standalone client mode fallback: keep optimistic local ledger entry
+      });
+  }
+
   public getState(): ArenaPersistentState {
     return this.state;
   }
@@ -1356,8 +1392,9 @@ class NearArenaEngine {
 
     this.state.fighters.unshift(newFighter);
 
+    const ledgerId = 'tx-' + Date.now();
     this.state.ledger.unshift({
-      id: 'tx-' + Date.now(),
+      id: ledgerId,
       txHash: makeTxHash(),
       type: 'MINT_NFT',
       summary: `NEP-245 mt_mint: fighter:${tokenId} + scroll:way-of-the-shinobi (${newFighter.title}) with Sub-Account Wallet ${agentWalletId}`,
@@ -1367,6 +1404,18 @@ class NearArenaEngine {
     });
 
     this.saveState();
+    this.relayOnChain(
+      ledgerId,
+      'mint_fighter',
+      {
+        char_class: params.charId,
+        name: newFighter.title,
+        atk: params.atk,
+        def: params.def,
+        spd: params.spd,
+      },
+      '0.05',
+    );
     return newFighter;
   }
 
@@ -1639,8 +1688,9 @@ class NearArenaEngine {
       this.state.npcDojo.currentDynamicCostNear = merchant.items[0]?.askPriceNear || 0.85;
     }
 
+    const ledgerId = 'tx-buy-' + Date.now();
     this.state.ledger.unshift({
-      id: 'tx-buy-' + Date.now(),
+      id: ledgerId,
       txHash: makeTxHash(),
       type: 'NPC_DOJO_TRAIN',
       summary: `NEP-245 mt_transfer: Bought ${quantity}x ${tokenId} from ${merchant.walletId} for ${totalCost.toFixed(2)} NEAR${appliedSummary}`,
@@ -1650,6 +1700,17 @@ class NearArenaEngine {
     });
 
     this.saveState();
+    if (merchantId === 'hanzo-dojo' && this.state.fighters[0]) {
+      const scrollType = tokenId.includes('crimson')
+        ? 'ATK'
+        : tokenId.includes('iron')
+          ? 'DEF'
+          : 'SPD';
+      this.relayOnChain(ledgerId, 'buy_dojo_scroll', {
+        token_id: this.state.fighters[0].tokenId,
+        scroll_type: scrollType,
+      });
+    }
     return merchant;
   }
 
