@@ -97,7 +97,7 @@ export default function MobileLandscapeGate({
       </h1>
 
       <p className="max-w-xs text-sm text-gray-300 font-sans leading-relaxed mb-8">
-        SHIN is built for widescreen combat—your left thumb guides your stance, while your right unleashes strikes and techniques.
+        SHIN is built for widescreen combat.
       </p>
 
       <button
