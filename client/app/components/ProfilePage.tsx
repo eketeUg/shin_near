@@ -18,7 +18,7 @@ import {
   Swords,
   Zap,
 } from 'lucide-react';
-import { nearArenaEngine } from '../services/nearArenaEngine';
+import { nearArenaEngine, COMBAT_DOCTRINES } from '../services/nearArenaEngine';
 import { Roster } from './PreGameFlow';
 
 interface ProfilePageProps {
@@ -76,11 +76,11 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
 
   const getCharGif = (charId: string) => {
     const found = Roster.find((r) => r.id === charId);
-    return found?.gif || '/sprites/fighter.gif';
+    return found ? `/assets/Shin_gifs/${found.gif}` : '/assets/Shin_gifs/Shinobi_AllActions.gif';
   };
 
   return (
-    <div className="flex flex-col w-full max-w-3xl mx-auto animate-in fade-in zoom-in duration-300">
+    <div className="flex flex-col w-full max-w-4xl mx-auto animate-in fade-in zoom-in duration-300">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 border-b border-shin-red/20 pb-4">
         <div className="flex items-center gap-4">
@@ -252,55 +252,86 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
-            {ownedFighters.map((f) => (
-              <div
-                key={f.tokenId}
-                className="bg-black/50 border border-white/10 hover:border-shin-gold/50 rounded-xl p-3 flex items-center gap-3 transition-colors"
-              >
-                <img
-                  src={getCharGif(f.charId)}
-                  alt={f.name}
-                  className="w-16 h-16 object-contain bg-black/70 rounded-lg p-1 border border-white/10 shrink-0"
-                  style={{ imageRendering: 'pixelated' }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-cinzel font-bold text-sm text-white truncate">
-                      {f.title}
-                    </span>
-                    <span className="text-[10px] font-mono font-bold bg-shin-gold text-black px-1.5 py-0.5 rounded shrink-0">
-                      LV.{f.powerLevel}
-                    </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {ownedFighters.map((f) => {
+              const doctrine =
+                COMBAT_DOCTRINES.find((d) => d.id === f.doctrine) || COMBAT_DOCTRINES[0];
+              return (
+                <div
+                  key={f.tokenId}
+                  className="w-full bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-shin-gold/40 rounded-2xl p-4 shadow-[0_0_30px_rgba(0,0,0,0.8)] relative overflow-hidden"
+                >
+                  {/* Top Champion Header */}
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3 gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-mono text-gray-400 truncate">
+                        {f.tokenId}
+                      </div>
+                      <h3 className="text-base font-cinzel font-black text-white uppercase truncate mt-0.5">
+                        {f.title}
+                      </h3>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="px-2 py-0.5 rounded bg-shin-gold text-black font-mono font-black text-xs">
+                        LV.{f.powerLevel}
+                      </span>
+                      <div className="text-[10px] font-mono text-gray-400 mt-1">
+                        {f.elo} ELO • {f.wins}W/{f.losses}L
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[10px] font-mono text-gray-500 truncate mt-0.5">
-                    ID: {f.tokenId}
+
+                  {/* Animated Fighter Stage */}
+                  <div className="relative h-48 flex items-end justify-center bg-gradient-to-t from-red-950/30 via-black/40 to-transparent rounded-xl border border-white/10 mb-3 overflow-hidden">
+                    <div className="absolute bottom-3 w-40 h-8 rounded-full bg-shin-gold/20 blur-md border border-shin-gold/40" />
+                    <img
+                      src={getCharGif(f.charId)}
+                      alt={f.name}
+                      className="w-40 h-40 object-contain scale-125 origin-bottom animate-float-idle z-10"
+                      style={{ imageRendering: 'pixelated' }}
+                    />
+                    <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full bg-black/80 border border-emerald-500/40 text-[10px] font-cinzel text-emerald-400 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>Style: {doctrine.name}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-1.5 text-[10px] font-mono text-gray-300">
-                    <span>ATK {f.atk}</span>
-                    <span>•</span>
-                    <span>DEF {f.def}</span>
-                    <span>•</span>
-                    <span>SPD {f.spd}</span>
-                    <span>•</span>
-                    <span className="text-shin-gold">ELO {f.elo}</span>
+
+                  {/* Fighter Attributes */}
+                  <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                      <div className="text-[9px] text-gray-400 uppercase">Attack</div>
+                      <div className="text-sm font-mono font-bold text-red-400">{f.atk}</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                      <div className="text-[9px] text-gray-400 uppercase">Defense</div>
+                      <div className="text-sm font-mono font-bold text-emerald-400">{f.def}</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                      <div className="text-[9px] text-gray-400 uppercase">Speed</div>
+                      <div className="text-sm font-mono font-bold text-blue-400">{f.spd}</div>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between mt-1.5 text-[10px] font-mono">
-                    <span className="text-emerald-400 font-bold flex items-center gap-1">
-                      <Coins size={11} /> {f.vaultBalanceNear.toFixed(2)} NEAR
-                    </span>
-                    <span className="text-gray-400">
-                      {f.wins}W - {f.losses}L
-                      {f.isAgentActive && (
-                        <span className="ml-1.5 text-emerald-400 inline-flex items-center gap-0.5">
-                          <Zap size={10} /> AI
-                        </span>
-                      )}
-                    </span>
+
+                  {/* War Chest & Stake Info */}
+                  <div className="bg-black/80 border border-shin-gold/30 rounded-xl p-2.5 flex items-center justify-between">
+                    <div>
+                      <div className="text-[9px] text-gray-400 uppercase">
+                        Fighter War Chest
+                      </div>
+                      <div className="text-xs font-mono font-bold text-shin-gold">
+                        {f.vaultBalanceNear.toFixed(2)} NEAR
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[9px] text-gray-400 uppercase">Stake Per Fight</div>
+                      <div className="text-xs font-mono font-bold text-emerald-400">
+                        {f.wagerPerFightNear.toFixed(1)} NEAR / Pool
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
