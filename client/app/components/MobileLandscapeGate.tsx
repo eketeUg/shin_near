@@ -34,9 +34,20 @@ export default function MobileLandscapeGate({
 
   return (
     <div className="mobile-landscape-gate fixed inset-0 z-[9999] bg-[#0a0807] flex-col items-center justify-center px-8 py-10 text-center select-none">
+      <style>{`
+        @keyframes shinRotatePhone {
+          0%, 15% { transform: rotate(0deg); }
+          45%, 80% { transform: rotate(-90deg); }
+          95%, 100% { transform: rotate(0deg); }
+        }
+      `}</style>
+
       {/* Animated Portrait -> Landscape Phone Icon */}
       <div className="mb-8 flex items-center justify-center w-24 h-24">
-        <div className="animate-rotate-phone w-12 h-20 rounded-xl border-2 border-shin-gold/90 bg-black/60 flex flex-col items-center justify-between py-2 shadow-[0_0_25px_rgba(251,191,36,0.25)]">
+        <div
+          className="w-12 h-20 rounded-xl border-2 border-shin-gold/90 bg-black/60 flex flex-col items-center justify-between py-2 shadow-[0_0_25px_rgba(251,191,36,0.25)] will-change-transform"
+          style={{ animation: 'shinRotatePhone 2.4s ease-in-out infinite' }}
+        >
           <div className="w-4 h-0.5 rounded-full bg-shin-gold/70" />
           <div className="w-1.5 h-1.5 rounded-full bg-shin-gold/40" />
         </div>
