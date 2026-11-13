@@ -354,7 +354,7 @@ export const AGENT_PERSONALITY_ARCHETYPES: {
   },
 ];
 
-const STORAGE_KEY = 'shin_near_arena_state_v6';
+const STORAGE_KEY = 'shin_near_arena_state_v7';
 
 function randomHex(len: number): string {
   try {
@@ -634,6 +634,7 @@ class NearArenaEngine {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('shin_near_arena_state_v4');
       localStorage.removeItem('shin_near_arena_state_v5');
+      localStorage.removeItem('shin_near_arena_state_v6');
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         try {
@@ -1406,6 +1407,55 @@ class NearArenaEngine {
           this.state.npcDojo.currentDynamicCostNear = Number(
             (costData.result / 1000).toFixed(3),
           );
+        }
+      }
+
+      // Sync owned Fighter NFTs directly from shin-arena-28d.testnet (removes unrecorded local NFTs)
+      const fightersRes = await fetch(
+        `${serverUrl}/api/near/view?method=get_all_fighters`,
+      );
+      if (fightersRes.ok) {
+        const fightersData = await fightersRes.json();
+        if (fightersData?.ok && Array.isArray(fightersData?.result)) {
+          const onChainOwned: FighterNftAsset[] = fightersData.result
+            .filter((f: any) => f?.owner_id === targetAddr)
+            .map((f: any) => ({
+              tokenId: f.token_id,
+              charId: f.char_class,
+              name: f.name,
+              title: f.name,
+              ownerAccountId: f.owner_id,
+              ownerName: this.state.playerWallet.username,
+              isNpc: false,
+              agentWalletId: f.agent_wallet_id,
+              implicitHexAddress: targetAddr,
+              vaultBalanceNear: Number(((f.vault_balance_milli_near || 0) / 1000).toFixed(3)),
+              wagerPerFightNear: Number(((f.wager_per_fight_milli_near || 1000) / 1000).toFixed(2)),
+              isAgentActive: Boolean(f.is_agent_active),
+              autoTrainAtDojo: Boolean(f.auto_train_at_dojo),
+              enrolledInAutoTournament: false,
+              withdrawAfterCurrentTournament: false,
+              personality: {
+                archetype: 'HONORABLE_SAMURAI' as const,
+                greetingLine: 'Ready for battle on NEAR Testnet.',
+                challengeAcceptLine: 'I accept your challenge.',
+                victoryLine: 'Victory recorded on-chain.',
+                minWagerNear: 1.0,
+              },
+              doctrine: 'AGGRESSIVE_RUSHDOWN' as const,
+              powerLevel: f.power_level || 1,
+              atk: f.atk || 70,
+              def: f.def || 65,
+              spd: f.spd || 70,
+              wins: f.wins || 0,
+              losses: f.losses || 0,
+              winStreak: 0,
+              elo: f.elo || 1000,
+              totalEarningsNear: 0,
+              marketPriceNear: Number(((f.market_price_milli_near || 0) / 1000).toFixed(2)),
+            }));
+          const npcFighters = this.state.fighters.filter((f) => f.isNpc);
+          this.state.fighters = [...onChainOwned, ...npcFighters];
         }
       }
 
