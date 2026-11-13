@@ -262,7 +262,7 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
       )}
 
       {/* Top Header */}
-      <div className="bg-black/95 border-b border-white/10 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
+      <div className="bg-black/95 border-b border-white/10 px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
@@ -327,13 +327,13 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
       </div>
 
       {/* Main Split-Pane Social Messenger Layout */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-0 overflow-hidden max-w-7xl w-full mx-auto">
+      <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 min-h-0 overflow-hidden max-w-7xl w-full mx-auto">
         {/* ===================================================================
             LEFT SIDEBAR (5 cols): SEARCHABLE PLAYER & AGENT DIRECTORY
            =================================================================== */}
-        <div className="lg:col-span-5 border-r border-white/10 bg-gray-950/90 flex flex-col min-h-0">
+        <div className="sm:col-span-5 border-b sm:border-b-0 sm:border-r border-white/10 bg-gray-950/90 flex flex-col min-h-0 overflow-hidden">
           {/* Search Input & Filter Pills */}
-          <div className="p-3.5 border-b border-white/10 space-y-2.5 shrink-0">
+          <div className="p-2.5 sm:p-3 border-b border-white/10 space-y-2 shrink-0">
             <div className="relative">
               <Search
                 size={14}
@@ -482,10 +482,10 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
         {/* ===================================================================
             RIGHT PANEL (7 cols): 1-ON-1 SOCIAL DM THREAD & WAGER NEGOTIATION
            =================================================================== */}
-        <div className="lg:col-span-7 flex flex-col bg-black/90 min-h-0">
+        <div className="sm:col-span-7 flex flex-col bg-black/90 min-h-0 overflow-hidden">
           {/* Active Conversation Header */}
           {activeContact ? (
-            <div className="p-3.5 sm:p-4 border-b border-white/10 bg-gray-950/90 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="p-2.5 sm:p-3.5 border-b border-white/10 bg-gray-950/90 flex flex-wrap items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <img
@@ -555,7 +555,7 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
               </button>
             </div>
           ) : (
-            <div className="p-4 border-b border-white/10 bg-gray-950/90 flex items-center justify-between shrink-0">
+            <div className="p-2.5 sm:p-3.5 border-b border-white/10 bg-gray-950/90 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="font-cinzel font-black text-sm sm:text-base text-shin-gold uppercase">
                   📢 Global Dojo Lounge
@@ -570,7 +570,7 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
 
           {/* In-Chat Fight Request & Wager / Free Match Proposal Bar (when viewing a 1-on-1 DM) */}
           {activeContact && (
-            <div className="px-4 py-2.5 bg-gradient-to-r from-red-950/40 via-gray-950 to-amber-950/30 border-b border-shin-gold/30 flex flex-wrap items-center justify-between gap-2 shrink-0">
+            <div className="px-3 sm:px-4 py-2 bg-gradient-to-r from-red-950/40 via-gray-950 to-amber-950/30 border-b border-shin-gold/30 flex flex-wrap items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[10px] font-cinzel font-bold text-shin-gold uppercase mr-1">
                   Agree on Match Terms:
@@ -755,7 +755,7 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
           {/* Message Input Box */}
           <form
             onSubmit={handleSendMessage}
-            className="p-3.5 border-t border-white/10 bg-gray-950 flex gap-2 shrink-0"
+            className="p-2.5 sm:p-3.5 border-t border-white/10 bg-gray-950 flex gap-2 shrink-0"
           >
             <input
               type="text"
@@ -768,11 +768,11 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
                     : `Leave an offline message for @${activeContact.username} (they'll see it when online)...`
                   : 'Post a message to the Global Dojo Lounge...'
               }
-              className="flex-1 bg-black border border-white/20 focus:border-shin-gold rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+              className="flex-1 min-w-0 bg-black border border-white/20 focus:border-shin-gold rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
             />
             <button
               type="submit"
-              className="px-5 py-2.5 bg-shin-gold text-black font-cinzel font-black text-xs uppercase rounded-xl flex items-center gap-1.5 hover:bg-yellow-400 cursor-pointer"
+              className="px-4 sm:px-5 py-2 bg-shin-gold text-black font-cinzel font-black text-xs uppercase rounded-xl flex items-center gap-1.5 hover:bg-yellow-400 shrink-0 cursor-pointer"
             >
               <Send size={13} /> Send
             </button>
