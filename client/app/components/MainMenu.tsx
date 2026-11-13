@@ -296,7 +296,7 @@ const MainMenu = ({
               <Flame size={12} /> Shinobi &amp; Samurai Arcade Arena
             </div>
             <div className="relative">
-              <h1 className="text-5xl sm:text-7xl md:text-8xl font-black font-cinzel tracking-[0.12em] text-transparent bg-clip-text bg-gradient-to-b from-white via-red-300 to-shin-red leading-none drop-shadow-[0_0_25px_rgba(255,42,42,0.5)]">
+              <h1 className="text-5xl sm:text-7xl md:text-8xl font-black font-cinzel tracking-[0.12em] text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-shin-gold to-amber-600 leading-none drop-shadow-[0_0_25px_rgba(251,191,36,0.45)]">
                 SHIN
               </h1>
               <div className="h-1 w-36 sm:w-48 bg-gradient-to-r from-shin-red via-shin-gold to-transparent mt-1.5 shadow-[0_0_15px_rgba(255,42,42,0.9)]" />
