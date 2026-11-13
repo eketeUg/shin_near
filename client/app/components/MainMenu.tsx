@@ -92,15 +92,12 @@ const MainMenu = ({
           setIsAuthLoading(false);
           return;
         }
-        let cachedName = localStorage.getItem('shin_username');
-        if (!cachedName) {
-          cachedName = `Warrior_${Math.floor(100 + Math.random() * 900)}`;
-          localStorage.setItem('shin_username', cachedName);
-        }
-        setUsername(cachedName);
-        nearArenaEngine.syncUsername(cachedName);
+        // Not logged in yet: keep home screen clean with Login button (no auto guest_... name)
+        setCurrentUser(null);
+        setUsername('');
       } catch {
-        setUsername('Warrior');
+        setCurrentUser(null);
+        setUsername('');
       } finally {
         setIsAuthLoading(false);
       }
@@ -139,19 +136,41 @@ const MainMenu = ({
           <button
             onClick={() => {
               playClickSound();
-              setActiveModal(currentUser ? 'profile' : 'auth');
+              setActiveModal(currentUser && !currentUser.isGuest ? 'profile' : 'auth');
             }}
-            className="group flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-shin-gold/40 px-2.5 sm:px-3.5 py-1.5 rounded-lg transition-all cursor-pointer"
+            className={`group flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
+              currentUser
+                ? 'bg-white/5 hover:bg-white/10 border border-shin-gold/40'
+                : 'bg-shin-gold text-black hover:bg-yellow-400 border border-shin-gold shadow-[0_0_16px_rgba(212,175,55,0.35)]'
+            }`}
           >
-            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded bg-shin-gold/20 border border-shin-gold flex items-center justify-center text-shin-gold font-cinzel font-black text-xs">
+            <div
+              className={`w-6 h-6 sm:w-7 sm:h-7 rounded flex items-center justify-center font-cinzel font-black text-xs ${
+                currentUser
+                  ? 'bg-shin-gold/20 border border-shin-gold text-shin-gold'
+                  : 'bg-black/15 border border-black/30 text-black'
+              }`}
+            >
               <UserIcon size={13} />
             </div>
             <div className="text-left">
-              <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-widest">
-                {currentUser ? 'Champion' : 'Pass'}
+              <div
+                className={`text-[8px] sm:text-[9px] uppercase tracking-widest ${
+                  currentUser ? 'text-gray-400' : 'text-black/75 font-bold'
+                }`}
+              >
+                {currentUser
+                  ? currentUser.isGuest
+                    ? 'Guest • Sign In'
+                    : 'Champion'
+                  : 'Enter Dojo'}
               </div>
-              <div className="text-[11px] sm:text-xs font-cinzel font-bold text-white group-hover:text-shin-gold transition-colors truncate max-w-[90px] sm:max-w-none">
-                {isAuthLoading ? 'Loading...' : username}
+              <div
+                className={`text-[11px] sm:text-xs font-cinzel font-black transition-colors truncate max-w-[110px] sm:max-w-none ${
+                  currentUser ? 'text-white group-hover:text-shin-gold' : 'text-black'
+                }`}
+              >
+                {isAuthLoading ? 'Loading...' : currentUser ? username : 'LOGIN'}
               </div>
             </div>
           </button>
