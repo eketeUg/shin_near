@@ -2509,6 +2509,83 @@ class NearArenaEngine {
   }
 
   /**
+   * Merge an incoming WebSocket message (DM, Offline Wake-up DM, or Fight Proposal) into local chat history
+   */
+  public ingestRemoteLobbyMessage(msg: LobbyChatMessage): void {
+    if (!msg?.id) return;
+    if (!this.state.lobbyChat) {
+      this.state.lobbyChat = [];
+    }
+    const exists = this.state.lobbyChat.some((m) => m.id === msg.id);
+    if (!exists) {
+      this.state.lobbyChat.push(msg);
+      if (this.state.lobbyChat.length > 80) {
+        this.state.lobbyChat = this.state.lobbyChat.slice(-80);
+      }
+      this.saveState();
+    }
+  }
+
+  public updateRemoteDmStatus(
+    msgId: string,
+    deliveryStatus: 'DELIVERED_LIVE' | 'QUEUED_OFFLINE' | 'READ_ON_WAKE',
+  ): void {
+    const found = (this.state.lobbyChat || []).find((m) => m.id === msgId);
+    if (found) {
+      found.deliveryStatus = deliveryStatus;
+      this.saveState();
+    }
+  }
+
+  /**
+   * Sync live WebSocket-connected human players into the searchable Dojo Directory
+   */
+  public syncRemoteLobbyUsers(
+    remoteUsers: Array<{
+      accountId: string;
+      username: string;
+      charId: string;
+      isOnline: boolean;
+      lastSeenLabel: string;
+      elo: number;
+      wins: number;
+      losses: number;
+    }>,
+  ): void {
+    if (!this.state.socialContacts) {
+      this.state.socialContacts = this.buildInitialSocialContacts();
+    }
+    const myAcct = this.state.playerWallet.accountId;
+    remoteUsers.forEach((ru) => {
+      if (!ru.accountId || ru.accountId === myAcct) return;
+      const existing = this.state.socialContacts.find(
+        (c) => c.accountId === ru.accountId,
+      );
+      if (existing) {
+        existing.isOnline = ru.isOnline;
+        existing.lastSeenLabel = ru.lastSeenLabel;
+        existing.username = ru.username || existing.username;
+      } else {
+        this.state.socialContacts.unshift({
+          contactId: 'ws-' + ru.accountId,
+          username: ru.username || 'Warrior',
+          accountId: ru.accountId,
+          userType: 'HUMAN',
+          charId: ru.charId || 'fighter',
+          isOnline: ru.isOnline,
+          lastSeenLabel: ru.lastSeenLabel || 'Active now',
+          statusBio: 'Live player connected via WebSocket!',
+          elo: ru.elo || 1200,
+          wins: ru.wins || 0,
+          losses: ru.losses || 0,
+          preferredWagerNear: 1.0,
+        });
+      }
+    });
+    this.saveState();
+  }
+
+  /**
    * Generates autonomous agent-to-agent banter in the lobby chat
    */
   public triggerAgentToAgentBanter(): LobbyChatMessage | null {

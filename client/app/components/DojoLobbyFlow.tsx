@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
 import {
   nearArenaEngine,
   DojoSocialContact,
@@ -55,9 +56,13 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
   const [chatInput, setChatInput] = useState<string>('');
   const [proposedWagerNear, setProposedWagerNear] = useState<number>(1.0); // 0 = Free Match
   const [roomCodeInput, setRoomCodeInput] = useState<string>('');
+  const [wsConnected, setWsConnected] = useState<boolean>(false);
   const [toast, setToast] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+
+  const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -89,10 +94,70 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
       }
     } catch {}
 
+    // Real-Time Socket.io WebSocket Connection (Presence, DMs, Offline Store-and-Forward & Fight Contracts)
+    try {
+      const socket = io(SERVER_URL, { timeout: 3000, reconnectionAttempts: 3 });
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        setWsConnected(true);
+        const st = nearArenaEngine.getState();
+        const myFighter = st.fighters.find((f) => !f.isNpc);
+        socket.emit('lobby_register_presence', {
+          accountId: st.playerWallet.accountId,
+          username: st.playerWallet.username,
+          charId: myFighter?.charId || 'fighter',
+          elo: myFighter?.elo || 1200,
+          wins: myFighter?.wins || 0,
+          losses: myFighter?.losses || 0,
+        });
+      });
+
+      socket.on('disconnect', () => {
+        setWsConnected(false);
+      });
+
+      socket.on('lobby_presence_updated', (remoteUsers: any[]) => {
+        nearArenaEngine.syncRemoteLobbyUsers(remoteUsers);
+        refreshAll();
+      });
+
+      socket.on('lobby_receive_dm', (msg: LobbyChatMessage) => {
+        nearArenaEngine.ingestRemoteLobbyMessage(msg);
+        refreshAll();
+        if (msg.deliveryStatus === 'READ_ON_WAKE') {
+          showToast(`📩 Delivered offline message from @${msg.senderName}!`);
+        }
+      });
+
+      socket.on('lobby_chat_broadcast', (msg: LobbyChatMessage) => {
+        nearArenaEngine.ingestRemoteLobbyMessage(msg);
+        refreshAll();
+      });
+
+      socket.on(
+        'lobby_dm_status_updated',
+        (data: { id: string; deliveryStatus: 'DELIVERED_LIVE' | 'QUEUED_OFFLINE' | 'READ_ON_WAKE' }) => {
+          nearArenaEngine.updateRemoteDmStatus(data.id, data.deliveryStatus);
+          refreshAll();
+        },
+      );
+
+      socket.on('lobby_fight_matched', (matchPayload: any) => {
+        onStartAgreedDuel({
+          p1Char: matchPayload.p1Char || 'fighter',
+          p2Char: matchPayload.p2Char || 'shinobi',
+          p2Name: matchPayload.p2Name || 'Challenger',
+          wagerNear: matchPayload.wagerNear || 0,
+        });
+      });
+    } catch {}
+
     return () => {
       window.removeEventListener('nearArenaStateUpdated', refreshAll);
       clearInterval(banterTimer);
       bcRef.current?.close();
+      socketRef.current?.disconnect();
     };
   }, []);
 
@@ -146,6 +211,10 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
     refreshAll();
     bcRef.current?.postMessage({ type: 'SYNC' });
 
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('lobby_send_dm', res.sentMsg);
+    }
+
     if (res.sentMsg.deliveryStatus === 'QUEUED_OFFLINE' && activeContact) {
       showToast(
         `📩 Saved offline message for @${activeContact.username}. They will see it as soon as they come online!`,
@@ -163,12 +232,15 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
       return;
     }
     try {
-      nearArenaEngine.sendChatFightProposal({
+      const proposalMsg = nearArenaEngine.sendChatFightProposal({
         targetAccountId: activeContact.accountId,
         wagerNear: proposedWagerNear,
       });
       refreshAll();
       bcRef.current?.postMessage({ type: 'SYNC' });
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('lobby_send_fight_proposal', proposalMsg);
+      }
       setTimeout(() => {
         chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
@@ -200,9 +272,20 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
           </button>
           <div className="h-4 w-px bg-white/15" />
           <div>
-            <h1 className="text-base sm:text-xl font-cinzel font-black text-shin-gold uppercase tracking-wider flex items-center gap-2">
-              <MessageSquare size={17} /> DOJO SOCIAL MESSENGER &amp; LOBBY
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-xl font-cinzel font-black text-shin-gold uppercase tracking-wider flex items-center gap-2">
+                <MessageSquare size={17} /> DOJO SOCIAL MESSENGER &amp; LOBBY
+              </h1>
+              <span
+                className={`px-2 py-0.5 rounded-full font-mono text-[9px] uppercase border ${
+                  wsConnected
+                    ? 'bg-emerald-500/15 border-emerald-400/50 text-emerald-300'
+                    : 'bg-amber-500/15 border-amber-400/40 text-amber-300'
+                }`}
+              >
+                {wsConnected ? '🟢 WS Live' : '⚡ Local Mesh'}
+              </span>
+            </div>
             <p className="text-[10px] text-gray-400 hidden sm:block">
               Search warriors by @username, see Online/Offline status, leave offline DMs, or
               negotiate Wager &amp; Free Matches right in chat

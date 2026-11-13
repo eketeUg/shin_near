@@ -35,6 +35,28 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     { socket: Socket; data: any }[]
   >();
 
+  // Social Dojo Lobby Presence Registry (keyed by accountId)
+  private lobbyUsers = new Map<
+    string,
+    {
+      accountId: string;
+      username: string;
+      charId: string;
+      socketId: string | null;
+      isOnline: boolean;
+      lastSeenLabel: string;
+      elo: number;
+      wins: number;
+      losses: number;
+    }
+  >();
+
+  // Store-and-forward Offline DM Queue (keyed by recipient accountId)
+  private offlineMessageQueue = new Map<string, any[]>();
+
+  // Active in-chat fight proposals (keyed by proposalId)
+  private chatFightProposals = new Map<string, any>();
+
   constructor(private readonly gameService: GameService) {}
 
   handleConnection(client: Socket) {
@@ -50,6 +72,24 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.matchmakingBuckets.set(
         key,
         queue.filter((p) => p.socket.id !== client.id),
+      );
+    }
+
+    // Mark any registered Dojo Lobby user for this socket as offline
+    let presenceChanged = false;
+    for (const [acct, user] of this.lobbyUsers.entries()) {
+      if (user.socketId === client.id) {
+        user.isOnline = false;
+        user.socketId = null;
+        user.lastSeenLabel = 'Last seen just now';
+        this.lobbyUsers.set(acct, user);
+        presenceChanged = true;
+      }
+    }
+    if (presenceChanged) {
+      this.server.emit(
+        'lobby_presence_updated',
+        Array.from(this.lobbyUsers.values()),
       );
     }
 
@@ -349,6 +389,182 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       console.log(`Matchmaking [${bucketKey}] successful! Match ${matchId}`);
     } else {
       currentBucket.push({ socket: client, data: userData });
+    }
+  }
+
+  @SubscribeMessage('lobby_register_presence')
+  handleLobbyRegisterPresence(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    userData: {
+      accountId: string;
+      username: string;
+      charId?: string;
+      elo?: number;
+      wins?: number;
+      losses?: number;
+    },
+  ) {
+    if (!userData?.accountId) return;
+    this.lobbyUsers.set(userData.accountId, {
+      accountId: userData.accountId,
+      username: userData.username || 'Warrior',
+      charId: userData.charId || 'fighter',
+      socketId: client.id,
+      isOnline: true,
+      lastSeenLabel: 'Active now',
+      elo: userData.elo || 1200,
+      wins: userData.wins || 0,
+      losses: userData.losses || 0,
+    });
+
+    // Deliver any queued offline DMs waiting for this user!
+    const queued = this.offlineMessageQueue.get(userData.accountId) || [];
+    if (queued.length > 0) {
+      queued.forEach((msg) => {
+        const deliveredMsg = {
+          ...msg,
+          deliveryStatus: 'READ_ON_WAKE',
+        };
+        client.emit('lobby_receive_dm', deliveredMsg);
+        const sender = this.lobbyUsers.get(msg.senderAccountId);
+        if (sender?.socketId) {
+          this.server.to(sender.socketId).emit('lobby_dm_status_updated', {
+            id: msg.id,
+            deliveryStatus: 'READ_ON_WAKE',
+          });
+        }
+      });
+      this.offlineMessageQueue.delete(userData.accountId);
+    }
+
+    this.server.emit(
+      'lobby_presence_updated',
+      Array.from(this.lobbyUsers.values()),
+    );
+  }
+
+  @SubscribeMessage('lobby_send_dm')
+  handleLobbySendDm(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() msg: any,
+  ) {
+    if (!msg?.recipientAccountId) {
+      // Global Dojo Lounge broadcast
+      this.server.emit('lobby_chat_broadcast', {
+        ...msg,
+        socketId: client.id,
+        timestamp: msg.timestamp || Date.now(),
+      });
+      return { deliveryStatus: 'DELIVERED_LIVE' };
+    }
+
+    const recipient = this.lobbyUsers.get(msg.recipientAccountId);
+    if (recipient?.isOnline && recipient.socketId) {
+      const liveMsg = {
+        ...msg,
+        deliveryStatus: 'DELIVERED_LIVE',
+      };
+      this.server.to(recipient.socketId).emit('lobby_receive_dm', liveMsg);
+      return { deliveryStatus: 'DELIVERED_LIVE' };
+    } else {
+      const queuedMsg = {
+        ...msg,
+        deliveryStatus: 'QUEUED_OFFLINE',
+      };
+      const existing = this.offlineMessageQueue.get(msg.recipientAccountId) || [];
+      existing.push(queuedMsg);
+      this.offlineMessageQueue.set(msg.recipientAccountId, existing);
+      return { deliveryStatus: 'QUEUED_OFFLINE' };
+    }
+  }
+
+  @SubscribeMessage('lobby_send_fight_proposal')
+  handleLobbySendFightProposal(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() msg: any,
+  ) {
+    const offer = msg?.challengeOffer;
+    if (!offer?.proposalId || !offer?.targetId) return;
+
+    this.chatFightProposals.set(offer.proposalId, {
+      ...offer,
+      challengerSocketId: client.id,
+    });
+
+    const recipient = this.lobbyUsers.get(offer.targetId);
+    if (recipient?.isOnline && recipient.socketId) {
+      this.server.to(recipient.socketId).emit('lobby_receive_dm', msg);
+    }
+  }
+
+  @SubscribeMessage('lobby_respond_fight_proposal')
+  handleLobbyRespondFightProposal(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      proposalId: string;
+      status: 'ACCEPTED' | 'COUNTERED' | 'DECLINED';
+      wagerNear: number;
+    },
+  ) {
+    const offer = this.chatFightProposals.get(data.proposalId);
+    if (!offer) return;
+
+    offer.status = data.status;
+    if (data.status === 'COUNTERED') {
+      offer.counterWagerNear = data.wagerNear;
+    } else {
+      offer.wagerNear = data.wagerNear;
+    }
+    this.chatFightProposals.set(data.proposalId, offer);
+
+    const challenger = this.lobbyUsers.get(offer.challengerId);
+    const target = this.lobbyUsers.get(offer.targetId);
+
+    if (data.status === 'ACCEPTED') {
+      const matchId = 'duel_' + Math.random().toString(36).substring(2, 9);
+      this.activeMatches.set(matchId, {
+        hostId: challenger?.socketId || client.id,
+        matchId,
+        hostName: offer.challengerName,
+        p1Type: offer.challengerCharId || 'fighter',
+        p2Type: offer.targetCharId || 'shinobi',
+        mode: offer.wagerNear > 0 ? `${offer.wagerNear} NEAR Chat Duel` : 'Free Chat Duel',
+        wager: offer.wagerNear > 0 ? { token: 'NEAR', amount: offer.wagerNear } : null,
+        viewers: 0,
+        spectatorBets: [],
+      });
+
+      const matchPayload = {
+        matchId,
+        proposalId: offer.proposalId,
+        wagerNear: offer.wagerNear,
+        p1Name: offer.challengerName,
+        p1Char: offer.challengerCharId || 'fighter',
+        p2Name: offer.targetName,
+        p2Char: offer.targetCharId || 'shinobi',
+      };
+
+      if (challenger?.socketId) {
+        this.server.to(challenger.socketId).emit('lobby_fight_matched', {
+          ...matchPayload,
+          isHost: true,
+        });
+      }
+      if (target?.socketId) {
+        this.server.to(target.socketId).emit('lobby_fight_matched', {
+          ...matchPayload,
+          isHost: false,
+        });
+      }
+    } else {
+      if (challenger?.socketId) {
+        this.server.to(challenger.socketId).emit('lobby_fight_proposal_updated', offer);
+      }
+      if (target?.socketId) {
+        this.server.to(target.socketId).emit('lobby_fight_proposal_updated', offer);
+      }
     }
   }
 
