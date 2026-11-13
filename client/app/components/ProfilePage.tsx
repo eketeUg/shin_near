@@ -46,6 +46,9 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
     return () => window.removeEventListener('nearArenaStateUpdated', onUpdate);
   }, [nearAccount, user?.isGuest]);
   const ownedFighters = arenaState.fighters.filter((f) => !f.isNpc);
+  const rankedFighters = [...arenaState.fighters].sort(
+    (a, b) => b.elo - a.elo || b.wins - a.wins,
+  );
   const totalWins = ownedFighters.reduce((acc, f) => acc + f.wins, 0);
   const totalLosses = ownedFighters.reduce((acc, f) => acc + f.losses, 0);
   const bestElo =
@@ -256,6 +259,9 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
             {ownedFighters.map((f) => {
               const doctrine =
                 COMBAT_DOCTRINES.find((d) => d.id === f.doctrine) || COMBAT_DOCTRINES[0];
+              const totalFights = f.wins + f.losses;
+              const rankIndex = rankedFighters.findIndex((r) => r.tokenId === f.tokenId);
+              const rankLabel = rankIndex >= 0 ? `#${rankIndex + 1}` : '—';
               return (
                 <div
                   key={f.tokenId}
@@ -297,7 +303,7 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
                   </div>
 
                   {/* Fighter Attributes */}
-                  <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+                  <div className="grid grid-cols-3 gap-2 mb-2 text-center">
                     <div className="bg-white/5 border border-white/10 rounded-lg p-2">
                       <div className="text-[9px] text-gray-400 uppercase">Attack</div>
                       <div className="text-sm font-mono font-bold text-red-400">{f.atk}</div>
@@ -309,6 +315,26 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
                     <div className="bg-white/5 border border-white/10 rounded-lg p-2">
                       <div className="text-[9px] text-gray-400 uppercase">Speed</div>
                       <div className="text-sm font-mono font-bold text-blue-400">{f.spd}</div>
+                    </div>
+                  </div>
+
+                  {/* Fights, Wins, Losses & Ranking */}
+                  <div className="grid grid-cols-4 gap-2 mb-3 text-center">
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                      <div className="text-[9px] text-gray-400 uppercase">Fights</div>
+                      <div className="text-sm font-mono font-bold text-white">{totalFights}</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                      <div className="text-[9px] text-gray-400 uppercase">Wins</div>
+                      <div className="text-sm font-mono font-bold text-emerald-400">{f.wins}</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                      <div className="text-[9px] text-gray-400 uppercase">Losses</div>
+                      <div className="text-sm font-mono font-bold text-red-400">{f.losses}</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                      <div className="text-[9px] text-gray-400 uppercase">Ranking</div>
+                      <div className="text-sm font-mono font-bold text-shin-gold">{rankLabel}</div>
                     </div>
                   </div>
 
