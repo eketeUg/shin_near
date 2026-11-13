@@ -34,10 +34,11 @@ export default function MobileLandscapeGate({
 
   return (
     <div className="mobile-landscape-gate fixed inset-0 z-[9999] bg-[#0a0807] flex-col items-center justify-center px-8 py-10 text-center select-none">
-      {/* Landscape Phone Icon */}
-      <div className="mb-8 flex items-center justify-center">
-        <div className="w-20 h-12 rounded-xl border-2 border-shin-gold/90 bg-black/60 flex items-center justify-end pr-2 shadow-[0_0_25px_rgba(251,191,36,0.2)]">
-          <div className="w-0.5 h-3.5 rounded-full bg-shin-gold/80" />
+      {/* Animated Portrait -> Landscape Phone Icon */}
+      <div className="mb-8 flex items-center justify-center w-24 h-24">
+        <div className="animate-rotate-phone w-12 h-20 rounded-xl border-2 border-shin-gold/90 bg-black/60 flex flex-col items-center justify-between py-2 shadow-[0_0_25px_rgba(251,191,36,0.25)]">
+          <div className="w-4 h-0.5 rounded-full bg-shin-gold/70" />
+          <div className="w-1.5 h-1.5 rounded-full bg-shin-gold/40" />
         </div>
       </div>
 

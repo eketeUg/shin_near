@@ -190,3 +190,19 @@ h1, h2, h3, .font-cinzel {
     display: flex;
   }
 }
+
+@keyframes rotatePhoneToLandscape {
+  0%, 15% {
+    transform: rotate(0deg);
+  }
+  45%, 80% {
+    transform: rotate(-90deg);
+  }
+  95%, 100% {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-rotate-phone {
+  animation: rotatePhoneToLandscape 2.6s ease-in-out infinite;
+}
