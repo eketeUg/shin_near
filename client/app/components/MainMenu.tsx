@@ -229,7 +229,7 @@ const MainMenu = ({
             <div>
               <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider">War Chest</div>
               <div className="text-[11px] sm:text-sm font-mono font-bold text-shin-gold">
-                {arenaState.playerWallet.NEAR.toFixed(1)} NEAR
+                {arenaState.playerWallet.NEAR.toFixed(2)} NEAR
               </div>
             </div>
             <button

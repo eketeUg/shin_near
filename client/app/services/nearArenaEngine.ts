@@ -1340,15 +1340,42 @@ class NearArenaEngine {
 
     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
     try {
-      const balRes = await fetch(`${serverUrl}/api/wallet/balance/${encodeURIComponent(targetAddr)}`);
-      if (balRes.ok) {
-        const balData = await balRes.json();
-        const nearVal = Number(balData?.NEAR?.balance ?? 0);
-        const usdcVal = Number(balData?.USDC?.balance ?? 0);
-        const usdtVal = Number(balData?.USDT?.balance ?? 0);
-        this.state.playerWallet.NEAR = Number.isFinite(nearVal) ? nearVal : 0;
-        this.state.playerWallet.USDC = Number.isFinite(usdcVal) ? usdcVal : 0;
-        this.state.playerWallet.USDT = Number.isFinite(usdtVal) ? usdtVal : 0;
+      let fetchedFromServer = false;
+      try {
+        const balRes = await fetch(
+          `${serverUrl}/api/wallet/balance/${encodeURIComponent(targetAddr)}`,
+        );
+        if (balRes.ok) {
+          const balData = await balRes.json();
+          const nearVal = Number(
+            balData?.nearBalance?.balance ?? balData?.NEAR?.balance ?? 0,
+          );
+          const usdcVal = Number(
+            balData?.usdcBalance?.balance ?? balData?.USDC?.balance ?? 0,
+          );
+          const usdtVal = Number(
+            balData?.usdtBalance?.balance ?? balData?.USDT?.balance ?? 0,
+          );
+          this.state.playerWallet.NEAR = Number.isFinite(nearVal) ? nearVal : 0;
+          this.state.playerWallet.USDC = Number.isFinite(usdcVal) ? usdcVal : 0;
+          this.state.playerWallet.USDT = Number.isFinite(usdtVal) ? usdtVal : 0;
+          fetchedFromServer = true;
+        }
+      } catch {
+        // Fallback to direct RPC below
+      }
+
+      if (!fetchedFromServer) {
+        // Direct NEAR Testnet JSON-RPC fallback if NestJS server is offline
+        const acctView = await nearRpcProvider.query<any>({
+          request_type: 'view_account',
+          finality: 'final',
+          account_id: targetAddr,
+        });
+        if (acctView?.amount) {
+          const formatted = utils.format.formatNearAmount(acctView.amount, 4);
+          this.state.playerWallet.NEAR = Number(formatted.replace(/,/g, '')) || 0;
+        }
       }
 
       const costRes = await fetch(

@@ -10,7 +10,7 @@ export class WalletController {
     try {
       const balances = await this.walletService.getWalletBalance(
         walletAddress,
-        process.env.SOLANA_RPC_URL!,
+        process.env.NEAR_RPC_URL,
       );
       
       if (!balances) {
