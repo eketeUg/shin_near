@@ -52,6 +52,30 @@ export default function Home() {
   >('AUTO_HYBRID');
 
   const isForceLandscapeActive = orientationPreference === 'FORCE_LANDSCAPE';
+  const [isLandscapeReady, setIsLandscapeReady] = useState(false);
+
+  useEffect(() => {
+    const updateLandscapeReady = () => {
+      if (typeof window === 'undefined') return;
+      const isTouchDevice =
+        window.matchMedia?.('(pointer: coarse)').matches ||
+        /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const isPortrait = window.innerHeight > window.innerWidth;
+      setIsLandscapeReady(!isTouchDevice || !isPortrait || isForceLandscapeActive);
+    };
+
+    updateLandscapeReady();
+    window.addEventListener('resize', updateLandscapeReady);
+    window.addEventListener('orientationchange', updateLandscapeReady);
+    const orientationObj = typeof screen !== 'undefined' ? (screen as any)?.orientation : null;
+    orientationObj?.addEventListener?.('change', updateLandscapeReady);
+
+    return () => {
+      window.removeEventListener('resize', updateLandscapeReady);
+      window.removeEventListener('orientationchange', updateLandscapeReady);
+      orientationObj?.removeEventListener?.('change', updateLandscapeReady);
+    };
+  }, [isForceLandscapeActive]);
 
   const isMobilePortraitViewport = () => {
     if (typeof window === 'undefined') return false;
@@ -329,7 +353,7 @@ export default function Home() {
       />
 
       {/* Loading Screen */}
-      {isLoading && <LoadingScreen onComplete={handleLoadComplete} />}
+      {isLoading && <LoadingScreen onComplete={handleLoadComplete} paused={!isLandscapeReady} />}
 
       {/* Main Menu */}
       {!isLoading &&

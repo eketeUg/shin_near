@@ -4,16 +4,19 @@ import { useState, useEffect } from 'react';
 
 interface LoadingScreenProps {
   onComplete: () => void;
+  paused?: boolean;
 }
 
-const LoadingScreen = ({ onComplete }: LoadingScreenProps) => {
+const LoadingScreen = ({ onComplete, paused = false }: LoadingScreenProps) => {
   const [actualProgress, setActualProgress] = useState(0);
   const [displayProgress, setDisplayProgress] = useState(0);
   const [isPhaserLoaded, setIsPhaserLoaded] = useState(false);
   const [splashPhase, setSplashPhase] = useState<'bg' | 'studio' | 'loading'>('bg');
 
   useEffect(() => {
-    // Sequence the splash screens
+    if (paused) return;
+    // Sequence the splash screens only once the user is in landscape
+    setSplashPhase('bg');
     const timer1 = setTimeout(() => setSplashPhase('studio'), 4000); // 4 seconds for bg
     const timer2 = setTimeout(() => setSplashPhase('loading'), 7000); // 3 seconds for studio logo
     
@@ -21,7 +24,7 @@ const LoadingScreen = ({ onComplete }: LoadingScreenProps) => {
       clearTimeout(timer1);
       clearTimeout(timer2);
     };
-  }, []);
+  }, [paused]);
 
   useEffect(() => {
     const handleProgress = (e: any) => {
