@@ -40,7 +40,7 @@ export class NearRelayerService implements OnModuleInit {
   private readonly logger = new Logger(NearRelayerService.name);
 
   readonly networkId = process.env.NEAR_NETWORK || 'testnet';
-  readonly rpcUrl = process.env.NEAR_RPC_URL || 'https://rpc.testnet.near.org';
+  readonly rpcUrl = process.env.NEAR_RPC_URL || 'https://test.rpc.fastnear.com';
   readonly contractId = process.env.NEAR_CONTRACT_ID || 'shin-arena-28d.testnet';
   readonly relayerAccountId =
     process.env.NEAR_REFEREE_ACCOUNT_ID ||

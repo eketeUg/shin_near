@@ -11,7 +11,7 @@ import {
 export const NEAR_ARENA_CONTRACT_ID =
   process.env.NEXT_PUBLIC_NEAR_CONTRACT_ID || 'shin-arena-28d.testnet';
 export const NEAR_RPC_ENDPOINT =
-  process.env.NEXT_PUBLIC_NEAR_RPC_URL || 'https://rpc.testnet.near.org';
+  process.env.NEXT_PUBLIC_NEAR_RPC_URL || 'https://test.rpc.fastnear.com';
 
 export const nearRpcProvider = new providers.JsonRpcProvider({
   url: NEAR_RPC_ENDPOINT,

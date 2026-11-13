@@ -19,7 +19,7 @@ dotenv.config();
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
 const YOCTO_NEAR = 1e24;
-const DEFAULT_NEAR_RPC = process.env.NEAR_RPC_URL || 'https://rpc.testnet.near.org';
+const DEFAULT_NEAR_RPC = process.env.NEAR_RPC_URL || 'https://test.rpc.fastnear.com';
 
 /**
  * Service for managing Embedded NEAR Protocol Wallets (Chain Abstraction / Zero-Popup Signing)
