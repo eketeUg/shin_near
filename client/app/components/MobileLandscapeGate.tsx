@@ -91,13 +91,13 @@ export default function MobileLandscapeGate({
       </div>
 
       <h1 className="text-2xl font-cinzel font-black text-shin-gold uppercase tracking-[0.14em] leading-snug mb-4">
-        Turn Your Phone
+        Rotate to Enter
         <br />
-        Sideways
+        The Arena
       </h1>
 
       <p className="max-w-xs text-sm text-gray-300 font-sans leading-relaxed mb-8">
-        SHIN plays in landscape: the joystick goes under your left thumb, the skills under your right.
+        SHIN is built for widescreen combat—your left thumb guides your stance, while your right unleashes strikes and techniques.
       </p>
 
       <button
@@ -105,7 +105,7 @@ export default function MobileLandscapeGate({
         onClick={handleGoFullscreen}
         className="px-7 py-3 rounded-xl bg-shin-gold hover:bg-amber-300 active:scale-95 text-black font-cinzel font-bold text-sm tracking-wide shadow-[0_0_25px_rgba(251,191,36,0.3)] transition-all cursor-pointer"
       >
-        Go full screen
+        Enter Fullscreen
       </button>
     </div>
   );
