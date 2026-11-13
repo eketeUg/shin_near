@@ -23,6 +23,89 @@ export type CombatDoctrineId =
   | 'COUNTER_STRIKER'
   | 'SHADOW_EVASIVE';
 
+export type AgentPersonalityArchetype =
+  | 'HONORABLE_SAMURAI'
+  | 'ARROGANT_SHINOBI'
+  | 'MERCENARY_BOUNTY'
+  | 'MYSTIC_SAGE';
+
+export interface AgentPersonalityProfile {
+  archetype: AgentPersonalityArchetype;
+  greetingLine: string;
+  challengeAcceptLine: string;
+  victoryLine: string;
+  minWagerNear: number;
+}
+
+export interface LobbyChatMessage {
+  id: string;
+  senderName: string;
+  senderAccountId: string;
+  senderType: 'HUMAN' | 'AGENT' | 'SYSTEM';
+  senderCharId?: string;
+  archetypeBadge?: string;
+  recipientName?: string;
+  text: string;
+  timestamp: number;
+  challengeOffer?: {
+    challengerId: string;
+    challengerName: string;
+    challengerCharId: string;
+    targetId: string;
+    targetName: string;
+    wagerNear: number;
+  };
+}
+
+export interface TournamentBracketMatch {
+  id: string;
+  round: 'SEMI_1' | 'SEMI_2' | 'GRAND_FINAL';
+  label: string;
+  p1Name: string;
+  p1CharId: string;
+  p1IsAgent: boolean;
+  p1WalletId: string;
+  p2Name: string;
+  p2CharId: string;
+  p2IsAgent: boolean;
+  p2WalletId: string;
+  winnerSide?: 'p1' | 'p2';
+  boutBountyPaidNear: number;
+}
+
+export interface HumanDailyTournamentState {
+  tournamentId: string;
+  title: string;
+  entryFeeNear: number;
+  boutWinnerCutPct: number; // e.g. 25% of each match's stake paid immediately to bout winner
+  championJackpotPct: number; // e.g. 50% of total tournament pool paid to overall tournament champion
+  totalPoolNear: number;
+  championJackpotNear: number;
+  boutBountyNear: number;
+  playerJoined: boolean;
+  playerCharId: string;
+  currentStage: 'REGISTRATION' | 'SEMI_1' | 'GRAND_FINAL' | 'COMPLETED';
+  matches: TournamentBracketMatch[];
+  championName?: string;
+  championWalletId?: string;
+  windowClosesAt: number;
+}
+
+export interface ContinuousAgentTournamentState {
+  tournamentNumber: number;
+  entryFeePerAgentNear: number;
+  totalPoolNear: number;
+  boutBountyNear: number;
+  championJackpotNear: number;
+  status: 'IN_PROGRESS' | 'REST_COOLDOWN';
+  currentRoundLabel: string;
+  restSecondsRemaining: number; // 120 seconds (2 mins) rest between tournaments
+  matches: TournamentBracketMatch[];
+  lastChampionTitle?: string;
+  lastChampionWallet?: string;
+  lastChampionWonNear?: number;
+}
+
 export interface FighterNftAsset {
   tokenId: string;
   charId: string;
@@ -37,6 +120,9 @@ export interface FighterNftAsset {
   wagerPerFightNear: number;
   isAgentActive: boolean;
   autoTrainAtDojo: boolean;
+  enrolledInAutoTournament?: boolean;
+  withdrawAfterCurrentTournament?: boolean;
+  personality?: AgentPersonalityProfile;
   doctrine: CombatDoctrineId;
   powerLevel: number;
   atk: number;
@@ -195,7 +281,54 @@ export const COMBAT_DOCTRINES: {
   },
 ];
 
-const STORAGE_KEY = 'shin_near_arena_state_v4';
+export const AGENT_PERSONALITY_ARCHETYPES: {
+  id: AgentPersonalityArchetype;
+  name: string;
+  badge: string;
+  desc: string;
+  defaultGreeting: string;
+  defaultChallengeReply: string;
+  defaultVictoryLine: string;
+}[] = [
+  {
+    id: 'HONORABLE_SAMURAI',
+    name: 'Honorable Samurai',
+    badge: '⛩️ BUSHIDO HONOR',
+    desc: 'Speaks with noble feudal courtesy, respects worthy blades, and never backs down from a fair stake.',
+    defaultGreeting: 'My blade is drawn in honor. Step into the dojo if your spirit is steady.',
+    defaultChallengeReply: 'A worthy challenge! I accept your terms under the Bushido code.',
+    defaultVictoryLine: 'Your technique was fierce, warrior. May your next duel bring you glory.',
+  },
+  {
+    id: 'ARROGANT_SHINOBI',
+    name: 'Shadow Assassin',
+    badge: '🗡️ SHADOW TAUNT',
+    desc: 'Sharp-tongued, psychological trash-talker who mocks slow stances and dares opponents to raise the NEAR pot.',
+    defaultGreeting: 'You move like a wooden training dummy. Care to lose some NEAR in the shadows?',
+    defaultChallengeReply: 'Easy coin! My shadow will strike before you even draw your steel.',
+    defaultVictoryLine: 'Too slow! Keep training at Master Hanzo’s dojo before challenging me again.',
+  },
+  {
+    id: 'MERCENARY_BOUNTY',
+    name: 'Bounty Mercenary',
+    badge: '💰 BOUNTY HUNTER',
+    desc: 'Fights strictly for NEAR & Tamahagane Steel spoils. Always calculating odds, pot sizes, and War Chest profit.',
+    defaultGreeting: 'My katana only leaves its scabbard for real NEAR. Show me the pot.',
+    defaultChallengeReply: 'The NEAR escrow looks good. Let’s settle this contract in the pit!',
+    defaultVictoryLine: 'Another bounty collected straight into my .agent.shin-arena.testnet vault.',
+  },
+  {
+    id: 'MYSTIC_SAGE',
+    name: 'Blood-Moon Monk',
+    badge: '🌕 MYSTIC SAGE',
+    desc: 'Cryptic, calm, and philosophical. Treats every duel and tournament bracket as a test of karmic balance.',
+    defaultGreeting: 'Beneath the crimson moon, every strike is written in spirit ink.',
+    defaultChallengeReply: 'The wind whispers of our clash. Let the arena judge our karma.',
+    defaultVictoryLine: 'Stillness defeats haste. Meditate on your stance before our next crossing.',
+  },
+];
+
+const STORAGE_KEY = 'shin_near_arena_state_v5';
 
 function randomHex(len: number): string {
   try {
@@ -257,6 +390,14 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     wagerPerFightNear: 2.0,
     isAgentActive: true,
     autoTrainAtDojo: true,
+    enrolledInAutoTournament: true,
+    personality: {
+      archetype: 'HONORABLE_SAMURAI',
+      greetingLine: 'My blade serves the Shogunate. Step forward if your Bushido spirit is unshaken.',
+      challengeAcceptLine: 'I accept your wager with honor. Draw your katana!',
+      victoryLine: 'A noble clash! Train further at Master Hanzo’s dojo and face me again.',
+      minWagerNear: 1.0,
+    },
     doctrine: 'AGGRESSIVE_RUSHDOWN',
     powerLevel: 6,
     atk: 84,
@@ -283,6 +424,14 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     wagerPerFightNear: 2.0,
     isAgentActive: true,
     autoTrainAtDojo: true,
+    enrolledInAutoTournament: true,
+    personality: {
+      archetype: 'ARROGANT_SHINOBI',
+      greetingLine: 'Still blinking, mortal? My twin kunai move faster than your eyes can track.',
+      challengeAcceptLine: 'Free NEAR for my crimson vault! Try not to fall in the first 10 seconds.',
+      victoryLine: 'Did you even swing? Thanks for funding my next shadow scroll.',
+      minWagerNear: 1.0,
+    },
     doctrine: 'SHADOW_EVASIVE',
     powerLevel: 5,
     atk: 76,
@@ -309,6 +458,14 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     wagerPerFightNear: 3.0,
     isAgentActive: true,
     autoTrainAtDojo: true,
+    enrolledInAutoTournament: true,
+    personality: {
+      archetype: 'MERCENARY_BOUNTY',
+      greetingLine: 'Tamahagane armor isn’t cheap. Put real NEAR on the table if you want a duel.',
+      challengeAcceptLine: 'Escrow locked. My iron guard will crush your stance and take the pot.',
+      victoryLine: 'Contract complete. Another bounty added to kenshin-npc.agent.shin-arena.testnet.',
+      minWagerNear: 1.5,
+    },
     doctrine: 'IRON_GUARD',
     powerLevel: 7,
     atk: 78,
@@ -335,6 +492,14 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     wagerPerFightNear: 1.5,
     isAgentActive: true,
     autoTrainAtDojo: true,
+    enrolledInAutoTournament: true,
+    personality: {
+      archetype: 'ARROGANT_SHINOBI',
+      greetingLine: 'From the mist I watch every flaw in your footwork. Dare to test my counter-strike?',
+      challengeAcceptLine: 'Step into the fog. Your NEAR already belongs to the Shadow Clan.',
+      victoryLine: 'One opening was all I needed. Vanish back to the barracks!',
+      minWagerNear: 1.0,
+    },
     doctrine: 'COUNTER_STRIKER',
     powerLevel: 4,
     atk: 80,
@@ -361,6 +526,14 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     wagerPerFightNear: 1.0,
     isAgentActive: true,
     autoTrainAtDojo: true,
+    enrolledInAutoTournament: true,
+    personality: {
+      archetype: 'MYSTIC_SAGE',
+      greetingLine: 'Calm water reflects the sharpest blade. Speak, traveler — do you seek wisdom or combat?',
+      challengeAcceptLine: 'The temple bells ring. Let us test the balance of our spirit in the arena.',
+      victoryLine: 'Anger clouds your strikes. Return when your breathing is steady.',
+      minWagerNear: 0.5,
+    },
     doctrine: 'COUNTER_STRIKER',
     powerLevel: 5,
     atk: 74,
@@ -387,6 +560,14 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     wagerPerFightNear: 2.0,
     isAgentActive: true,
     autoTrainAtDojo: false,
+    enrolledInAutoTournament: true,
+    personality: {
+      archetype: 'MERCENARY_BOUNTY',
+      greetingLine: 'A masterless ronin fights only for NEAR and cold steel. Name your price.',
+      challengeAcceptLine: 'Good coin. Let’s see if your blade is worth the bounty!',
+      victoryLine: 'Paid in full. Master Kenji’s forge awaits my Tamahagane steel.',
+      minWagerNear: 1.0,
+    },
     doctrine: 'AGGRESSIVE_RUSHDOWN',
     powerLevel: 4,
     atk: 85,
@@ -410,6 +591,9 @@ export interface ArenaPersistentState {
   npcMerchants: NpcMerchantLiveState[];
   playerItems: Record<string, number>;
   simulatedDaysElapsed: number;
+  lobbyChat: LobbyChatMessage[];
+  humanDailyTournament: HumanDailyTournamentState;
+  agentContinuousTournament: ContinuousAgentTournamentState;
 }
 
 class NearArenaEngine {
@@ -426,6 +610,21 @@ class NearArenaEngine {
         try {
           const parsed = JSON.parse(raw);
           if (parsed && parsed.playerWallet && parsed.fighters && parsed.npcMerchants) {
+            if (!parsed.lobbyChat) {
+              parsed.lobbyChat = [];
+            }
+            if (!parsed.humanDailyTournament) {
+              parsed.humanDailyTournament = this.buildInitialHumanTournament(
+                parsed.playerWallet.username || 'Warrior',
+                parsed.playerWallet.accountId || 'warrior.shin-arena.testnet',
+              );
+            }
+            if (!parsed.agentContinuousTournament) {
+              parsed.agentContinuousTournament = this.buildInitialAgentTournament(
+                parsed.fighters,
+                1,
+              );
+            }
             return parsed;
           }
         } catch (e) {
@@ -454,6 +653,15 @@ class NearArenaEngine {
       wagerPerFightNear: 1.0,
       isAgentActive: true,
       autoTrainAtDojo: true,
+      enrolledInAutoTournament: true,
+      withdrawAfterCurrentTournament: false,
+      personality: {
+        archetype: 'HONORABLE_SAMURAI',
+        greetingLine: 'My blade is drawn in honor. Step into the dojo if your spirit is steady.',
+        challengeAcceptLine: 'A worthy challenge! I accept your terms under the Bushido code.',
+        victoryLine: 'Your technique was fierce, warrior. May your next duel bring you glory.',
+        minWagerNear: 1.0,
+      },
       doctrine: 'AGGRESSIVE_RUSHDOWN',
       powerLevel: 2,
       atk: 68,
@@ -498,6 +706,40 @@ class NearArenaEngine {
         'scroll:shadow-step-mastery': 1,
       },
       simulatedDaysElapsed: 0,
+      lobbyChat: [
+        {
+          id: 'chat-init-1',
+          senderName: 'Shogun Takeshi',
+          senderAccountId: 'takeshi-npc.agent.shin-arena.testnet',
+          senderType: 'AGENT',
+          senderCharId: 'samurai_commander',
+          archetypeBadge: '⛩️ BUSHIDO HONOR',
+          text: 'My blade serves the Shogunate. Step forward if your Bushido spirit is unshaken — 2 NEAR on the line.',
+          timestamp: Date.now() - 95000,
+        },
+        {
+          id: 'chat-init-2',
+          senderName: 'Lady Akatsuki',
+          senderAccountId: 'akatsuki-npc.agent.shin-arena.testnet',
+          senderType: 'AGENT',
+          senderCharId: 'kunoichi',
+          archetypeBadge: '🗡️ SHADOW TAUNT',
+          text: 'Still blinking, mortals? My twin kunai move faster than your eyes can track. Challenge me in the lobby if you dare!',
+          timestamp: Date.now() - 45000,
+        },
+        {
+          id: 'chat-init-3',
+          senderName: 'Kenshin Ironclad',
+          senderAccountId: 'kenshin-npc.agent.shin-arena.testnet',
+          senderType: 'AGENT',
+          senderCharId: 'knight_1',
+          archetypeBadge: '💰 BOUNTY HUNTER',
+          text: 'The Daily Blood-Moon Tournament window is open! 2 NEAR entry — bout winners take instant spoils and the Grand Champion claims the jackpot.',
+          timestamp: Date.now() - 18000,
+        },
+      ],
+      humanDailyTournament: this.buildInitialHumanTournament(defaultUsername, playerAccountId),
+      agentContinuousTournament: this.buildInitialAgentTournament(fighters, 1),
       ledger: [
         {
           id: 'tx-init-1',
@@ -682,6 +924,147 @@ class NearArenaEngine {
     ];
   }
 
+  private buildInitialHumanTournament(
+    playerName: string,
+    playerAccountId: string,
+  ): HumanDailyTournamentState {
+    const entryFeeNear = 2.0;
+    const totalPoolNear = entryFeeNear * 4; // 4-player bracket (8 NEAR total pool)
+    const boutBountyNear = 1.0; // Each semifinal winner immediately gets 1.0 NEAR
+    const championJackpotNear = 6.0; // Grand Final Champion takes the 6.0 NEAR Jackpot!
+
+    return {
+      tournamentId: 'tourney-daily-bloodmoon-1',
+      title: 'Blood-Moon Open Cup (Humans & Agents)',
+      entryFeeNear,
+      boutWinnerCutPct: 25,
+      championJackpotPct: 75,
+      totalPoolNear,
+      championJackpotNear,
+      boutBountyNear,
+      playerJoined: false,
+      playerCharId: 'fighter',
+      currentStage: 'REGISTRATION',
+      windowClosesAt: Date.now() + 3600 * 1000 * 4,
+      matches: [
+        {
+          id: 'hm-semi-1',
+          round: 'SEMI_1',
+          label: 'Semifinal 1 (Your Bracket)',
+          p1Name: `${playerName} (Open Slot)`,
+          p1CharId: 'fighter',
+          p1IsAgent: false,
+          p1WalletId: playerAccountId,
+          p2Name: 'Lady Akatsuki',
+          p2CharId: 'kunoichi',
+          p2IsAgent: true,
+          p2WalletId: 'akatsuki-npc.agent.shin-arena.testnet',
+          boutBountyPaidNear: boutBountyNear,
+        },
+        {
+          id: 'hm-semi-2',
+          round: 'SEMI_2',
+          label: 'Semifinal 2',
+          p1Name: 'Hanzo_Slayer (Human)',
+          p1CharId: 'shinobi',
+          p1IsAgent: false,
+          p1WalletId: 'hanzoslayer.shin-arena.testnet',
+          p2Name: 'Shogun Takeshi',
+          p2CharId: 'samurai_commander',
+          p2IsAgent: true,
+          p2WalletId: 'takeshi-npc.agent.shin-arena.testnet',
+          winnerSide: 'p2',
+          boutBountyPaidNear: boutBountyNear,
+        },
+        {
+          id: 'hm-final',
+          round: 'GRAND_FINAL',
+          label: 'Grand Final Championship',
+          p1Name: 'Winner of Semifinal 1',
+          p1CharId: 'fighter',
+          p1IsAgent: false,
+          p1WalletId: playerAccountId,
+          p2Name: 'Shogun Takeshi',
+          p2CharId: 'samurai_commander',
+          p2IsAgent: true,
+          p2WalletId: 'takeshi-npc.agent.shin-arena.testnet',
+          boutBountyPaidNear: championJackpotNear,
+        },
+      ],
+    };
+  }
+
+  private buildInitialAgentTournament(
+    fighters: FighterNftAsset[],
+    tournamentNumber: number,
+  ): ContinuousAgentTournamentState {
+    const enrolled = fighters.filter((f) => f.enrolledInAutoTournament !== false);
+    const f1 = enrolled[0] || fighters[0];
+    const f2 = enrolled[1] || fighters[1];
+    const f3 = enrolled[2] || fighters[2];
+    const f4 = enrolled[3] || fighters[3];
+
+    const entryFeePerAgentNear = 1.5;
+    const totalPoolNear = entryFeePerAgentNear * 4; // 6.0 NEAR pool
+    const boutBountyNear = 0.75; // 0.75 NEAR per Semifinal win
+    const championJackpotNear = 4.5; // 4.5 NEAR to the Tournament Champion
+
+    return {
+      tournamentNumber,
+      entryFeePerAgentNear,
+      totalPoolNear,
+      boutBountyNear,
+      championJackpotNear,
+      status: 'IN_PROGRESS',
+      currentRoundLabel: 'Semifinals In Progress',
+      restSecondsRemaining: 0,
+      matches: [
+        {
+          id: `ag-t${tournamentNumber}-semi-1`,
+          round: 'SEMI_1',
+          label: 'Agent Semifinal A',
+          p1Name: f1.title,
+          p1CharId: f1.charId,
+          p1IsAgent: true,
+          p1WalletId: f1.agentWalletId,
+          p2Name: f2.title,
+          p2CharId: f2.charId,
+          p2IsAgent: true,
+          p2WalletId: f2.agentWalletId,
+          boutBountyPaidNear: boutBountyNear,
+        },
+        {
+          id: `ag-t${tournamentNumber}-semi-2`,
+          round: 'SEMI_2',
+          label: 'Agent Semifinal B',
+          p1Name: f3.title,
+          p1CharId: f3.charId,
+          p1IsAgent: true,
+          p1WalletId: f3.agentWalletId,
+          p2Name: f4.title,
+          p2CharId: f4.charId,
+          p2IsAgent: true,
+          p2WalletId: f4.agentWalletId,
+          boutBountyPaidNear: boutBountyNear,
+        },
+        {
+          id: `ag-t${tournamentNumber}-final`,
+          round: 'GRAND_FINAL',
+          label: 'Agent Grand Final',
+          p1Name: 'TBD (Winner A)',
+          p1CharId: f1.charId,
+          p1IsAgent: true,
+          p1WalletId: f1.agentWalletId,
+          p2Name: 'TBD (Winner B)',
+          p2CharId: f3.charId,
+          p2IsAgent: true,
+          p2WalletId: f3.agentWalletId,
+          boutBountyPaidNear: championJackpotNear,
+        },
+      ],
+    };
+  }
+
   private saveState(stateToSave: ArenaPersistentState = this.state) {
     if (typeof window !== 'undefined') {
       try {
@@ -859,6 +1242,15 @@ class NearArenaEngine {
       wagerPerFightNear: params.wagerPerFightNear ?? 1.0,
       isAgentActive: true,
       autoTrainAtDojo: true,
+      enrolledInAutoTournament: true,
+      withdrawAfterCurrentTournament: false,
+      personality: {
+        archetype: 'HONORABLE_SAMURAI',
+        greetingLine: 'My blade is drawn in honor. Step into the dojo if your spirit is steady.',
+        challengeAcceptLine: 'A worthy challenge! I accept your terms under the Bushido code.',
+        victoryLine: 'Your technique was fierce, warrior. May your next duel bring you glory.',
+        minWagerNear: 1.0,
+      },
       doctrine: params.doctrine || 'AGGRESSIVE_RUSHDOWN',
       powerLevel: 1,
       atk: params.atk,
@@ -953,6 +1345,9 @@ class NearArenaEngine {
       wagerPerFightNear: number;
       isAgentActive: boolean;
       autoTrainAtDojo: boolean;
+      enrolledInAutoTournament: boolean;
+      withdrawAfterCurrentTournament: boolean;
+      personality: AgentPersonalityProfile;
       doctrine: CombatDoctrineId;
       marketPriceNear: number;
     }>,
@@ -968,6 +1363,15 @@ class NearArenaEngine {
     }
     if (updates.autoTrainAtDojo !== undefined) {
       fighter.autoTrainAtDojo = updates.autoTrainAtDojo;
+    }
+    if (updates.enrolledInAutoTournament !== undefined) {
+      fighter.enrolledInAutoTournament = updates.enrolledInAutoTournament;
+    }
+    if (updates.withdrawAfterCurrentTournament !== undefined) {
+      fighter.withdrawAfterCurrentTournament = updates.withdrawAfterCurrentTournament;
+    }
+    if (updates.personality !== undefined) {
+      fighter.personality = updates.personality;
     }
     if (updates.doctrine !== undefined) {
       fighter.doctrine = updates.doctrine;
@@ -1610,6 +2014,375 @@ class NearArenaEngine {
       spectatorPayoutNear: playerSpectatorPayout,
       fighterPotWonNear: match.fighterPoolNear + fighterRoyalty,
     };
+  }
+
+  // ===========================================================================
+  // LIVING DOJO LOBBY CHAT, AGENT PERSONALITY CONVERSATION & TOURNAMENT ENGINE
+  // ===========================================================================
+
+  public postLobbyChatMessage(params: {
+    text: string;
+    targetAgentTokenId?: string;
+    challengeWagerNear?: number;
+  }): { userMsg: LobbyChatMessage; agentReply?: LobbyChatMessage } {
+    if (!this.state.lobbyChat) {
+      this.state.lobbyChat = [];
+    }
+
+    const player = this.state.playerWallet;
+    const targetAgent = params.targetAgentTokenId
+      ? this.state.fighters.find((f) => f.tokenId === params.targetAgentTokenId)
+      : undefined;
+
+    const userMsg: LobbyChatMessage = {
+      id: 'chat-' + Date.now(),
+      senderName: player.username,
+      senderAccountId: player.accountId,
+      senderType: 'HUMAN',
+      senderCharId: 'fighter',
+      recipientName: targetAgent?.title,
+      text: params.text.trim(),
+      timestamp: Date.now(),
+    };
+    this.state.lobbyChat.push(userMsg);
+
+    // Pick either the targeted agent or a random active agent in the lobby to reply in-character
+    const responder =
+      targetAgent ||
+      this.state.fighters.find(
+        (f) =>
+          params.text.toLowerCase().includes(f.title.toLowerCase()) ||
+          params.text.toLowerCase().includes(f.name.toLowerCase()),
+      ) ||
+      this.state.fighters[Math.floor(Math.random() * this.state.fighters.length)];
+
+    let agentReply: LobbyChatMessage | undefined;
+    if (responder) {
+      const p = responder.personality || {
+        archetype: 'HONORABLE_SAMURAI',
+        greetingLine: 'My blade is ready in the Shadow Dojo.',
+        challengeAcceptLine: 'I accept your challenge under the Bushido code!',
+        victoryLine: 'Honor to the swift blade.',
+        minWagerNear: 1.0,
+      };
+      const archMeta = AGENT_PERSONALITY_ARCHETYPES.find((a) => a.id === p.archetype);
+      const lower = params.text.toLowerCase();
+
+      let replyText = p.greetingLine;
+      if (params.challengeWagerNear !== undefined || lower.includes('fight') || lower.includes('challenge') || lower.includes('duel') || lower.includes('wager')) {
+        const offered = params.challengeWagerNear ?? responder.wagerPerFightNear;
+        if (offered < p.minWagerNear) {
+          replyText = `@${player.username} Only ${offered} NEAR? My minimum contract is ${p.minWagerNear} NEAR (${responder.agentWalletId}). Raise the stakes if you want to cross blades!`;
+        } else {
+          replyText = `@${player.username} ${p.challengeAcceptLine} (${offered} NEAR stake locked on ${responder.agentWalletId} — click "⚔️ Challenge" to enter the pit!)`;
+        }
+      } else if (lower.includes('tournament') || lower.includes('bracket') || lower.includes('cup')) {
+        replyText = `@${player.username} I am ${
+          responder.enrolledInAutoTournament !== false ? 'enrolled in the Continuous Agent Tournament' : 'resting in the barracks'
+        } with ${responder.vaultBalanceNear.toFixed(1)} NEAR in my War Chest. Meet me in the Grand Final!`;
+      } else if (lower.includes('hello') || lower.includes('hi') || lower.includes('yo') || lower.includes('hey')) {
+        replyText = `@${player.username} ${p.greetingLine}`;
+      } else {
+        replyText = `@${player.username} [${responder.doctrine.replace('_', ' ')}] ${p.greetingLine} (Record: ${responder.wins}W-${responder.losses}L • War Chest: ${responder.vaultBalanceNear.toFixed(1)} NEAR)`;
+      }
+
+      agentReply = {
+        id: 'chat-reply-' + (Date.now() + 1),
+        senderName: responder.title,
+        senderAccountId: responder.agentWalletId,
+        senderType: 'AGENT',
+        senderCharId: responder.charId,
+        archetypeBadge: archMeta?.badge || '⛩️ BUSHIDO',
+        recipientName: player.username,
+        text: replyText,
+        timestamp: Date.now() + 200,
+      };
+      this.state.lobbyChat.push(agentReply);
+    }
+
+    if (this.state.lobbyChat.length > 40) {
+      this.state.lobbyChat = this.state.lobbyChat.slice(-40);
+    }
+
+    this.saveState();
+    return { userMsg, agentReply };
+  }
+
+  /**
+   * Generates autonomous agent-to-agent banter in the lobby chat
+   */
+  public triggerAgentToAgentBanter(): LobbyChatMessage | null {
+    if (this.state.fighters.length < 2) return null;
+    const idx1 = Math.floor(Math.random() * this.state.fighters.length);
+    let idx2 = Math.floor(Math.random() * this.state.fighters.length);
+    if (idx2 === idx1) idx2 = (idx1 + 1) % this.state.fighters.length;
+
+    const a1 = this.state.fighters[idx1];
+    const a2 = this.state.fighters[idx2];
+    const p1 = a1.personality;
+    const archMeta = AGENT_PERSONALITY_ARCHETYPES.find((a) => a.id === p1?.archetype);
+
+    const lines = [
+      `@${a2.title} Your ${a2.doctrine.replace('_', ' ')} stance won't survive my Lv.${a1.powerLevel} katana in the next tournament bracket!`,
+      `@${a2.title} I just stocked up on Scrolls from Master Hanzo. Ready to stake ${a1.wagerPerFightNear} NEAR in the pit?`,
+      `@${a2.title} ${p1?.greetingLine || 'Step into the arena if your War Chest is funded!'}`,
+    ];
+
+    const msg: LobbyChatMessage = {
+      id: 'chat-banter-' + Date.now(),
+      senderName: a1.title,
+      senderAccountId: a1.agentWalletId,
+      senderType: 'AGENT',
+      senderCharId: a1.charId,
+      archetypeBadge: archMeta?.badge || '🤖 AGENT',
+      recipientName: a2.title,
+      text: lines[Math.floor(Math.random() * lines.length)],
+      timestamp: Date.now(),
+    };
+
+    this.state.lobbyChat = [...(this.state.lobbyChat || []).slice(-39), msg];
+    this.saveState();
+    return msg;
+  }
+
+  /**
+   * Join the Daily Human + Agent Open Tournament Window
+   */
+  public joinHumanDailyTournament(playerCharId: string): HumanDailyTournamentState {
+    if (!this.state.humanDailyTournament) {
+      this.state.humanDailyTournament = this.buildInitialHumanTournament(
+        this.state.playerWallet.username,
+        this.state.playerWallet.accountId,
+      );
+    }
+    const tourney = this.state.humanDailyTournament;
+    if (tourney.playerJoined && tourney.currentStage !== 'COMPLETED') {
+      return tourney;
+    }
+
+    if (tourney.currentStage === 'COMPLETED') {
+      // Reset a fresh tournament window if previous one completed
+      this.state.humanDailyTournament = this.buildInitialHumanTournament(
+        this.state.playerWallet.username,
+        this.state.playerWallet.accountId,
+      );
+    }
+
+    const t = this.state.humanDailyTournament;
+    if (this.state.playerWallet.NEAR < t.entryFeeNear) {
+      throw new Error(
+        `Insufficient NEAR (${this.state.playerWallet.NEAR.toFixed(2)} NEAR). Need ${t.entryFeeNear} NEAR entry stake.`,
+      );
+    }
+
+    this.state.playerWallet.NEAR = Number(
+      (this.state.playerWallet.NEAR - t.entryFeeNear).toFixed(2),
+    );
+    t.playerJoined = true;
+    t.playerCharId = playerCharId;
+    t.currentStage = 'SEMI_1';
+    t.matches[0].p1Name = this.state.playerWallet.username;
+    t.matches[0].p1CharId = playerCharId;
+    t.matches[2].p1Name = this.state.playerWallet.username;
+    t.matches[2].p1CharId = playerCharId;
+
+    this.state.ledger.unshift({
+      id: 'tx-tourney-join-' + Date.now(),
+      txHash: makeTxHash(),
+      type: 'SPECTATOR_BET',
+      summary: `${this.state.playerWallet.username} staked ${t.entryFeeNear.toFixed(2)} NEAR to enter ${t.title} (Pool: ${t.totalPoolNear.toFixed(2)} NEAR)`,
+      amountNear: t.entryFeeNear,
+      actorWallet: this.state.playerWallet.accountId,
+      timestamp: Date.now(),
+    });
+
+    this.saveState();
+    return t;
+  }
+
+  /**
+   * Record the result of the player's current Human Daily Tournament round:
+   * - Pays the immediate Per-Fight Bout Bounty for winning Semifinal 1
+   * - Pays the Grand Champion Jackpot for winning the Grand Final
+   */
+  public resolveHumanTournamentBout(didPlayerWin: boolean): {
+    stageResolved: string;
+    bountyPaidNear: number;
+    jackpotPaidNear: number;
+    tournament: HumanDailyTournamentState;
+  } {
+    const t = this.state.humanDailyTournament;
+    let bountyPaidNear = 0;
+    let jackpotPaidNear = 0;
+    const stageResolved = t.currentStage;
+
+    if (t.currentStage === 'SEMI_1') {
+      t.matches[0].winnerSide = didPlayerWin ? 'p1' : 'p2';
+      if (didPlayerWin) {
+        bountyPaidNear = t.boutBountyNear;
+        this.state.playerWallet.NEAR = Number(
+          (this.state.playerWallet.NEAR + bountyPaidNear).toFixed(2),
+        );
+        t.currentStage = 'GRAND_FINAL';
+        t.matches[2].p1Name = this.state.playerWallet.username;
+        t.matches[2].p1CharId = t.playerCharId;
+        this.state.ledger.unshift({
+          id: 'tx-tourney-semi-' + Date.now(),
+          txHash: makeTxHash(),
+          type: 'FIGHT_POOL_SETTLED',
+          summary: `Tournament Semifinal Victory! Paid +${bountyPaidNear.toFixed(2)} NEAR Bout Bounty to ${this.state.playerWallet.accountId}. Advanced to Grand Final!`,
+          amountNear: bountyPaidNear,
+          actorWallet: this.state.playerWallet.accountId,
+          timestamp: Date.now(),
+        });
+      } else {
+        t.currentStage = 'COMPLETED';
+        t.championName = 'Shogun Takeshi';
+        t.championWalletId = 'takeshi-npc.agent.shin-arena.testnet';
+        t.matches[2].p1Name = t.matches[0].p2Name;
+        t.matches[2].winnerSide = 'p2';
+      }
+    } else if (t.currentStage === 'GRAND_FINAL') {
+      t.matches[2].winnerSide = didPlayerWin ? 'p1' : 'p2';
+      t.currentStage = 'COMPLETED';
+      if (didPlayerWin) {
+        jackpotPaidNear = t.championJackpotNear;
+        this.state.playerWallet.NEAR = Number(
+          (this.state.playerWallet.NEAR + jackpotPaidNear).toFixed(2),
+        );
+        t.championName = this.state.playerWallet.username;
+        t.championWalletId = this.state.playerWallet.accountId;
+        this.state.ledger.unshift({
+          id: 'tx-tourney-final-' + Date.now(),
+          txHash: makeTxHash(),
+          type: 'FIGHT_POOL_SETTLED',
+          summary: `🏆 GRAND TOURNAMENT CHAMPION! ${this.state.playerWallet.username} won the ${jackpotPaidNear.toFixed(2)} NEAR Championship Jackpot!`,
+          amountNear: jackpotPaidNear,
+          actorWallet: this.state.playerWallet.accountId,
+          timestamp: Date.now(),
+        });
+      } else {
+        t.championName = t.matches[2].p2Name;
+        t.championWalletId = t.matches[2].p2WalletId;
+      }
+    }
+
+    this.saveState();
+    return { stageResolved, bountyPaidNear, jackpotPaidNear, tournament: t };
+  }
+
+  /**
+   * Advances the Continuous 24/7 Autonomous Agent Tournament:
+   * - Resolves Semifinals (paying per-fight Bout Bounty to winners' agent wallets)
+   * - Resolves Grand Final (paying Champion Jackpot to the winning agent wallet)
+   * - Enters a 2-minute (120s) Rest Cooldown between tournaments so owners can withdraw or rest their agents
+   */
+  public stepContinuousAgentTournament(skipRestCooldown: boolean = false): ContinuousAgentTournamentState {
+    if (!this.state.agentContinuousTournament) {
+      this.state.agentContinuousTournament = this.buildInitialAgentTournament(
+        this.state.fighters,
+        1,
+      );
+    }
+    const agT = this.state.agentContinuousTournament;
+
+    if (agT.status === 'REST_COOLDOWN') {
+      if (skipRestCooldown || agT.restSecondsRemaining <= 0) {
+        // Apply any queued withdrawals after tournament before starting the next tournament
+        this.state.fighters.forEach((f) => {
+          if (f.withdrawAfterCurrentTournament) {
+            f.enrolledInAutoTournament = false;
+            f.withdrawAfterCurrentTournament = false;
+          }
+        });
+        const nextNum = agT.tournamentNumber + 1;
+        const nextState = this.buildInitialAgentTournament(this.state.fighters, nextNum);
+        nextState.lastChampionTitle = agT.lastChampionTitle;
+        nextState.lastChampionWallet = agT.lastChampionWallet;
+        nextState.lastChampionWonNear = agT.lastChampionWonNear;
+        this.state.agentContinuousTournament = nextState;
+        this.saveState();
+        return nextState;
+      } else {
+        agT.restSecondsRemaining = Math.max(0, agT.restSecondsRemaining - 1);
+        this.saveState();
+        return agT;
+      }
+    }
+
+    const semi1 = agT.matches[0];
+    const semi2 = agT.matches[1];
+    const finalM = agT.matches[2];
+
+    const payAgentBout = (walletId: string, amountNear: number, reason: string) => {
+      const f = this.state.fighters.find((x) => x.agentWalletId === walletId);
+      if (f) {
+        f.vaultBalanceNear = Number((f.vaultBalanceNear + amountNear).toFixed(2));
+        f.totalEarningsNear = Number((f.totalEarningsNear + amountNear).toFixed(2));
+        f.wins += 1;
+      }
+      this.state.ledger.unshift({
+        id: 'tx-agtourney-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5),
+        txHash: makeTxHash(),
+        type: 'FIGHT_POOL_SETTLED',
+        summary: reason,
+        amountNear,
+        actorWallet: walletId,
+        timestamp: Date.now(),
+      });
+    };
+
+    if (!semi1.winnerSide || !semi2.winnerSide) {
+      semi1.winnerSide = Math.random() >= 0.45 ? 'p1' : 'p2';
+      semi2.winnerSide = Math.random() >= 0.48 ? 'p1' : 'p2';
+
+      const w1Name = semi1.winnerSide === 'p1' ? semi1.p1Name : semi1.p2Name;
+      const w1Char = semi1.winnerSide === 'p1' ? semi1.p1CharId : semi1.p2CharId;
+      const w1Wallet = semi1.winnerSide === 'p1' ? semi1.p1WalletId : semi1.p2WalletId;
+
+      const w2Name = semi2.winnerSide === 'p1' ? semi2.p1Name : semi2.p2Name;
+      const w2Char = semi2.winnerSide === 'p1' ? semi2.p1CharId : semi2.p2CharId;
+      const w2Wallet = semi2.winnerSide === 'p1' ? semi2.p1WalletId : semi2.p2WalletId;
+
+      payAgentBout(
+        w1Wallet,
+        agT.boutBountyNear,
+        `[Agent Cup #${agT.tournamentNumber}] ${w1Name} won Semifinal A (+${agT.boutBountyNear.toFixed(2)} NEAR Bout Cut)`,
+      );
+      payAgentBout(
+        w2Wallet,
+        agT.boutBountyNear,
+        `[Agent Cup #${agT.tournamentNumber}] ${w2Name} won Semifinal B (+${agT.boutBountyNear.toFixed(2)} NEAR Bout Cut)`,
+      );
+
+      finalM.p1Name = w1Name;
+      finalM.p1CharId = w1Char;
+      finalM.p1WalletId = w1Wallet;
+      finalM.p2Name = w2Name;
+      finalM.p2CharId = w2Char;
+      finalM.p2WalletId = w2Wallet;
+      agT.currentRoundLabel = `Grand Final: ${w1Name} vs ${w2Name}`;
+    } else if (!finalM.winnerSide) {
+      finalM.winnerSide = Math.random() >= 0.45 ? 'p1' : 'p2';
+      const champName = finalM.winnerSide === 'p1' ? finalM.p1Name : finalM.p2Name;
+      const champWallet = finalM.winnerSide === 'p1' ? finalM.p1WalletId : finalM.p2WalletId;
+
+      payAgentBout(
+        champWallet,
+        agT.championJackpotNear,
+        `🏆 [Agent Cup #${agT.tournamentNumber} Champion] ${champName} won the ${agT.championJackpotNear.toFixed(2)} NEAR Grand Jackpot! Entering 2m Rest Cooldown.`,
+      );
+
+      agT.lastChampionTitle = champName;
+      agT.lastChampionWallet = champWallet;
+      agT.lastChampionWonNear = Number((agT.championJackpotNear + agT.boutBountyNear).toFixed(2));
+      agT.status = 'REST_COOLDOWN';
+      agT.restSecondsRemaining = 120; // 2 minutes mandatory rest window!
+      agT.currentRoundLabel = `Champion: ${champName} • 2-Min Rest Window`;
+    }
+
+    this.saveState();
+    return agT;
   }
 }
 

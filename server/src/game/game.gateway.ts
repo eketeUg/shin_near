@@ -282,7 +282,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() userData: any,
   ) {
     const wager = userData.wager; // { token: string, amount: number } | null
-    const bucketKey = wager ? `wager_${wager.token}_${wager.amount}` : 'free';
+    const roomCode = userData.roomCode ? String(userData.roomCode).trim().toUpperCase() : null;
+    const bucketKey = roomCode
+      ? `room_${roomCode}`
+      : wager
+      ? `wager_${wager.token}_${wager.amount}`
+      : 'free';
 
     console.log(`Client ${client.id} joining NEAR queue for [${bucketKey}]`);
 
@@ -309,7 +314,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         hostName: opponent.data?.username || 'Player 1',
         p1Type: opponent.data?.charType || 'shinobi',
         p2Type: userData?.charType || 'samurai',
-        mode: wager ? 'NEAR Wager Fight' : 'Free Fight',
+        mode: roomCode ? `Room #${roomCode}` : wager ? 'NEAR Wager Fight' : 'Free Fight',
         wager: wager,
         viewers: 0,
         spectatorBets: [],
@@ -323,6 +328,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       opponent.socket.emit('match_found', {
         role: 'P1',
         matchId: matchId,
+        roomCode,
         opponentId: client.id,
         opponentName: userData?.username || 'Player 2',
         opponentChar: userData?.charType || 'samurai',
@@ -332,6 +338,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('match_found', {
         role: 'P2',
         matchId: matchId,
+        roomCode,
         opponentId: opponent.socket.id,
         opponentName: opponent.data?.username || 'Player 1',
         opponentChar: opponent.data?.charType || 'shinobi',
@@ -343,6 +350,30 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } else {
       currentBucket.push({ socket: client, data: userData });
     }
+  }
+
+  @SubscribeMessage('lobby_chat_message')
+  handleLobbyChatMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() msgData: any,
+  ) {
+    this.server.emit('lobby_chat_broadcast', {
+      ...msgData,
+      socketId: client.id,
+      timestamp: Date.now(),
+    });
+  }
+
+  @SubscribeMessage('direct_challenge_request')
+  handleDirectChallengeRequest(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() challengeData: any,
+  ) {
+    this.server.emit('direct_challenge_received', {
+      ...challengeData,
+      challengerSocketId: client.id,
+      timestamp: Date.now(),
+    });
   }
 
   @SubscribeMessage('cancel_matchmaking')

@@ -5,6 +5,8 @@ import {
   nearArenaEngine,
   ActiveArenaMatch,
   COMBAT_DOCTRINES,
+  AGENT_PERSONALITY_ARCHETYPES,
+  AgentPersonalityArchetype,
 } from '../services/nearArenaEngine';
 import { Roster, CharacterId } from './PreGameFlow';
 import {
@@ -795,6 +797,163 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         </button>
                       );
                     })}
+                  </div>
+                </div>
+
+                {/* ============================================================
+                    AGENT SOCIAL PERSONALITY, DIALOGUE & CONTINUOUS TOURNAMENT
+                   ============================================================ */}
+                <div className="bg-black/70 border border-shin-gold/30 rounded-xl p-4 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                    <div>
+                      <div className="text-xs font-cinzel font-black text-shin-gold uppercase tracking-wider">
+                        Continuous 24/7 Agent Tournament Enrollment
+                      </div>
+                      <p className="text-[11px] text-gray-400">
+                        Enrolled agents automatically enter bracket cups, win per-bout NEAR cuts +
+                        championship jackpots, and take a 2-minute rest cooldown between tournaments.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => {
+                          const nextState = selectedFighter.enrolledInAutoTournament === false;
+                          nearArenaEngine.updateAgentConfig(selectedFighter.tokenId, {
+                            enrolledInAutoTournament: nextState,
+                            withdrawAfterCurrentTournament: false,
+                          });
+                          setArenaState({ ...nearArenaEngine.getState() });
+                          showToast(
+                            nextState
+                              ? `${selectedFighter.title} enrolled in Continuous Agent Tournaments!`
+                              : `${selectedFighter.title} removed from Continuous Agent Tournaments.`,
+                          );
+                        }}
+                        className={`px-3.5 py-2 rounded-lg font-cinzel font-bold text-[10px] uppercase tracking-wider border cursor-pointer ${
+                          selectedFighter.enrolledInAutoTournament !== false
+                            ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                            : 'bg-white/5 border-white/20 text-gray-400'
+                        }`}
+                      >
+                        {selectedFighter.enrolledInAutoTournament !== false
+                          ? '🏆 TOURNAMENT: ENROLLED'
+                          : '⚪ TOURNAMENT: RESTING'}
+                      </button>
+
+                      {selectedFighter.enrolledInAutoTournament !== false && (
+                        <button
+                          onClick={() => {
+                            const nextW = !selectedFighter.withdrawAfterCurrentTournament;
+                            nearArenaEngine.updateAgentConfig(selectedFighter.tokenId, {
+                              withdrawAfterCurrentTournament: nextW,
+                            });
+                            setArenaState({ ...nearArenaEngine.getState() });
+                            showToast(
+                              nextW
+                                ? `${selectedFighter.title} will withdraw during the next 2-min Rest Cooldown.`
+                                : `Cancelled post-tournament withdrawal for ${selectedFighter.title}.`,
+                            );
+                          }}
+                          className={`px-3 py-2 rounded-lg font-mono text-[10px] uppercase border cursor-pointer ${
+                            selectedFighter.withdrawAfterCurrentTournament
+                              ? 'bg-amber-500/20 border-amber-400 text-amber-300'
+                              : 'bg-black/60 border-white/15 text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          {selectedFighter.withdrawAfterCurrentTournament
+                            ? '⏸️ Withdraw Queued After Cup'
+                            : 'Withdraw After Cup'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Programmable Lobby Personality & Custom Dialogue */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-cinzel font-black text-white uppercase tracking-wider">
+                        Programmable Lobby Personality &amp; Challenge Dialogue
+                      </span>
+                      <span className="text-[10px] font-mono text-shin-gold">
+                        Talks to Humans &amp; Agents in Live Lobby
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {AGENT_PERSONALITY_ARCHETYPES.map((arch) => {
+                        const currentArch =
+                          selectedFighter.personality?.archetype || 'HONORABLE_SAMURAI';
+                        const isSelectedArch = currentArch === arch.id;
+                        return (
+                          <button
+                            key={arch.id}
+                            onClick={() => {
+                              nearArenaEngine.updateAgentConfig(selectedFighter.tokenId, {
+                                personality: {
+                                  archetype: arch.id as AgentPersonalityArchetype,
+                                  greetingLine: arch.defaultGreeting,
+                                  challengeAcceptLine: arch.defaultChallengeReply,
+                                  victoryLine: arch.defaultVictoryLine,
+                                  minWagerNear: selectedFighter.wagerPerFightNear,
+                                },
+                              });
+                              setArenaState({ ...nearArenaEngine.getState() });
+                              showToast(`${selectedFighter.title} personality set to ${arch.name}!`);
+                            }}
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                              isSelectedArch
+                                ? 'bg-shin-gold/15 border-shin-gold'
+                                : 'bg-black/60 border-white/10 hover:border-white/25'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-cinzel font-bold text-xs text-white">
+                                {arch.name}
+                              </span>
+                              <span className="text-[9px] font-mono text-shin-gold">
+                                {arch.badge}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-gray-400 leading-relaxed">{arch.desc}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Custom Greeting / Trash-Talk Line Editor */}
+                    <div className="pt-2 space-y-2">
+                      <label className="block text-[10px] font-mono text-gray-400 uppercase">
+                        Custom Lobby Greeting &amp; Challenge Response Line:
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={
+                            selectedFighter.personality?.greetingLine ||
+                            'My blade is drawn in honor. Step into the dojo if your spirit is steady.'
+                          }
+                          onChange={(e) => {
+                            const existing = selectedFighter.personality || {
+                              archetype: 'HONORABLE_SAMURAI' as AgentPersonalityArchetype,
+                              greetingLine: '',
+                              challengeAcceptLine:
+                                'A worthy challenge! I accept your terms under the Bushido code.',
+                              victoryLine: 'Your technique was fierce, warrior.',
+                              minWagerNear: selectedFighter.wagerPerFightNear,
+                            };
+                            nearArenaEngine.updateAgentConfig(selectedFighter.tokenId, {
+                              personality: {
+                                ...existing,
+                                greetingLine: e.target.value,
+                              },
+                            });
+                            setArenaState({ ...nearArenaEngine.getState() });
+                          }}
+                          className="flex-1 bg-black border border-white/20 rounded-lg px-3 py-2 text-xs text-white font-sans"
+                          placeholder="Enter how your agent talks to humans & agents in the lobby..."
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

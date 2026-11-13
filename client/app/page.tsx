@@ -39,6 +39,7 @@ export default function Home() {
   >(null);
 
   const [wager, setWager] = useState<{ token: string; amount: number } | null>(null);
+  const [matchmakingRoomCode, setMatchmakingRoomCode] = useState<string | null>(null);
   const [balances, setBalances] = useState({ NEAR: 25, USDC: 100, USDT: 50 });
   const [pendingPlayerFight, setPendingPlayerFight] = useState<any | null>(null);
   const [orientationPreference, setOrientationPreference] = useState<
@@ -447,12 +448,15 @@ export default function Home() {
           playerName={username || 'Player'}
           charType={matchmakingP1Char}
           wager={wager}
+          initialRoomCode={matchmakingRoomCode}
           onCancel={() => {
             setShowMatchmaking(false);
+            setMatchmakingRoomCode(null);
             setShowPreGameFlow(true);
           }}
           onMatchFound={(matchData) => {
             setShowMatchmaking(false);
+            setMatchmakingRoomCode(null);
             startPlayerFightWithLandscapeGate({
               mode: matchData.isAgentFallback ? 'PVE' : 'PVP',
               p1: matchData.p1Type,
@@ -535,6 +539,27 @@ export default function Home() {
               setSpectatingMatch(matchData);
               setIsSpectating(true);
             }
+          }}
+          onStartDirectDuel={(duelConfig) => {
+            setShowLiveFights(false);
+            startPlayerFightWithLandscapeGate({
+              mode: 'PVE',
+              p1: duelConfig.p1Char,
+              p2: duelConfig.p2Char,
+              p1Name: username,
+              p2Name: duelConfig.p2Name,
+              difficulty: 'HARD',
+              rounds: 1,
+              wager: { token: 'NEAR', amount: duelConfig.wagerNear },
+              isTournamentBout: duelConfig.isTournamentBout,
+            });
+          }}
+          onJoinRoomCode={(code, wagerNear) => {
+            setShowLiveFights(false);
+            setMatchmakingP1Char((ownedChars[0] as CharacterId) || 'fighter');
+            setWager(wagerNear > 0 ? { token: 'NEAR', amount: wagerNear } : null);
+            setMatchmakingRoomCode(code);
+            setShowMatchmaking(true);
           }}
           onBack={() => setShowLiveFights(false)}
           onHome={handleHome}

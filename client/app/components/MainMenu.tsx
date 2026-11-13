@@ -352,7 +352,7 @@ const MainMenu = ({
               >
                 <div className="arcade-unskew flex items-center justify-center gap-1.5 sm:gap-2 font-cinzel font-bold text-[10px] sm:text-xs tracking-wider sm:tracking-widest text-blue-300 group-hover:text-white uppercase">
                   <Eye size={14} />
-                  <span>Spectate TV</span>
+                  <span>Dojo Lobby &amp; Cups</span>
                 </div>
               </button>
             </div>
