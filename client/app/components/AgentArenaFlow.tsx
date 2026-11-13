@@ -157,11 +157,11 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       {/* =====================================================================
           TOP BAR (Game-First War Chest + Optional NEAR Judge Inspector Switch)
          ===================================================================== */}
-      <div className="sticky top-0 z-50 bg-black/90 border-b border-white/10 px-3 sm:px-6 md:px-8 py-2.5 sm:py-3.5 flex flex-wrap items-center justify-between gap-2 sm:gap-4 backdrop-blur-md">
+      <div className="sticky top-0 z-50 bg-black/90 border-b border-white/10 px-3 sm:px-6 md:px-8 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2.5 sm:py-3.5 flex flex-wrap items-center justify-between gap-2 sm:gap-4 backdrop-blur-md">
         <div className="flex items-center gap-2 sm:gap-4">
           <button
             onClick={onBack}
-            className="text-gray-400 hover:text-white font-cinzel font-bold text-[10px] sm:text-xs uppercase tracking-widest flex items-center gap-1 cursor-pointer"
+            className="mobile-touch-target text-gray-400 hover:text-white font-cinzel font-bold text-[10px] sm:text-xs uppercase tracking-widest flex items-center gap-1 cursor-pointer"
           >
             <span>←</span> <span className="hidden xs:inline">Title</span> Hall
           </button>
@@ -211,7 +211,8 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
 
           <button
             onClick={onHome}
-            className="text-gray-400 hover:text-shin-red font-cinzel font-bold text-xs uppercase tracking-widest px-2.5 py-1.5 border border-white/10 rounded-lg cursor-pointer"
+            className="mobile-touch-target text-gray-400 hover:text-shin-red font-cinzel font-bold text-xs uppercase tracking-widest px-2.5 py-1.5 border border-white/10 rounded-lg cursor-pointer flex items-center justify-center"
+            aria-label="Close Colosseum"
           >
             ✕
           </button>

@@ -24,6 +24,7 @@ html, body {
 
   max-width: 100vw;
   overflow-x: hidden;
+  overflow-wrap: anywhere;
   overscroll-behavior-y: none;
   touch-action: pan-x pan-y;
   -webkit-tap-highlight-color: transparent;
@@ -97,22 +98,36 @@ html, body {
 }
 
 @media (max-width: 640px) {
-  .arcade-skew {
-    transform: skewX(-4deg);
-  }
-  .arcade-unskew {
-    transform: skewX(4deg);
-  }
-  .arcade-skew-right {
-    transform: skewX(4deg);
-  }
+  .arcade-skew,
+  .arcade-unskew,
+  .arcade-skew-right,
   .arcade-unskew-right {
-    transform: skewX(-4deg);
+    transform: none;
   }
+}
+
+img, video {
+  max-inline-size: 100%;
+  block-size: auto;
 }
 
 h1, h2, h3, .font-cinzel {
   font-family: var(--font-cinzel), serif;
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+p, li {
+  text-wrap: pretty;
+}
+
+@media (pointer: coarse) {
+  .mobile-touch-target {
+    min-block-size: 44px;
+    min-inline-size: 44px;
+  }
 }
 
 .text-shin-red { color: var(--shin-red); }

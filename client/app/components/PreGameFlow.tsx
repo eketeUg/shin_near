@@ -88,21 +88,22 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
   return (
     <div className="fixed inset-0 z-40 overflow-y-auto bg-black/95 text-white backdrop-blur-xl">
       {/* Navigation Buttons */}
-      <div className="fixed top-6 left-6 right-6 z-50 flex justify-between items-center">
+      <div className="fixed top-[max(1rem,env(safe-area-inset-top))] left-4 right-4 sm:left-6 sm:right-6 z-50 flex justify-between items-center">
         <button 
           onClick={handleBack}
-          className="group flex items-center gap-2 text-gray-500 hover:text-shin-red transition-all font-cinzel font-bold text-xs md:text-sm tracking-widest uppercase"
+          className="mobile-touch-target group flex items-center gap-2 text-gray-500 hover:text-shin-red transition-all font-cinzel font-bold text-xs md:text-sm tracking-widest uppercase"
         >
-          <div className="w-8 h-8 rounded-full border border-gray-800 flex items-center justify-center group-hover:border-shin-red">←</div>
+          <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-full border border-gray-800 flex items-center justify-center group-hover:border-shin-red">←</div>
           <span>Back</span>
         </button>
 
         <button 
           onClick={onHome}
-          className="group flex items-center gap-2 text-gray-500 hover:text-shin-gold transition-all font-cinzel font-bold text-xs md:text-sm tracking-widest uppercase"
+          className="mobile-touch-target group flex items-center gap-2 text-gray-500 hover:text-shin-gold transition-all font-cinzel font-bold text-xs md:text-sm tracking-widest uppercase"
+          aria-label="Main Menu"
         >
           <span>Main Menu</span>
-          <div className="w-8 h-8 rounded-full border border-gray-800 flex items-center justify-center group-hover:border-shin-gold text-lg">✕</div>
+          <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-full border border-gray-800 flex items-center justify-center group-hover:border-shin-gold text-lg">✕</div>
         </button>
       </div>
 
