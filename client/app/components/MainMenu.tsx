@@ -287,9 +287,9 @@ const MainMenu = ({
       {/* =====================================================================
           MAIN SPLIT-STAGE ARCADE HUB (Left: Arcade Blades | Right: Champion)
          ===================================================================== */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 md:px-10 py-4 sm:py-6 pb-10 grid grid-cols-1 lg:grid-cols-12 items-center gap-6 sm:gap-8 z-20">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 md:px-10 py-4 sm:py-6 pb-10 grid grid-cols-1 sm:grid-cols-12 items-center gap-6 sm:gap-8 z-20">
         {/* LEFT COLUMN (7 cols): Title & Angled Arcade Action Blades */}
-        <div className="lg:col-span-7 flex flex-col items-start justify-center space-y-4 sm:space-y-6 w-full">
+        <div className="sm:col-span-7 flex flex-col items-start justify-center space-y-4 sm:space-y-6 w-full">
           {/* Dramatic Title Block */}
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-shin-red/20 border border-shin-red/50 text-shin-red text-[9px] sm:text-[10px] font-cinzel font-bold tracking-[0.2em] uppercase mb-1.5">
@@ -481,7 +481,7 @@ const MainMenu = ({
 
         {/* RIGHT COLUMN (5 cols): Living Champion Showcase Pedestal */}
         {activeChampion ? (
-          <div className="lg:col-span-5 flex flex-col items-center">
+          <div className="sm:col-span-5 flex flex-col items-center">
             <div className="w-full max-w-md bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-shin-gold/40 rounded-2xl p-5 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden">
               {/* Top Champion Header */}
               <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
@@ -610,7 +610,7 @@ const MainMenu = ({
             </div>
           </div>
         ) : (
-          <div className="lg:col-span-5 flex flex-col items-center">
+          <div className="sm:col-span-5 flex flex-col items-center">
             <div className="w-full max-w-md bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-white/15 rounded-2xl p-6 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden text-center">
               <div className="text-[10px] font-cinzel text-shin-gold uppercase tracking-widest flex items-center justify-center gap-1.5 mb-1">
                 <Trophy size={12} /> Active Champion Showcase
