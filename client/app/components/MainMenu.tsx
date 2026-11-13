@@ -88,7 +88,7 @@ const MainMenu = ({
           setCurrentUser(parsed);
           const name = parsed.username || parsed.userName || 'Warrior';
           setUsername(name);
-          nearArenaEngine.syncUsername(name);
+          nearArenaEngine.syncUsername(name, parsed.walletAddress);
           setIsAuthLoading(false);
           return;
         }
@@ -102,7 +102,7 @@ const MainMenu = ({
           setCurrentUser(authedUser);
           const name = authedUser.username || authedUser.userName || 'Warrior';
           setUsername(name);
-          nearArenaEngine.syncUsername(name);
+          nearArenaEngine.syncUsername(name, authedUser.walletAddress);
           return;
         }
         // Not logged in yet: keep home screen clean with Login button (no auto guest_... name)
@@ -599,7 +599,7 @@ const MainMenu = ({
                   setCurrentUser(user);
                   const name = user.username || user.userName || 'Warrior';
                   setUsername(name);
-                  nearArenaEngine.syncUsername(name);
+                  nearArenaEngine.syncUsername(name, user.walletAddress);
                   setArenaState({ ...nearArenaEngine.getState() });
                   setActiveModal(null);
                   if (pendingFightMode) {

@@ -240,7 +240,10 @@ export default function Home() {
           const parsed = JSON.parse(storedUser);
           setUser(parsed);
           const resolved = parsed.username || parsed.userName;
-          if (resolved) setUsername(resolved);
+          if (resolved) {
+            setUsername(resolved);
+            nearArenaEngine.syncUsername(resolved, parsed.walletAddress);
+          }
           return;
         }
         const engineName = nearArenaEngine.getState().playerWallet.username;
@@ -265,7 +268,7 @@ export default function Home() {
     setUser(userData);
     const name = userData?.username || userData?.userName || 'Warrior';
     setUsername(name);
-    nearArenaEngine.syncUsername(name);
+    nearArenaEngine.syncUsername(name, userData?.walletAddress);
     syncFromNearEngine();
     setSelectedMode(mode);
     setLastMenuModal('gamemode');

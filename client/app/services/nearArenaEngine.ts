@@ -1293,21 +1293,32 @@ class NearArenaEngine {
     return items;
   }
 
-  public syncUsername(username: string): PlayerWalletState {
-    if (!username || username === this.state.playerWallet.username) {
+  public syncUsername(username: string, realWalletAddress?: string): PlayerWalletState {
+    const cleanName = username?.trim();
+    if (!cleanName) {
       return this.state.playerWallet;
     }
-    const cleanSlug = username.toLowerCase().replace(/[^a-z0-9]/g, '') || 'warrior';
-    const oldAccountId = this.state.playerWallet.accountId;
-    const newAccountId = `${cleanSlug}.shin-arena.testnet`;
 
-    this.state.playerWallet.username = username;
+    const oldAccountId = this.state.playerWallet.accountId;
+    const newAccountId = realWalletAddress?.trim() || this.state.playerWallet.implicitHex;
+
+    if (
+      cleanName === this.state.playerWallet.username &&
+      newAccountId === oldAccountId
+    ) {
+      return this.state.playerWallet;
+    }
+
+    this.state.playerWallet.username = cleanName;
     this.state.playerWallet.accountId = newAccountId;
+    if (realWalletAddress?.trim()) {
+      this.state.playerWallet.implicitHex = realWalletAddress.trim();
+    }
 
     this.state.fighters.forEach((f) => {
       if (!f.isNpc && f.ownerAccountId === oldAccountId) {
         f.ownerAccountId = newAccountId;
-        f.ownerName = username;
+        f.ownerName = cleanName;
       }
     });
 

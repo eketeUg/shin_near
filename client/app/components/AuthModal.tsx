@@ -69,7 +69,7 @@ export default function AuthModal({
     };
     localStorage.setItem('shin_username', finalName);
     localStorage.setItem('shin_near_user', JSON.stringify(authedUser));
-    nearArenaEngine.syncUsername(finalName);
+    nearArenaEngine.syncUsername(finalName, authedUser.walletAddress);
     onSuccess(authedUser);
   };
 
