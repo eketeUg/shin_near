@@ -17,8 +17,8 @@ const LoadingScreen = ({ onComplete, paused = false }: LoadingScreenProps) => {
     if (paused) return;
     // Sequence the splash screens only once the user is in landscape
     setSplashPhase('bg');
-    const timer1 = setTimeout(() => setSplashPhase('studio'), 4000); // 4 seconds for bg
-    const timer2 = setTimeout(() => setSplashPhase('loading'), 7000); // 3 seconds for studio logo
+    const timer1 = setTimeout(() => setSplashPhase('studio'), 2000); // 2 seconds for bg
+    const timer2 = setTimeout(() => setSplashPhase('loading'), 5000); // 3 seconds for studio logo
     
     return () => {
       clearTimeout(timer1);
