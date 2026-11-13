@@ -178,15 +178,15 @@ const MainMenu = ({
       {/* =====================================================================
           TOP ARCADE HUD BAR (Gamer-first profile + Judge Under-the-Hood Toggle)
          ===================================================================== */}
-      <header className="w-full px-3 sm:px-6 md:px-10 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2.5 sm:py-3.5 flex flex-wrap items-center justify-between gap-2 sm:gap-3 border-b border-white/10 bg-black/75 backdrop-blur-md z-30">
+      <header className="w-full px-3 sm:px-6 md:px-10 py-2.5 sm:py-3.5 flex flex-wrap items-center justify-between gap-2 sm:gap-3 border-b border-white/10 bg-black/75 backdrop-blur-md z-30">
         {/* Left: Player Identity & War Chest */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-4 min-w-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           <button
             onClick={() => {
               playClickSound();
               setActiveModal(currentUser && !currentUser.isGuest ? 'profile' : 'auth');
             }}
-            className={`mobile-touch-target group flex items-center gap-2 px-2.5 sm:px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
+            className={`group flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
               currentUser
                 ? 'bg-white/5 hover:bg-white/10 border border-shin-gold/40'
                 : 'bg-shin-gold text-black hover:bg-yellow-400 border border-shin-gold shadow-[0_0_16px_rgba(212,175,55,0.35)]'
@@ -234,7 +234,7 @@ const MainMenu = ({
             </div>
             <button
               onClick={handleQuickTopUp}
-              className="mobile-touch-target ml-1 sm:ml-2 px-2.5 py-1 bg-shin-gold text-black hover:bg-yellow-400 rounded text-[9px] sm:text-[10px] font-cinzel font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center"
+              className="ml-1 sm:ml-2 px-2 py-1 bg-shin-gold text-black hover:bg-yellow-400 rounded text-[9px] sm:text-[10px] font-cinzel font-black uppercase tracking-wider transition-all cursor-pointer"
               title="Refill War Chest (Instant & Gasless)"
             >
               + Refill
@@ -249,18 +249,16 @@ const MainMenu = ({
         </div>
 
         {/* Right: Live Colosseum Pulse + Judge Inspector Toggle + Sound */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => {
               playClickSound();
               onOpenColosseum?.('LIVE_ARENA');
             }}
-            className="mobile-touch-target flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/70 border border-red-500/40 text-[10px] sm:text-xs font-cinzel text-red-300 cursor-pointer transition-all"
-            aria-label={`${arenaState.activeMatches.length} Live Colosseum Fights`}
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/70 border border-red-500/40 text-xs font-cinzel text-red-300 cursor-pointer transition-all"
           >
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0" />
-            <span className="sm:hidden">{arenaState.activeMatches.length} Live</span>
-            <span className="hidden sm:inline">{arenaState.activeMatches.length} Live Colosseum Fights</span>
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+            <span>{arenaState.activeMatches.length} Live Colosseum Fights</span>
           </button>
 
           {/* Dedicated Judge / Under-The-Hood Inspector Button */}
@@ -269,21 +267,19 @@ const MainMenu = ({
               playClickSound();
               setActiveModal('judge');
             }}
-            className="mobile-touch-target px-2.5 sm:px-3 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 text-[10px] sm:text-[11px] font-mono flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer"
             title="Inspect Embedded NEAR Accounts, NEP-171 Fighter Vaults & Contract Receipts"
-            aria-label="Open NEAR Inspector"
           >
-            <Terminal size={14} aria-hidden="true" />
-            <span className="hidden sm:inline">NEAR Inspector</span>
+            <Terminal size={13} />
+            <span>NEAR Inspector</span>
           </button>
 
           <button
             onClick={onToggleMute}
-            className="mobile-touch-target p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/15 text-gray-300 hover:text-white cursor-pointer flex items-center justify-center"
+            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/15 text-gray-300 hover:text-white cursor-pointer"
             title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
-            aria-label={isMuted ? 'Unmute Audio' : 'Mute Audio'}
           >
-            {isMuted ? <VolumeX size={16} aria-hidden="true" /> : <Volume2 size={16} aria-hidden="true" />}
+            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </button>
         </div>
       </header>
@@ -291,16 +287,16 @@ const MainMenu = ({
       {/* =====================================================================
           MAIN SPLIT-STAGE ARCADE HUB (Left: Arcade Blades | Right: Champion)
          ===================================================================== */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 md:px-10 py-3 sm:py-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] grid grid-cols-1 lg:grid-cols-12 items-center gap-5 sm:gap-8 z-20">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 md:px-10 py-4 sm:py-6 pb-10 grid grid-cols-1 lg:grid-cols-12 items-center gap-6 sm:gap-8 z-20">
         {/* LEFT COLUMN (7 cols): Title & Angled Arcade Action Blades */}
-        <div className="lg:col-span-7 flex flex-col items-start justify-center space-y-3 sm:space-y-6 w-full">
+        <div className="lg:col-span-7 flex flex-col items-start justify-center space-y-4 sm:space-y-6 w-full">
           {/* Dramatic Title Block */}
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-shin-red/20 border border-shin-red/50 text-shin-red text-[9px] sm:text-[10px] font-cinzel font-bold tracking-[0.2em] uppercase mb-1.5">
-              <Flame size={12} aria-hidden="true" /> Shinobi &amp; Samurai Arcade Arena
+              <Flame size={12} /> Shinobi &amp; Samurai Arcade Arena
             </div>
             <div className="relative">
-              <h1 className="text-4xl sm:text-7xl md:text-8xl font-black font-cinzel tracking-[0.12em] text-transparent bg-clip-text bg-gradient-to-b from-white via-gray-100 to-gray-400 leading-none glow-text">
+              <h1 className="text-5xl sm:text-7xl md:text-8xl font-black font-cinzel tracking-[0.12em] text-transparent bg-clip-text bg-gradient-to-b from-white via-red-300 to-shin-red leading-none drop-shadow-[0_0_25px_rgba(255,42,42,0.5)]">
                 SHIN
               </h1>
               <div className="h-1 w-36 sm:w-48 bg-gradient-to-r from-shin-red via-shin-gold to-transparent mt-1.5 shadow-[0_0_15px_rgba(255,42,42,0.9)]" />
@@ -522,20 +518,18 @@ const MainMenu = ({
                           (prev) => (prev - 1 + ownedChampions.length) % ownedChampions.length,
                         );
                       }}
-                      className="mobile-touch-target absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-black/70 border border-white/20 hover:border-shin-gold flex items-center justify-center text-white z-20 cursor-pointer"
-                      aria-label="Previous Champion"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/70 border border-white/20 hover:border-shin-gold flex items-center justify-center text-white z-20 cursor-pointer"
                     >
-                      <ChevronLeft size={16} aria-hidden="true" />
+                      <ChevronLeft size={16} />
                     </button>
                     <button
                       onClick={() => {
                         playClickSound();
                         setChampionIdx((prev) => (prev + 1) % ownedChampions.length);
                       }}
-                      className="mobile-touch-target absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-black/70 border border-white/20 hover:border-shin-gold flex items-center justify-center text-white z-20 cursor-pointer"
-                      aria-label="Next Champion"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/70 border border-white/20 hover:border-shin-gold flex items-center justify-center text-white z-20 cursor-pointer"
                     >
-                      <ChevronRight size={16} aria-hidden="true" />
+                      <ChevronRight size={16} />
                     </button>
                   </>
                 )}
@@ -634,22 +628,20 @@ const MainMenu = ({
                     playClickSound();
                     setPreviewIdx((prev) => (prev - 1 + Roster.length) % Roster.length);
                   }}
-                  className="mobile-touch-target absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-black/70 border border-white/20 hover:border-shin-gold flex items-center justify-center text-white z-20 cursor-pointer"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/70 border border-white/20 hover:border-shin-gold flex items-center justify-center text-white z-20 cursor-pointer"
                   title="Previous Fighter"
-                  aria-label="Previous Fighter"
                 >
-                  <ChevronLeft size={16} aria-hidden="true" />
+                  <ChevronLeft size={16} />
                 </button>
                 <button
                   onClick={() => {
                     playClickSound();
                     setPreviewIdx((prev) => (prev + 1) % Roster.length);
                   }}
-                  className="mobile-touch-target absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-black/70 border border-white/20 hover:border-shin-gold flex items-center justify-center text-white z-20 cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/70 border border-white/20 hover:border-shin-gold flex items-center justify-center text-white z-20 cursor-pointer"
                   title="Next Fighter"
-                  aria-label="Next Fighter"
                 >
-                  <ChevronRight size={16} aria-hidden="true" />
+                  <ChevronRight size={16} />
                 </button>
 
                 <img
@@ -686,9 +678,9 @@ const MainMenu = ({
           MODALS (Game Mode, Controls, About, Judge Inspector, Auth, Profile)
          ===================================================================== */}
       {activeModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/90 p-0 sm:p-4 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
           {activeModal === 'auth' ? (
-            <div className="animate-in zoom-in-95 duration-200 flex justify-center w-full max-h-[92dvh] overflow-y-auto p-3 sm:p-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="animate-in zoom-in-95 duration-200 flex justify-center w-full">
               <AuthModal
                 subtitle={
                   pendingFightMode
@@ -721,12 +713,8 @@ const MainMenu = ({
           ) : (
             <div
               className={`${
-                activeModal === 'profile'
-                  ? 'max-w-4xl'
-                  : activeModal === 'judge'
-                  ? 'max-w-3xl'
-                  : 'max-w-md'
-              } bg-gray-950 border-t-2 sm:border-2 border-shin-red rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 md:p-8 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-6 md:pb-8 w-full relative animate-in zoom-in-95 duration-200 shadow-[0_0_35px_rgba(255,42,42,0.3)] max-h-[90dvh] overflow-y-auto`}
+                activeModal === 'profile' || activeModal === 'judge' ? 'max-w-3xl' : 'max-w-md'
+              } bg-gray-950 border-2 border-shin-red rounded-2xl p-4 sm:p-6 md:p-8 w-full relative animate-in zoom-in-95 duration-200 shadow-[0_0_35px_rgba(255,42,42,0.3)] max-h-[90%] overflow-y-auto`}
             >
               {activeModal !== 'profile' && (
                 <button
@@ -734,9 +722,8 @@ const MainMenu = ({
                     playClickSound();
                     setActiveModal(null);
                   }}
-                  className="mobile-touch-target absolute top-3 right-3 text-gray-400 hover:text-white transition-colors text-xl font-bold cursor-pointer flex items-center justify-center rounded-lg hover:bg-white/10"
+                  className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors text-xl font-bold cursor-pointer"
                   title="Close"
-                  aria-label="Close modal"
                 >
                   ✕
                 </button>
