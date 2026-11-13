@@ -57,6 +57,7 @@ const MainMenu = ({
   const [arenaState, setArenaState] = useState(() => nearArenaEngine.getState());
   const [championIdx, setChampionIdx] = useState(0);
   const [topUpFeedback, setTopUpFeedback] = useState<string | null>(null);
+  const [pendingFightMode, setPendingFightMode] = useState<'PVE' | 'PVP' | null>(null);
 
   const playHoverSound = () => {
     if (isMuted) return;
@@ -552,8 +553,14 @@ const MainMenu = ({
           {activeModal === 'auth' ? (
             <div className="animate-in zoom-in-95 duration-200 flex justify-center w-full">
               <AuthModal
+                subtitle={
+                  pendingFightMode
+                    ? 'Sign in with Google/Email for on-chain NEAR rewards, or fight as a Guest'
+                    : undefined
+                }
                 onClose={() => {
                   playClickSound();
+                  setPendingFightMode(null);
                   setActiveModal(null);
                 }}
                 onSuccess={(user) => {
@@ -563,6 +570,11 @@ const MainMenu = ({
                   nearArenaEngine.syncUsername(name);
                   setArenaState({ ...nearArenaEngine.getState() });
                   setActiveModal(null);
+                  if (pendingFightMode) {
+                    const modeToLaunch = pendingFightMode;
+                    setPendingFightMode(null);
+                    onStart(user, modeToLaunch);
+                  }
                 }}
               />
             </div>
@@ -610,8 +622,13 @@ const MainMenu = ({
                     <button
                       onClick={() => {
                         playClickSound();
+                        if (!currentUser) {
+                          setPendingFightMode('PVE');
+                          setActiveModal('auth');
+                          return;
+                        }
                         setActiveModal(null);
-                        onStart(currentUser || { username }, 'PVE');
+                        onStart(currentUser, 'PVE');
                       }}
                       className="group relative w-full px-6 py-5 bg-black/80 border border-white/20 hover:border-shin-gold hover:bg-shin-gold/10 rounded-xl transition-all cursor-pointer text-left"
                     >
@@ -629,8 +646,13 @@ const MainMenu = ({
                     <button
                       onClick={() => {
                         playClickSound();
+                        if (!currentUser) {
+                          setPendingFightMode('PVP');
+                          setActiveModal('auth');
+                          return;
+                        }
                         setActiveModal(null);
-                        onStart(currentUser || { username }, 'PVP');
+                        onStart(currentUser, 'PVP');
                       }}
                       className="group relative w-full px-6 py-5 bg-black/80 border border-white/20 hover:border-shin-red hover:bg-shin-red/10 rounded-xl transition-all cursor-pointer text-left"
                     >

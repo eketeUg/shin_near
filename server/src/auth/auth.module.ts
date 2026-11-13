@@ -22,6 +22,7 @@ import { WalletModule } from 'src/wallet/wallet.module';
   ],
   providers: [AuthService, GoogleStrategy],
   controllers: [AuthController],
+  exports: [JwtModule],
 })
 export class AuthModule {}
 

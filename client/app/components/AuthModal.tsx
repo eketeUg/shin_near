@@ -7,13 +7,14 @@ import { nearArenaEngine } from '../services/nearArenaEngine';
 interface AuthModalProps {
   onClose: () => void;
   onSuccess: (user: any) => void;
+  subtitle?: string;
 }
 
 type AuthStep = 'method' | 'instant' | 'email' | 'otp';
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
 
-export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
+export default function AuthModal({ onClose, onSuccess, subtitle }: AuthModalProps) {
   const [step, setStep] = useState<AuthStep>('method');
   const [warriorName, setWarriorName] = useState('');
   const [email, setEmail] = useState('');
@@ -37,7 +38,9 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'AUTH_SUCCESS') {
-        onSuccess(event.data.user);
+        const authedUser = { ...event.data.user, isGuest: false };
+        localStorage.setItem('shin_near_user', JSON.stringify(authedUser));
+        onSuccess(authedUser);
       }
     };
 
@@ -58,6 +61,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
       email: email || `${cleanName.toLowerCase()}@shin-arena.near`,
       walletAddress: wallet.accountId,
       implicitHex: wallet.implicitHex,
+      isGuest: true,
       rating: 1080,
       level: 2,
       wins: 3,
@@ -158,7 +162,9 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
       if (!res.ok) {
         throw new Error(data.message || 'Invalid OTP');
       }
-      onSuccess(data.user);
+      const authedUser = { ...data.user, isGuest: false };
+      localStorage.setItem('shin_near_user', JSON.stringify(authedUser));
+      onSuccess(authedUser);
     } catch (err: any) {
       setError(err.message || 'Verification failed');
       setOtp(['', '', '', '', '']);
@@ -201,24 +207,29 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           {step === 'otp' ? 'Verify OTP' : 'Join The Struggle'}
         </h2>
         <p className="text-gray-400 text-[11px] tracking-[0.15em] uppercase">
-          Auto-creates your embedded NEAR wallet & Fighter Agent
+          {subtitle || 'Auto-creates your embedded NEAR wallet & Fighter Agent'}
         </p>
       </div>
 
       {step === 'method' && (
         <div className="flex flex-col gap-3.5">
-          {/* 1-Click Instant Warrior Login (Recommended for Judges & Instant Play) */}
+          {/* 1-Click Fight as Guest (Instant Warrior Login) */}
           <button
             onClick={() => {
               playClickSound();
               setStep('instant');
             }}
             onMouseEnter={playHoverSound}
-            className="group relative w-full px-5 py-4 bg-shin-gold text-black border border-shin-gold transition-all duration-300 hover:bg-yellow-400 flex items-center justify-center gap-2.5 cursor-pointer rounded-lg shadow-[0_0_20px_rgba(212,175,55,0.4)]"
+            className="group relative w-full px-5 py-4 bg-shin-gold text-black border border-shin-gold transition-all duration-300 hover:bg-yellow-400 flex flex-col items-center justify-center gap-0.5 cursor-pointer rounded-lg shadow-[0_0_20px_rgba(212,175,55,0.4)]"
           >
-            <Zap size={18} fill="currentColor" />
-            <span className="font-black tracking-[0.12em] text-xs md:text-sm uppercase">
-              Instant Warrior Login (0 Popups)
+            <div className="flex items-center gap-2">
+              <Zap size={18} fill="currentColor" />
+              <span className="font-black tracking-[0.12em] text-xs md:text-sm uppercase">
+                Fight as Guest (0 Popups)
+              </span>
+            </div>
+            <span className="text-[10px] font-semibold tracking-wider text-black/75">
+              Local demo • Sign in below for on-chain NEAR rewards
             </span>
           </button>
 

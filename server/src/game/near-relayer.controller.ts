@@ -1,9 +1,14 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import type { Request } from 'express';
 import { NearRelayerService } from './near-relayer.service';
 
 @Controller('near')
 export class NearRelayerController {
-  constructor(private readonly nearRelayer: NearRelayerService) {}
+  constructor(
+    private readonly nearRelayer: NearRelayerService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   @Get('status')
   getStatus() {
@@ -36,6 +41,7 @@ export class NearRelayerController {
 
   @Post('call')
   async callMethod(
+    @Req() req: Request,
     @Body()
     body: {
       methodName: string;
@@ -44,6 +50,24 @@ export class NearRelayerController {
       gas?: string;
     },
   ) {
+    const token = req.cookies?.['jwt'] as string | undefined;
+    if (!token) {
+      return {
+        ok: false,
+        simulated: true,
+        error: 'Login with Google or Email to execute on-chain NEAR transactions',
+      };
+    }
+    try {
+      this.jwtService.verify(token);
+    } catch {
+      return {
+        ok: false,
+        simulated: true,
+        error: 'Session expired. Please sign in again.',
+      };
+    }
+
     return this.nearRelayer.callMethod(
       body.methodName,
       body.args || {},

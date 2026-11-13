@@ -1179,10 +1179,22 @@ class NearArenaEngine {
     attachedDepositNear: string = '0',
   ) {
     if (typeof window === 'undefined') return;
+    try {
+      const userRaw = localStorage.getItem('shin_near_user');
+      const parsedUser = userRaw ? JSON.parse(userRaw) : null;
+      if (!parsedUser || parsedUser.isGuest) {
+        // Guest / Instant Warrior sessions run locally without spending relayer Testnet NEAR
+        return;
+      }
+    } catch {
+      return;
+    }
+
     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
     fetch(`${serverUrl}/api/near/call`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ methodName, args, attachedDepositNear }),
     })
       .then((res) => (res.ok ? res.json() : null))
