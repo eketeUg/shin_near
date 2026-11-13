@@ -134,20 +134,6 @@ export default function Home() {
     };
   }, [pendingPlayerFight]);
 
-  const handleToggleMobileOrientation = () => {
-    const nextIsLandscape = !isForceLandscapeActive;
-    if (nextIsLandscape) {
-      setOrientationPreference('FORCE_LANDSCAPE');
-      applyNativeOrientation('landscape');
-      if (pendingPlayerFight) {
-        executeFightStart(pendingPlayerFight);
-      }
-    } else {
-      setOrientationPreference('FORCE_PORTRAIT');
-      applyNativeOrientation('portrait');
-    }
-  };
-
   const syncFromNearEngine = () => {
     const st = nearArenaEngine.getState();
     setBalances({
@@ -341,36 +327,6 @@ export default function Home() {
           applyNativeOrientation('landscape');
         }}
       />
-
-      {/* Floating Mobile Orientation Toggle Pill (visible on screens <= 900px) */}
-      {!isLoading && (
-        <div
-          className="fixed z-[90] flex items-center gap-1 lg:hidden"
-          style={{
-            bottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))',
-            left: '50%',
-            transform: 'translateX(-50%)',
-          }}
-        >
-          <button
-            onClick={handleToggleMobileOrientation}
-            className="px-3 py-1 rounded-full bg-black/85 border border-shin-gold/50 text-shin-gold text-[10px] font-mono uppercase tracking-widest shadow-[0_0_15px_rgba(0,0,0,0.9)] backdrop-blur-md flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
-            title="Switch between Widescreen Landscape and Portrait on mobile"
-          >
-            <span>🔄</span>
-            <span>{isForceLandscapeActive ? 'Switch to Portrait' : 'Rotate to Landscape'}</span>
-          </button>
-          {orientationPreference !== 'AUTO_HYBRID' && (
-            <button
-              onClick={() => setOrientationPreference('AUTO_HYBRID')}
-              className="px-2 py-1 rounded-full bg-gray-900/90 border border-white/20 text-gray-300 text-[9px] font-mono uppercase tracking-wider cursor-pointer"
-              title="Reset to Smart Hybrid (Portrait Menus + Auto-Landscape Fights)"
-            >
-              Auto
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Loading Screen */}
       {isLoading && <LoadingScreen onComplete={handleLoadComplete} />}
