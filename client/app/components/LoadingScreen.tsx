@@ -111,7 +111,7 @@ const LoadingScreen = ({ onComplete, paused = false }: LoadingScreenProps) => {
       >
         {/* SHIN Logo Container */}
         <div className="relative mb-8 md:mb-12">
-          <h1 className="text-6xl md:text-9xl font-black font-cinzel tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-600 glow-text animate-pulse">
+          <h1 className="text-6xl md:text-9xl font-black font-cinzel tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-shin-gold to-amber-600 drop-shadow-[0_0_25px_rgba(251,191,36,0.45)] animate-pulse">
             SHIN
           </h1>
           <div className="absolute -bottom-2 md:-bottom-4 left-0 w-full h-1 bg-shin-red shadow-[0_0_20px_rgba(255,0,0,0.8)]"></div>
