@@ -8,15 +8,37 @@ interface AuthModalProps {
   onClose: () => void;
   onSuccess: (user: any) => void;
   subtitle?: string;
+  initialStep?: AuthStep;
+  initialPendingUser?: any;
 }
 
-type AuthStep = 'method' | 'instant' | 'email' | 'otp';
+type AuthStep = 'method' | 'instant' | 'email' | 'otp' | 'pick_username';
+
+const PRESET_WARRIOR_NAMES = [
+  'KageBlade',
+  'ShadowRonin',
+  'CrimsonTengu',
+  'StormShinobi',
+  'IronShogun',
+  'VoidKunoichi',
+  'ObsidianFang',
+  'JadeViper',
+];
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
 
-export default function AuthModal({ onClose, onSuccess, subtitle }: AuthModalProps) {
-  const [step, setStep] = useState<AuthStep>('method');
-  const [warriorName, setWarriorName] = useState('');
+export default function AuthModal({
+  onClose,
+  onSuccess,
+  subtitle,
+  initialStep = 'method',
+  initialPendingUser = null,
+}: AuthModalProps) {
+  const [step, setStep] = useState<AuthStep>(initialStep);
+  const [warriorName, setWarriorName] = useState(
+    initialPendingUser?.userName || initialPendingUser?.username || '',
+  );
+  const [pendingAuthedUser, setPendingAuthedUser] = useState<any>(initialPendingUser);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,12 +57,34 @@ export default function AuthModal({ onClose, onSuccess, subtitle }: AuthModalPro
     audio.play().catch(() => {});
   };
 
+  const finalizeAuthenticatedUser = (userData: any, chosenName?: string) => {
+    const finalName =
+      chosenName || userData.userName || userData.username || 'Warrior';
+    const authedUser = {
+      ...userData,
+      username: finalName,
+      userName: finalName,
+      isGuest: false,
+      isNewUser: false,
+    };
+    localStorage.setItem('shin_username', finalName);
+    localStorage.setItem('shin_near_user', JSON.stringify(authedUser));
+    nearArenaEngine.syncUsername(finalName);
+    onSuccess(authedUser);
+  };
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'AUTH_SUCCESS') {
-        const authedUser = { ...event.data.user, isGuest: false };
-        localStorage.setItem('shin_near_user', JSON.stringify(authedUser));
-        onSuccess(authedUser);
+        const incoming = { ...event.data.user, isGuest: false };
+        if (incoming.isNewUser) {
+          setPendingAuthedUser(incoming);
+          setWarriorName(incoming.userName || incoming.username || '');
+          setError(null);
+          setStep('pick_username');
+        } else {
+          finalizeAuthenticatedUser(incoming);
+        }
       }
     };
 
@@ -162,13 +206,49 @@ export default function AuthModal({ onClose, onSuccess, subtitle }: AuthModalPro
       if (!res.ok) {
         throw new Error(data.message || 'Invalid OTP');
       }
-      const authedUser = { ...data.user, isGuest: false };
-      localStorage.setItem('shin_near_user', JSON.stringify(authedUser));
-      onSuccess(authedUser);
+      const incoming = { ...data.user, isGuest: false };
+      if (incoming.isNewUser) {
+        setPendingAuthedUser(incoming);
+        setWarriorName(incoming.userName || incoming.username || '');
+        setError(null);
+        setStep('pick_username');
+      } else {
+        finalizeAuthenticatedUser(incoming);
+      }
     } catch (err: any) {
       setError(err.message || 'Verification failed');
       setOtp(['', '', '', '', '']);
       inputRefs.current[0]?.focus();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConfirmUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    playClickSound();
+    const cleanName = warriorName.trim();
+    if (cleanName.length < 3) {
+      setError('Username must be at least 3 characters');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${SERVER_URL}/api/auth/profile/username`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username: cleanName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Could not save username');
+      }
+      finalizeAuthenticatedUser(pendingAuthedUser || data, cleanName);
+    } catch (err: any) {
+      setError(err.message || 'Could not save username');
     } finally {
       setIsLoading(false);
     }
@@ -204,10 +284,16 @@ export default function AuthModal({ onClose, onSuccess, subtitle }: AuthModalPro
           Invisible NEAR Account • 0 Popups
         </span>
         <h2 className="text-2xl md:text-3xl font-black text-shin-gold mt-2 mb-1 uppercase">
-          {step === 'otp' ? 'Verify OTP' : 'Join The Struggle'}
+          {step === 'otp'
+            ? 'Verify OTP'
+            : step === 'pick_username'
+              ? 'Choose Warrior Name'
+              : 'Join The Struggle'}
         </h2>
         <p className="text-gray-400 text-[11px] tracking-[0.15em] uppercase">
-          {subtitle || 'Auto-creates your embedded NEAR wallet & Fighter Agent'}
+          {step === 'pick_username'
+            ? 'Pick a custom handle or tap a shinobi name below'
+            : subtitle || 'Auto-creates your embedded NEAR wallet & Fighter Agent'}
         </p>
       </div>
 
@@ -338,6 +424,62 @@ export default function AuthModal({ onClose, onSuccess, subtitle }: AuthModalPro
             CONFIRM AUTHORIZATION
           </button>
         </div>
+      )}
+
+      {step === 'pick_username' && (
+        <form onSubmit={handleConfirmUsername} className="flex flex-col gap-4">
+          <div>
+            <label className="block text-[10px] text-gray-400 uppercase tracking-widest mb-1.5">
+              Your Arena Handle
+            </label>
+            <input
+              type="text"
+              maxLength={20}
+              value={warriorName}
+              onChange={(e) => setWarriorName(e.target.value)}
+              placeholder="Enter custom username (min 3 chars)"
+              className="w-full bg-black border border-shin-gold/50 text-white text-center text-base px-4 py-3 rounded-lg focus:outline-none focus:border-shin-gold font-cinzel"
+              autoFocus
+              required
+            />
+          </div>
+
+          <div>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-2 text-center">
+              Or pick a pre-generated shinobi name
+            </p>
+            <div className="flex flex-wrap gap-1.5 justify-center">
+              {PRESET_WARRIOR_NAMES.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    playClickSound();
+                    setWarriorName(preset);
+                    setError(null);
+                  }}
+                  className={`px-2.5 py-1 rounded text-xs font-cinzel font-bold border transition-all cursor-pointer ${
+                    warriorName === preset
+                      ? 'bg-shin-gold text-black border-shin-gold'
+                      : 'bg-black/60 text-gray-300 border-white/15 hover:border-shin-gold/60 hover:text-white'
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && <p className="text-red-500 text-xs text-center font-sans">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={isLoading || warriorName.trim().length < 3}
+            className="w-full py-3.5 bg-shin-gold hover:bg-yellow-400 disabled:opacity-50 text-black font-black tracking-[0.18em] uppercase text-sm rounded-lg cursor-pointer shadow-[0_0_20px_rgba(212,175,55,0.45)]"
+          >
+            {isLoading ? 'SAVING HANDLE...' : 'CLAIM WARRIOR NAME'}
+          </button>
+        </form>
       )}
     </div>
   );

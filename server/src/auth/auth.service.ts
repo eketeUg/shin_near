@@ -49,6 +49,7 @@ export class AuthService {
 
     let dbUser = await this.usersService.findByEmail(req.user.email);
     let needsSave = false;
+    let isNewUser = false;
 
     if (!dbUser) {
       dbUser = await this.usersService.create({
@@ -57,6 +58,7 @@ export class AuthService {
         type: UserType.AUTHENTICATED,
       } as any);
       needsSave = true;
+      isNewUser = true;
     }
 
     if (!dbUser.googleId) {
@@ -79,8 +81,10 @@ export class AuthService {
       email: dbUser.email,
       sub: dbUser.id || (dbUser as any)._id?.toString(),
       userName: dbUser.username,
+      username: dbUser.username,
       provider: dbUser.authProvider,
       walletAddress: dbUser.walletAddress,
+      isNewUser,
     };
 
     return {
@@ -181,6 +185,7 @@ export class AuthService {
     // Find or create the user
     let dbUser = await this.usersService.findByEmail(email);
     let needsSave = false;
+    let isNewUser = false;
 
     if (!dbUser) {
       dbUser = await this.usersService.create({
@@ -191,6 +196,7 @@ export class AuthService {
       dbUser.authProvider = 'email';
       dbUser.emailVerified = true;
       needsSave = true;
+      isNewUser = true;
     } else {
       if (!dbUser.emailVerified) {
         dbUser.emailVerified = true;
@@ -213,8 +219,10 @@ export class AuthService {
       email: dbUser.email,
       sub: dbUser.id || (dbUser as any)._id?.toString(),
       userName: dbUser.username,
+      username: dbUser.username,
       provider: dbUser.authProvider,
       walletAddress: dbUser.walletAddress,
+      isNewUser,
     };
 
     return {
@@ -259,9 +267,10 @@ export class AuthService {
   }
 
   async updateUsername(userId: string, username: string) {
-    if (!username || username.length < 3) {
+    const clean = (username || '').trim();
+    if (clean.length < 3) {
       throw new BadRequestException('Username must be at least 3 characters');
     }
-    return this.usersService.update(userId, { username });
+    return this.usersService.update(userId, { username: clean });
   }
 }

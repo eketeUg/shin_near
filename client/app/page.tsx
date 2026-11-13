@@ -233,11 +233,31 @@ export default function Home() {
     window.addEventListener('rematch', handleRematch);
     window.addEventListener('nextAgentMatch', handleNextAgentMatch);
 
+    const syncUserIdentity = () => {
+      try {
+        const storedUser = localStorage.getItem('shin_near_user');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          setUser(parsed);
+          const resolved = parsed.username || parsed.userName;
+          if (resolved) setUsername(resolved);
+          return;
+        }
+        const engineName = nearArenaEngine.getState().playerWallet.username;
+        if (engineName) setUsername(engineName);
+      } catch {
+        // ignore storage errors
+      }
+    };
+    syncUserIdentity();
+    window.addEventListener('nearArenaStateUpdated', syncUserIdentity);
+
     return () => {
       window.removeEventListener('leaveSpectator', handleLeaveSpectator);
       window.removeEventListener('exitMatch', handleExitMatch);
       window.removeEventListener('rematch', handleRematch);
       window.removeEventListener('nextAgentMatch', handleNextAgentMatch);
+      window.removeEventListener('nearArenaStateUpdated', syncUserIdentity);
     };
   }, [returnToAgentArenaAfterFight]);
 
