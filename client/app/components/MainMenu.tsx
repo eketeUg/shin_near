@@ -126,7 +126,9 @@ const MainMenu = ({
 
   const ownedChampions = arenaState.fighters.filter((f) => !f.isNpc);
   const activeChampion =
-    ownedChampions[championIdx % Math.max(1, ownedChampions.length)] || arenaState.fighters[0];
+    ownedChampions.length > 0
+      ? ownedChampions[championIdx % ownedChampions.length]
+      : null;
 
   const getCharGif = (charId: string) => {
     const found = Roster.find((r) => r.id === charId);
@@ -455,7 +457,7 @@ const MainMenu = ({
         </div>
 
         {/* RIGHT COLUMN (5 cols): Living Champion Showcase Pedestal */}
-        {activeChampion && (
+        {activeChampion ? (
           <div className="lg:col-span-5 flex flex-col items-center">
             <div className="w-full max-w-md bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-shin-gold/40 rounded-2xl p-5 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden">
               {/* Top Champion Header */}
@@ -582,6 +584,43 @@ const MainMenu = ({
                   <span>🏮 Train at Dojo</span>
                 </button>
               </div>
+            </div>
+          </div>
+        ) : (
+          <div className="lg:col-span-5 flex flex-col items-center">
+            <div className="w-full max-w-md bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-white/15 rounded-2xl p-6 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden text-center">
+              <div className="text-[10px] font-cinzel text-shin-gold uppercase tracking-widest flex items-center justify-center gap-1.5 mb-1">
+                <Trophy size={12} /> Active Champion Showcase
+              </div>
+              <h2 className="text-xl font-cinzel font-black text-white uppercase">
+                No Fighter NFT Yet
+              </h2>
+              <p className="text-xs text-gray-400 mt-1 mb-5">
+                Recruit an on-chain NEP-245 Fighter NFT to unlock your autonomous Agent Vault, ELO progression, and Dojo training.
+              </p>
+
+              <div className="relative h-48 flex items-end justify-center bg-gradient-to-t from-shin-gold/10 via-black/40 to-transparent rounded-xl border border-dashed border-shin-gold/30 mb-5 overflow-hidden">
+                <img
+                  src="/assets/Shin_gifs/Shinobi_AllActions.gif"
+                  alt="Recruit Warrior"
+                  className="w-40 h-40 object-contain scale-125 origin-bottom opacity-35 grayscale contrast-125"
+                  style={{ imageRendering: 'pixelated' }}
+                />
+                <span className="absolute top-3 px-3 py-1 rounded-full bg-black/80 border border-white/15 text-[10px] font-mono text-gray-300 uppercase tracking-wider">
+                  0 Warriors Owned
+                </span>
+              </div>
+
+              <button
+                  onClick={() => {
+                    playClickSound();
+                    onAwakenWarrior?.();
+                  }}
+                className="w-full py-3.5 px-4 bg-shin-gold hover:bg-yellow-400 text-black font-cinzel font-black text-xs uppercase tracking-widest rounded-xl shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Plus size={15} />
+                <span>Recruit Your First Warrior</span>
+              </button>
             </div>
           </div>
         )}
