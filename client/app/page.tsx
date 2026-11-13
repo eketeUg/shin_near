@@ -12,6 +12,7 @@ import TournamentsFlow from './components/TournamentsFlow';
 import SpectatorGameCanvasWrapper from './components/SpectatorGameCanvasWrapper';
 import MatchmakingScreen from './components/MatchmakingScreen';
 import AgentArenaFlow from './components/AgentArenaFlow';
+import MobileLandscapeGate from './components/MobileLandscapeGate';
 import { nearArenaEngine, ActiveArenaMatch } from './services/nearArenaEngine';
 
 export default function Home() {
@@ -332,6 +333,15 @@ export default function Home() {
       id="shin-mobile-shell"
       className={`${isForceLandscapeActive ? 'mobile-landscape-shell' : 'mobile-hybrid-shell'} relative`}
     >
+      {/* Global Mobile Landscape Gate (shows immediately on portrait mobile browsers) */}
+      <MobileLandscapeGate
+        forceLandscapeCss={isForceLandscapeActive}
+        onForceLandscapeCss={() => {
+          setOrientationPreference('FORCE_LANDSCAPE');
+          applyNativeOrientation('landscape');
+        }}
+      />
+
       {/* Floating Mobile Orientation Toggle Pill (visible on screens <= 900px) */}
       {!isLoading && (
         <div
