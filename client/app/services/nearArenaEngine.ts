@@ -1345,7 +1345,11 @@ class NearArenaEngine {
       return this.state.playerWallet;
     }
 
-    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const serverUrl =
+      process.env.NEXT_PUBLIC_SERVER_URL ||
+      (typeof window !== 'undefined'
+        ? `http://${window.location.hostname}:3001`
+        : 'http://localhost:3001');
     try {
       let fetchedFromServer = false;
       try {
@@ -1363,9 +1367,13 @@ class NearArenaEngine {
           const usdtVal = Number(
             balData?.usdtBalance?.balance ?? balData?.USDT?.balance ?? 0,
           );
-          this.state.playerWallet.NEAR = Number.isFinite(nearVal) ? nearVal : 0;
-          this.state.playerWallet.USDC = Number.isFinite(usdcVal) ? usdcVal : 0;
-          this.state.playerWallet.USDT = Number.isFinite(usdtVal) ? usdtVal : 0;
+          this.state.playerWallet = {
+            ...this.state.playerWallet,
+            accountId: targetAddr,
+            NEAR: Number.isFinite(nearVal) ? nearVal : 0,
+            USDC: Number.isFinite(usdcVal) ? usdcVal : 0,
+            USDT: Number.isFinite(usdtVal) ? usdtVal : 0,
+          };
           fetchedFromServer = true;
         }
       } catch {
@@ -1381,7 +1389,11 @@ class NearArenaEngine {
         });
         if (acctView?.amount) {
           const formatted = utils.format.formatNearAmount(acctView.amount, 4);
-          this.state.playerWallet.NEAR = Number(formatted.replace(/,/g, '')) || 0;
+          this.state.playerWallet = {
+            ...this.state.playerWallet,
+            accountId: targetAddr,
+            NEAR: Number(formatted.replace(/,/g, '')) || 0,
+          };
         }
       }
 

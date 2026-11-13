@@ -25,19 +25,22 @@ interface ProfilePageProps {
 }
 
 export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfilePageProps) {
-  const arenaState = nearArenaEngine.getState();
+  const [arenaState, setArenaState] = useState(() => nearArenaEngine.getState());
   const [isEditing, setIsEditing] = useState(false);
   const [newUsername, setNewUsername] = useState(
     user?.username || user?.userName || arenaState.playerWallet.username || 'Warrior',
   );
   const [copySuccess, setCopySuccess] = useState(false);
 
-  const nearAccount = arenaState.playerWallet.accountId;
+  const nearAccount = user?.walletAddress || arenaState.playerWallet.accountId;
 
   useEffect(() => {
+    const onUpdate = () => setArenaState({ ...nearArenaEngine.getState() });
+    window.addEventListener('nearArenaStateUpdated', onUpdate);
     if (!user?.isGuest && nearAccount) {
       void nearArenaEngine.syncOnChainState(nearAccount);
     }
+    return () => window.removeEventListener('nearArenaStateUpdated', onUpdate);
   }, [nearAccount, user?.isGuest]);
   const ownedFighters = arenaState.fighters.filter((f) => !f.isNpc);
   const totalWins = ownedFighters.reduce((acc, f) => acc + f.wins, 0);
