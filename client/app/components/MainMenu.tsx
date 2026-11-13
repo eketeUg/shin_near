@@ -92,6 +92,19 @@ const MainMenu = ({
           setIsAuthLoading(false);
           return;
         }
+        // Fallback: check if user has an active HttpOnly JWT session from Google/Email OAuth
+        const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+        const res = await fetch(`${serverUrl}/api/auth/me`, { credentials: 'include' });
+        if (res.ok) {
+          const userData = await res.json();
+          const authedUser = { ...userData, isGuest: false };
+          localStorage.setItem('shin_near_user', JSON.stringify(authedUser));
+          setCurrentUser(authedUser);
+          const name = authedUser.username || authedUser.userName || 'Warrior';
+          setUsername(name);
+          nearArenaEngine.syncUsername(name);
+          return;
+        }
         // Not logged in yet: keep home screen clean with Login button (no auto guest_... name)
         setCurrentUser(null);
         setUsername('');
