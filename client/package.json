@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "postinstall": "patch-package",
-    "dev": "rm -rf .next && next dev",
+    "dev": "rm -rf .next && next dev -p 3002",
     "build": "rm -rf .next && next build",
-    "start": "rm -rf .next && next start",
-    "mobile": "next build && next start -H 0.0.0.0",
+    "start": "next start -p 3002",
+    "mobile": "next build && next start -H 0.0.0.0 -p 3002",
     "lint": "eslint"
   },
   "dependencies": {
