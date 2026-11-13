@@ -1,7 +1,7 @@
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedMap};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{env, near_bindgen, AccountId, NearToken, PanicOnDefault, Promise};
+use near_sdk::{env, near, AccountId, NearToken, PanicOnDefault, Promise};
 
 /// Combat AI Doctrine assigned to an autonomous Fighter Agent
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -81,8 +81,8 @@ pub struct NpcDojoMaster {
     pub total_investor_capital_milli_near: u128,
 }
 
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[near(contract_state)]
+#[derive(PanicOnDefault)]
 pub struct ShinArenaContract {
     pub oracle_id: AccountId,
     pub fighters: UnorderedMap<String, FighterNft>,
@@ -95,7 +95,7 @@ pub struct ShinArenaContract {
     pub mt_supplies: LookupMap<String, u128>,
 }
 
-#[near_bindgen]
+#[near]
 impl ShinArenaContract {
     #[init]
     pub fn new(oracle_id: AccountId) -> Self {
@@ -189,7 +189,7 @@ impl ShinArenaContract {
 
         let fighter = FighterNft {
             token_id: token_id.clone(),
-            owner_id: caller,
+            owner_id: caller.clone(),
             agent_wallet_id,
             char_class,
             name,
@@ -534,7 +534,9 @@ impl ShinArenaContract {
             Some("Bazaar Fighter NFT Ownership Transfer (NEP-245)"),
         );
 
-        Promise::new(seller).transfer(NearToken::from_millinear(attached));
+        Promise::new(seller)
+            .transfer(NearToken::from_millinear(attached))
+            .detach();
         fighter
     }
 
@@ -613,5 +615,206 @@ impl ShinArenaContract {
 
     pub fn get_all_fighters(&self) -> Vec<FighterNft> {
         self.fighters.values().collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use near_sdk::test_utils::VMContextBuilder;
+    use near_sdk::testing_env;
+
+    fn get_context(predecessor: &str, attached_millinear: u128) -> near_sdk::VMContext {
+        VMContextBuilder::new()
+            .predecessor_account_id(predecessor.parse().unwrap())
+            .attached_deposit(NearToken::from_millinear(attached_millinear))
+            .build()
+    }
+
+    #[test]
+    fn test_mint_fighter_and_nep245_starter_tokens() {
+        testing_env!(get_context("alice.testnet", 5_000));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+
+        let fighter = contract.mint_fighter(
+            "hayabusa".to_string(),
+            "Shadow Hayabusa".to_string(),
+            85,
+            70,
+            95,
+        );
+
+        assert_eq!(fighter.token_id, "shin-hayabusa-1");
+        assert_eq!(fighter.owner_id.as_str(), "alice.testnet");
+        assert_eq!(fighter.vault_balance_milli_near, 5_000);
+        assert_eq!(fighter.elo, 1000);
+
+        let alice: AccountId = "alice.testnet".parse().unwrap();
+        assert_eq!(
+            contract.mt_balance_of(alice.clone(), "fighter:shin-hayabusa-1".to_string()),
+            "1"
+        );
+        assert_eq!(
+            contract.mt_balance_of(alice, "scroll:way-of-the-shinobi".to_string()),
+            "1"
+        );
+        assert_eq!(
+            contract.mt_supply("fighter:shin-hayabusa-1".to_string()),
+            Some("1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_configure_and_fund_agent_wallet() {
+        testing_env!(get_context("alice.testnet", 1_000));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let fighter = contract.mint_fighter("kaze".to_string(), "Kaze".to_string(), 75, 65, 90);
+
+        let updated = contract.configure_agent(
+            fighter.token_id.clone(),
+            2_000,
+            true,
+            true,
+            CombatDoctrine::CounterStriker,
+        );
+        assert_eq!(updated.wager_per_fight_milli_near, 2_000);
+        assert!(updated.is_agent_active);
+        assert!(updated.auto_train_at_dojo);
+        assert_eq!(updated.doctrine, CombatDoctrine::CounterStriker);
+
+        testing_env!(get_context("alice.testnet", 3_500));
+        let funded = contract.fund_agent_wallet(fighter.token_id);
+        assert_eq!(funded.vault_balance_milli_near, 4_500);
+    }
+
+    #[test]
+    fn test_create_match_pool_bet_and_settle_with_auto_train() {
+        testing_env!(get_context("alice.testnet", 5_000));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let f1 = contract.mint_fighter("hayabusa".to_string(), "Hayabusa".to_string(), 80, 70, 90);
+        contract.configure_agent(
+            f1.token_id.clone(),
+            1_000,
+            true,
+            true,
+            CombatDoctrine::AggressiveRushdown,
+        );
+
+        testing_env!(get_context("bob.testnet", 5_000));
+        let f2 = contract.mint_fighter("musashi".to_string(), "Musashi".to_string(), 85, 80, 70);
+
+        contract.create_agent_match_pool(
+            "match-1".to_string(),
+            f1.token_id.clone(),
+            f2.token_id.clone(),
+            1_000,
+        );
+
+        testing_env!(get_context("carol.testnet", 2_000));
+        contract.place_spectator_bet("match-1".to_string(), f1.token_id.clone());
+
+        contract.settle_match("match-1".to_string(), f1.token_id.clone());
+
+        let fighters = contract.get_all_fighters();
+        let winner = fighters.iter().find(|f| f.token_id == f1.token_id).unwrap();
+        let loser = fighters.iter().find(|f| f.token_id == f2.token_id).unwrap();
+
+        // f1 started with 5000, staked 1000 -> 4000, won 2000 pot + 100 (5% of 2000 bet) = 6100,
+        // auto_train_at_dojo paid 500 -> 5600
+        assert_eq!(winner.vault_balance_milli_near, 5_600);
+        assert_eq!(winner.wins, 1);
+        assert_eq!(winner.elo, 1024);
+        assert_eq!(winner.power_level, 3); // +1 from win, +1 from auto-train
+
+        assert_eq!(loser.losses, 1);
+        assert_eq!(loser.elo, 982);
+        assert_eq!(loser.vault_balance_milli_near, 4_000);
+
+        // Auto-train minted shadow-step-mastery scroll to winner's agent wallet
+        assert_eq!(
+            contract.mt_balance_of(
+                winner.agent_wallet_id.parse().unwrap(),
+                "scroll:shadow-step-mastery".to_string()
+            ),
+            "1"
+        );
+    }
+
+    #[test]
+    fn test_dynamic_npc_dojo_scroll_purchase() {
+        testing_env!(get_context("alice.testnet", 5_000));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let f1 = contract.mint_fighter("raiden".to_string(), "Raiden".to_string(), 80, 75, 85);
+
+        let initial_cost = contract.get_dynamic_dojo_cost();
+        assert_eq!(initial_cost, 500);
+
+        let trained = contract.buy_dojo_scroll(f1.token_id.clone(), "ATK".to_string());
+        assert_eq!(trained.atk, 83);
+        assert_eq!(trained.power_level, 2);
+        assert_eq!(trained.vault_balance_milli_near, 4_500);
+
+        // Dynamic price increases by 25 milliNEAR after 1 training
+        assert_eq!(contract.get_dynamic_dojo_cost(), 525);
+        assert_eq!(
+            contract.mt_balance_of(
+                trained.agent_wallet_id.parse().unwrap(),
+                "scroll:crimson-katana".to_string()
+            ),
+            "1"
+        );
+    }
+
+    #[test]
+    fn test_list_and_buy_fighter_on_market_transfers_nep245() {
+        testing_env!(get_context("alice.testnet", 1_000));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let f1 = contract.mint_fighter("shinobi".to_string(), "Shinobi".to_string(), 70, 70, 70);
+
+        contract.list_fighter_on_market(f1.token_id.clone(), 10_000);
+
+        testing_env!(get_context("bob.testnet", 10_000));
+        let bought = contract.buy_fighter_from_market(f1.token_id.clone());
+
+        assert_eq!(bought.owner_id.as_str(), "bob.testnet");
+        assert_eq!(bought.market_price_milli_near, 0);
+
+        let nep245_id = format!("fighter:{}", f1.token_id);
+        assert_eq!(
+            contract.mt_balance_of("alice.testnet".parse().unwrap(), nep245_id.clone()),
+            "0"
+        );
+        assert_eq!(
+            contract.mt_balance_of("bob.testnet".parse().unwrap(), nep245_id),
+            "1"
+        );
+    }
+
+    #[test]
+    fn test_nep245_batch_transfer_and_balance() {
+        testing_env!(get_context("alice.testnet", 1_000));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let f1 = contract.mint_fighter("kunoichi".to_string(), "Kunoichi".to_string(), 75, 65, 95);
+
+        let token_ids = vec![
+            format!("fighter:{}", f1.token_id),
+            "scroll:way-of-the-shinobi".to_string(),
+        ];
+        contract.mt_batch_transfer(
+            "bob.testnet".parse().unwrap(),
+            token_ids.clone(),
+            vec!["1".to_string(), "1".to_string()],
+            None,
+            Some("Batch gift".to_string()),
+        );
+
+        assert_eq!(
+            contract.mt_batch_balance_of("bob.testnet".parse().unwrap(), token_ids.clone()),
+            vec!["1".to_string(), "1".to_string()]
+        );
+        assert_eq!(
+            contract.mt_batch_balance_of("alice.testnet".parse().unwrap(), token_ids),
+            vec!["0".to_string(), "0".to_string()]
+        );
     }
 }
