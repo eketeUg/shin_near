@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 interface MobileLandscapeGateProps {
   forceLandscapeCss?: boolean;
   onForceLandscapeCss?: () => void;
@@ -9,58 +11,83 @@ export default function MobileLandscapeGate({
   forceLandscapeCss = false,
   onForceLandscapeCss,
 }: MobileLandscapeGateProps) {
+  const [statusHint, setStatusHint] = useState<string | null>(null);
+
   if (forceLandscapeCss) {
     return null;
   }
 
-  const handleGoFullscreen = () => {
+  const handleGoFullscreen = async () => {
+    setStatusHint('Entering landscape...');
+
     const el = document.documentElement as HTMLElement & {
       webkitRequestFullscreen?: () => Promise<void> | void;
     };
 
-    const tryLockOrFallback = async () => {
+    const lockOrientation = async (): Promise<boolean> => {
       try {
         const orientation = (screen as any)?.orientation;
         if (orientation && typeof orientation.lock === 'function') {
           await orientation.lock('landscape');
-          return;
+          return true;
         }
       } catch {
-        // Browser blocked native orientation lock (e.g. iOS Safari or desktop mobile emulation)
+        // Orientation lock rejected or unsupported (e.g. iOS Safari)
       }
-
-      // If still in portrait after attempting native lock, rotate the app shell via CSS immediately
-      if (typeof window !== 'undefined' && window.innerHeight > window.innerWidth) {
-        onForceLandscapeCss?.();
-      }
+      return false;
     };
 
-    try {
-      let fsPromise: Promise<void> | void = undefined;
-      if (el.requestFullscreen) {
-        fsPromise = el.requestFullscreen();
-      } else if (el.webkitRequestFullscreen) {
-        fsPromise = el.webkitRequestFullscreen();
-      }
+    // Wait for fullscreenchange if not already fullscreen, then lock orientation
+    const waitForFullscreenAndLock = () =>
+      new Promise<boolean>((resolve) => {
+        if (document.fullscreenElement) {
+          void lockOrientation().then(resolve);
+          return;
+        }
 
-      if (fsPromise && typeof (fsPromise as Promise<void>).then === 'function') {
-        (fsPromise as Promise<void>)
-          .then(() => tryLockOrFallback())
-          .catch(() => tryLockOrFallback());
-      } else {
-        void tryLockOrFallback();
+        let settled = false;
+        const finish = async () => {
+          if (settled) return;
+          settled = true;
+          document.removeEventListener('fullscreenchange', onFsChange);
+          const locked = await lockOrientation();
+          resolve(locked);
+        };
+
+        const onFsChange = () => {
+          void finish();
+        };
+
+        document.addEventListener('fullscreenchange', onFsChange, { once: true });
+        setTimeout(() => {
+          void finish();
+        }, 800);
+      });
+
+    try {
+      if (el.requestFullscreen) {
+        const lockPromise = waitForFullscreenAndLock();
+        await el.requestFullscreen({ navigationUI: 'hide' }).catch(() => el.requestFullscreen());
+        const locked = await lockPromise;
+        if (locked) return;
+      } else if (el.webkitRequestFullscreen) {
+        await el.webkitRequestFullscreen();
+        const locked = await lockOrientation();
+        if (locked) return;
       }
     } catch {
-      void tryLockOrFallback();
+      // Fullscreen rejected
     }
 
-    // Safety net: if the browser neither rotated natively nor resolved fullscreen within 450ms,
-    // activate CSS landscape so a single tap always works.
-    setTimeout(() => {
-      if (typeof window !== 'undefined' && window.innerHeight > window.innerWidth) {
-        onForceLandscapeCss?.();
+    // Native lock not supported/allowed (e.g. iOS Safari or OS rotation lock):
+    // Fall back to CSS-rotated landscape shell so 1 tap still enters landscape.
+    if (typeof window !== 'undefined' && window.innerHeight > window.innerWidth) {
+      if (onForceLandscapeCss) {
+        onForceLandscapeCss();
+      } else {
+        setStatusHint('Please turn your phone sideways to continue.');
       }
-    }, 450);
+    }
   };
 
   return (
@@ -101,6 +128,12 @@ export default function MobileLandscapeGate({
       >
         Go full screen
       </button>
+
+      {statusHint && (
+        <p className="mt-4 text-xs font-mono text-amber-300/90 max-w-xs">
+          {statusHint}
+        </p>
+      )}
     </div>
   );
 }
