@@ -134,11 +134,24 @@ const MainMenu = ({
 
   useEffect(() => {
     if (ownedChampions.length > 0) return;
-    const timer = setInterval(() => {
+    const durationsMs: Record<string, number> = {
+      fighter: 4750,
+      knight_1: 4150,
+      kunoichi: 6650,
+      ninja_monk: 5450,
+      ninja_peasant: 4650,
+      samurai: 5150,
+      samurai_1: 4950,
+      samurai_archer: 5750,
+      samurai_commander: 4650,
+      shinobi: 5250,
+    };
+    const waitMs = durationsMs[previewFighter.id] ?? 5500;
+    const timer = setTimeout(() => {
       setPreviewIdx((prev) => (prev + 1) % Roster.length);
-    }, 2500);
-    return () => clearInterval(timer);
-  }, [ownedChampions.length]);
+    }, waitMs);
+    return () => clearTimeout(timer);
+  }, [ownedChampions.length, previewIdx, previewFighter.id]);
 
   const getCharGif = (charId: string) => {
     const found = Roster.find((r) => r.id === charId);
