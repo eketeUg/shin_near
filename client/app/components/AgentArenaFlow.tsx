@@ -85,7 +85,19 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
     const sync = () => setArenaState({ ...nearArenaEngine.getState() });
     window.addEventListener('nearArenaStateUpdated', sync);
 
-    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const envUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+    let serverUrl = envUrl || 'http://localhost:3001';
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      if (
+        (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) &&
+        host &&
+        host !== 'localhost' &&
+        host !== '127.0.0.1'
+      ) {
+        serverUrl = `${window.location.protocol}//${host}:3001`;
+      }
+    }
     const socket = io(serverUrl, { reconnectionAttempts: 5 });
 
     socket.on('connect', () => {
@@ -364,12 +376,20 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
             ) : (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6">
                 {serverMatches.map((sm) => {
-                  const matchId = sm.id;
-                  const p1Char = String(sm.p1Char || 'samurai').toLowerCase();
-                  const p2Char = String(sm.p2Char || 'shinobi').toLowerCase();
-                  const p1Name = sm.p1Name || 'Red Corner';
-                  const p2Name = sm.p2Name || 'Blue Corner';
-                  const potShin = Number(sm.potShin || 2000);
+                  const matchId = sm.matchId || sm.id;
+                  const p1Char = String(sm.p1Type || sm.p1Char || sm.p1?.charId || 'samurai').toLowerCase();
+                  const p2Char = String(sm.p2Type || sm.p2Char || sm.p2?.charId || 'shinobi').toLowerCase();
+                  const p1Name = sm.p1Name || sm.p1?.name || sm.hostName || 'Red Corner';
+                  const p2Name = sm.p2Name || sm.p2?.name || 'Blue Corner';
+                  const p1Hp = sm.sim?.p1Hp ?? sm.p1Hp ?? 100;
+                  const p2Hp = sm.sim?.p2Hp ?? sm.p2Hp ?? 100;
+                  const timer = sm.sim?.matchTimer ?? sm.timer ?? 99;
+                  const viewers = sm.viewers ?? sm.spectatorCount ?? 0;
+                  const potShin = Number(
+                    sm.fighterPoolShin ||
+                      sm.potShin ||
+                      (sm.wager?.token === 'SHIN' ? Number(sm.wager.amount || 0) * 2 : 500),
+                  );
                   const currentBetAmt = betAmounts[matchId] ?? 1.0;
 
                   return (
@@ -380,7 +400,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                       {/* Top Match Header */}
                       <div className="flex flex-wrap items-center justify-between gap-1 mb-2 sm:mb-3">
                         <span className="text-[8px] sm:text-[10px] font-cinzel text-gray-300 bg-white/5 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded border border-white/10">
-                          👁 {sm.spectatorCount || 1} • ⏱ {sm.timer ?? 99}s
+                          👁 {viewers} • ⏱ {timer}s
                         </span>
                         <span className="bg-shin-red/20 text-shin-red border border-shin-red/50 text-[8px] sm:text-[10px] font-cinzel font-black px-1.5 sm:px-3 py-0.5 rounded-full flex items-center gap-1">
                           <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-shin-red animate-ping shrink-0" />
@@ -406,7 +426,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                           <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden mt-1">
                             <div
                               className="h-full bg-emerald-400 transition-all duration-300"
-                              style={{ width: `${Math.max(0, Math.min(100, sm.p1Hp ?? 100))}%` }}
+                              style={{ width: `${Math.max(0, Math.min(100, p1Hp))}%` }}
                             />
                           </div>
                         </div>
@@ -434,7 +454,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                           <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden mt-1">
                             <div
                               className="h-full bg-red-400 transition-all duration-300"
-                              style={{ width: `${Math.max(0, Math.min(100, sm.p2Hp ?? 100))}%` }}
+                              style={{ width: `${Math.max(0, Math.min(100, p2Hp))}%` }}
                             />
                           </div>
                         </div>
@@ -455,7 +475,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                             Broadcast Mode
                           </div>
                           <div className="text-[10px] sm:text-sm font-mono font-bold text-emerald-400 truncate">
-                            {sm.mode === 'AGENT_BROADCAST' ? 'AI COLOSSEUM' : '1v1 DUEL'}
+                            {sm.mode || 'LIVE DUEL'}
                           </div>
                         </div>
                       </div>
@@ -509,10 +529,13 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                       <button
                         onClick={() =>
                           onWatchAgentFight({
-                            matchId: sm.id,
-                            id: sm.id,
+                            matchId,
+                            id: matchId,
+                            p1Type: p1Char,
+                            p2Type: p2Char,
                             p1Character: p1Char,
                             p2Character: p2Char,
+                            hostName: p1Name,
                             p1Name,
                             p2Name,
                             potShin,

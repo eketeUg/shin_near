@@ -16,7 +16,19 @@ const LiveFightsFlow: React.FC<LiveFightsFlowProps> = ({ onWatchMatch, onBack, o
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const envUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+    let serverUrl = envUrl || 'http://localhost:3001';
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      if (
+        (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) &&
+        host &&
+        host !== 'localhost' &&
+        host !== '127.0.0.1'
+      ) {
+        serverUrl = `${window.location.protocol}//${host}:3001`;
+      }
+    }
     const socket = io(serverUrl, { reconnectionAttempts: 5 });
 
     socket.on('connect', () => {

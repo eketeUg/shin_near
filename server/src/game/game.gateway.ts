@@ -61,6 +61,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // Active in-chat fight proposals (keyed by proposalId)
   private chatFightProposals = new Map<string, any>();
+  private disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private broadcastTickCount = 0;
   private cachedOnChainAgents: any[] = [];
 
@@ -369,24 +370,28 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
     }
 
-    // If acting as a host, clean up their match
-    let matchEnded = false;
+    // If acting as a host, give a 6s grace period in case the client is transitioning from MatchmakingScreen to GameScene
     for (const [mid, match] of this.activeMatches.entries()) {
-      if (match.hostId === client.id) {
-        this.activeMatches.delete(mid);
-        this.server.to(`match_${mid}`).emit('match_ended');
-        matchEnded = true;
-        console.log(
-          `Match ${mid} ended because host ${client.id} disconnected.`,
-        );
+      if (match.hostId === client.id && !match.isServerBroadcast) {
+        const prevTimer = this.disconnectTimers.get(mid);
+        if (prevTimer) clearTimeout(prevTimer);
+        const timer = setTimeout(() => {
+          this.disconnectTimers.delete(mid);
+          const current = this.activeMatches.get(mid);
+          if (current && current.hostId === client.id) {
+            this.activeMatches.delete(mid);
+            this.server.to(`match_${mid}`).emit('match_ended');
+            console.log(
+              `Match ${mid} ended because host ${client.id} disconnected.`,
+            );
+            this.server.emit(
+              'active_matches_updated',
+              Array.from(this.activeMatches.values()),
+            );
+          }
+        }, 6000);
+        this.disconnectTimers.set(mid, timer);
       }
-    }
-
-    if (matchEnded) {
-      this.server.emit(
-        'active_matches_updated',
-        Array.from(this.activeMatches.values()),
-      );
     }
   }
 
@@ -402,19 +407,49 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const matchId =
       matchData?.matchId ||
       'near_match_' + Math.random().toString(36).substring(2, 9);
+    const existing = this.activeMatches.get(matchId);
+    const pendingTimer = this.disconnectTimers.get(matchId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      this.disconnectTimers.delete(matchId);
+    }
+
+    const p1Type = String(matchData?.p1Type || existing?.p1Type || 'shinobi').toLowerCase();
+    const p2Type = String(matchData?.p2Type || existing?.p2Type || 'samurai').toLowerCase();
+    const p1Name = matchData?.p1Name || matchData?.hostName || existing?.p1Name || existing?.hostName || 'Warrior 1';
+    const p2Name = matchData?.p2Name || existing?.p2Name || 'Challenger';
+    const wager = matchData?.wager || existing?.wager || null;
+    const fighterPoolShin =
+      matchData?.fighterPoolShin ||
+      existing?.fighterPoolShin ||
+      (wager?.token === 'SHIN' ? Number(wager.amount || 0) * 2 : 500);
+
     this.activeMatches.set(matchId, {
+      ...(existing || {}),
       hostId: client.id,
-      matchId: matchId,
-      hostName: matchData?.hostName || 'Unknown Warrior',
-      p1Type: matchData?.p1Type || 'shinobi',
-      p2Type: matchData?.p2Type || 'samurai',
-      mode: matchData?.mode || 'AGENT_ARENA',
-      wagerNear: matchData?.wagerNear || 1.0,
-      viewers: 0,
-      spectatorBets: [],
+      matchId,
+      hostName: p1Name,
+      p1Name,
+      p2Name,
+      p1Type,
+      p2Type,
+      mode: matchData?.mode || existing?.mode || 'LIVE DUEL',
+      wager,
+      wagerNear: matchData?.wagerNear || existing?.wagerNear || 1.0,
+      fighterPoolShin,
+      viewers: existing?.viewers || 0,
+      spectatorBets: existing?.spectatorBets || [],
+      sim: existing?.sim || {
+        matchTimer: matchData?.matchTimer || 180,
+        p1Hp: 100,
+        p2Hp: 100,
+        p1MaxHp: 100,
+        p2MaxHp: 100,
+      },
     });
 
-    console.log(`[NEAR ARENA] Match created on ${NEAR_ARENA_CONTRACT_ID}: ${matchId}`);
+    client.join(`match_${matchId}`);
+    console.log(`[NEAR ARENA] Match created on ${NEAR_ARENA_CONTRACT_ID}: ${matchId} (${p1Name} vs ${p2Name})`);
     // Broadcast to everyone that there's a new match to watch
     this.server.emit(
       'active_matches_updated',
@@ -429,15 +464,31 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() frameData: any,
   ) {
-    let matchId: string | null = null;
-    for (const [mid, match] of this.activeMatches.entries()) {
-      if (match.hostId === client.id) {
-        matchId = mid;
-        break;
+    let matchId: string | null = frameData?.matchId || null;
+    if (!matchId || !this.activeMatches.has(matchId)) {
+      matchId = null;
+      for (const [mid, match] of this.activeMatches.entries()) {
+        if (match.hostId === client.id) {
+          matchId = mid;
+          break;
+        }
       }
     }
 
-    if (matchId) {
+    if (matchId && this.activeMatches.has(matchId)) {
+      const match = this.activeMatches.get(matchId);
+      if (match) {
+        match.hostId = client.id;
+        match.sim = {
+          ...(match.sim || {}),
+          matchTimer: frameData?.matchTimer ?? match.sim?.matchTimer ?? 180,
+          p1Hp: frameData?.p1?.hp ?? match.sim?.p1Hp ?? 100,
+          p2Hp: frameData?.p2?.hp ?? match.sim?.p2Hp ?? 100,
+          p1MaxHp: frameData?.p1?.maxHp ?? 100,
+          p2MaxHp: frameData?.p2?.maxHp ?? 100,
+        };
+        this.activeMatches.set(matchId, match);
+      }
       client.broadcast
         .to(`match_${matchId}`)
         .emit('spectator_sync_frame', frameData);
@@ -449,11 +500,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() eventData: any,
   ) {
-    let matchId: string | null = null;
-    for (const [mid, match] of this.activeMatches.entries()) {
-      if (match.hostId === client.id) {
-        matchId = mid;
-        break;
+    let matchId: string | null = eventData?.matchId || eventData?.data?.detail?.matchId || null;
+    if (!matchId || !this.activeMatches.has(matchId)) {
+      matchId = null;
+      for (const [mid, match] of this.activeMatches.entries()) {
+        if (match.hostId === client.id) {
+          matchId = mid;
+          break;
+        }
       }
     }
 
@@ -1022,9 +1076,15 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() matchId: string,
   ) {
     if (this.activeMatches.has(matchId)) {
+      const pendingTimer = this.disconnectTimers.get(matchId);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        this.disconnectTimers.delete(matchId);
+      }
       const match = this.activeMatches.get(matchId);
       match.hostId = client.id;
       this.activeMatches.set(matchId, match);
+      client.join(`match_${matchId}`);
       console.log(
         `Host ${client.id} successfully bound to remote match ${matchId}`,
       );

@@ -41,7 +41,21 @@ const MatchmakingScreen: React.FC<MatchmakingScreenProps> = ({
     'tab_' + Math.random().toString(36).substring(2, 9),
   );
 
-  const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+  const SERVER_URL = (() => {
+    const envUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      if (
+        (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) &&
+        host &&
+        host !== 'localhost' &&
+        host !== '127.0.0.1'
+      ) {
+        return `${window.location.protocol}//${host}:3001`;
+      }
+    }
+    return envUrl || 'http://localhost:3001';
+  })();
 
   const matchWithFundedArenaAgent = () => {
     if (matchedRef.current) return;

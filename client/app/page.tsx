@@ -84,7 +84,19 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const envUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+    let serverUrl = envUrl || 'http://localhost:3001';
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      if (
+        (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) &&
+        host &&
+        host !== 'localhost' &&
+        host !== '127.0.0.1'
+      ) {
+        serverUrl = `${window.location.protocol}//${host}:3001`;
+      }
+    }
     const socket = io(serverUrl, { reconnectionAttempts: 5 });
 
     const checkMyReadyMatch = (cup: any) => {
@@ -590,11 +602,11 @@ export default function Home() {
               mode: matchData.isAgentFallback ? 'PVE' : 'PVP',
               p1: matchData.p1Type,
               p2: matchData.p2Type,
-              p1Name: username,
+              p1Name: matchData.p1Name || username,
               p2Name: matchData.p2Name || 'Challenger',
               difficulty: 'HARD',
               rounds: 1,
-              isOnlineHost: !!matchData.isHost,
+              isOnlineHost: matchData.isAgentFallback ? true : !!matchData.isHost,
               matchId: matchData.matchId,
               wager,
             });

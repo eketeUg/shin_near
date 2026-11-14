@@ -113,7 +113,19 @@ export class SpectatorScene extends Phaser.Scene {
 
         // Connect to Server as Spectator
         try {
-            const wsUrl = process.env.NEXT_PUBLIC_SERVER_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001` : 'http://localhost:3001');
+            const envUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+            let wsUrl = envUrl || 'http://localhost:3001';
+            if (typeof window !== 'undefined') {
+                const host = window.location.hostname;
+                if (
+                    (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) &&
+                    host &&
+                    host !== 'localhost' &&
+                    host !== '127.0.0.1'
+                ) {
+                    wsUrl = `${window.location.protocol}//${host}:3001`;
+                }
+            }
             const customPath = wsUrl.includes('/shin') ? '/shin/socket.io' : '/socket.io';
             const origin = new URL(wsUrl).origin;
             this.socket = io(origin, { path: customPath });

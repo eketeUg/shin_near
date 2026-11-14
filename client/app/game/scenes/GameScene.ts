@@ -54,6 +54,8 @@ export class GameScene extends Phaser.Scene {
     private p1LastHitTime: number = 0;
     private p2ComboCount: number = 0;
     private p2LastHitTime: number = 0;
+    private lastFrameBroadcastTime: number = 0;
+    private lastP2InputSentStr: string = '';
 
     constructor() {
         super({ key: 'GameScene' });
@@ -70,10 +72,17 @@ export class GameScene extends Phaser.Scene {
         if (data.p2Doctrine) this.p2Doctrine = data.p2Doctrine;
         if (data.difficulty) this.difficulty = data.difficulty;
         if (data.rounds) this.totalRounds = data.rounds;
-        if (data.isOnlineHost) this.isOnlineHost = data.isOnlineHost;
-        if (data.matchId) this.matchId = data.matchId;
+        this.isOnlineHost =
+            data.isOnlineHost !== undefined
+                ? data.isOnlineHost
+                : this.gameMode !== 'PVP';
+        this.matchId =
+            data.matchId ||
+            `live_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
         if (data.p1PubKey) this.p1PubKey = data.p1PubKey;
         if (data.p2PubKey) this.p2PubKey = data.p2PubKey;
+        this.lastFrameBroadcastTime = 0;
+        this.lastP2InputSentStr = '';
 
         this.matchTimer = this.gameMode === 'AGENT_ARENA' ? 90 : 180;
         this.p1Wins = 0;
@@ -194,12 +203,29 @@ export class GameScene extends Phaser.Scene {
         this.setupSocketConnection();
     }
 
-    private setupSocketConnection() {
-        if (!this.matchId || this.gameMode !== 'PVP') return;
-
-        const wsUrl = process.env.NEXT_PUBLIC_SERVER_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001` : 'http://localhost:3001');
+    private resolveServerOrigin(): { origin: string; customPath: string } {
+        const envUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+        let wsUrl = envUrl || 'http://localhost:3001';
+        if (typeof window !== 'undefined') {
+            const host = window.location.hostname;
+            if (
+                (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) &&
+                host &&
+                host !== 'localhost' &&
+                host !== '127.0.0.1'
+            ) {
+                wsUrl = `${window.location.protocol}//${host}:3001`;
+            }
+        }
         const customPath = wsUrl.includes('/shin') ? '/shin/socket.io' : '/socket.io';
         const origin = new URL(wsUrl).origin;
+        return { origin, customPath };
+    }
+
+    private setupSocketConnection() {
+        if (!this.matchId) return;
+
+        const { origin, customPath } = this.resolveServerOrigin();
         this.socket = io(origin, { path: customPath });
 
         this.socket.on('connect', () => {
@@ -207,19 +233,118 @@ export class GameScene extends Phaser.Scene {
                 this.socket?.emit('create_match', {
                     matchId: this.matchId,
                     hostName: this.p1Name,
+                    p1Name: this.p1Name,
+                    p2Name: this.p2Name,
                     p1Type: this.p1CharType,
                     p2Type: this.p2CharType,
-                    mode: this.gameMode
+                    mode: this.gameMode,
+                    matchTimer: this.matchTimer,
                 });
                 this.socket?.emit('host_bind_match', this.matchId);
+            } else if (this.gameMode === 'PVP') {
+                this.socket?.emit('join_spectator', this.matchId);
             }
         });
 
         if (this.isOnlineHost) {
             this.socket.on('host_p2_input', (inputData: any) => {
-                this.remoteP2Input = inputData;
+                if (!inputData) return;
+                if (inputData.type === 'joystick' && inputData.payload) {
+                    this.remoteP2Input = inputData.payload;
+                } else if (inputData.type === 'action' && inputData.payload) {
+                    const act = inputData.payload.action;
+                    if (act === 'attack') this.player2?.playAttackAnimation();
+                    else if (act === 'special') this.player2?.playSpecialAttackAnimation();
+                    else if (act === 'block_start') this.player2?.startBlock();
+                    else if (act === 'block_end') this.player2?.stopBlock();
+                    else if (act === 'block') {
+                        this.player2?.startBlock();
+                        this.time.delayedCall(300, () => this.player2?.stopBlock());
+                    }
+                } else if (typeof inputData.left === 'boolean') {
+                    this.remoteP2Input = inputData;
+                }
+            });
+        } else if (this.gameMode === 'PVP') {
+            this.socket.on('spectator_sync_frame', (frameData: any) => {
+                this.applyHostSyncFrameForP2(frameData);
+            });
+            this.socket.on('spectator_fire_event', (payload: any) => {
+                if (payload?.type === 'match_event' && payload?.data?.event) {
+                    window.dispatchEvent(new CustomEvent(payload.data.event, { detail: payload.data.detail }));
+                }
             });
         }
+    }
+
+    private applyHostSyncFrameForP2(data: any) {
+        if (!this.player || !this.player2 || !data) return;
+        if (typeof data.matchTimer === 'number') {
+            this.matchTimer = data.matchTimer;
+            window.dispatchEvent(new CustomEvent('timerUpdate', { detail: { time: data.matchTimer } }));
+        }
+        const centerX = this.scale.width / 2;
+        const groundY = this.scale.height - 115 - 100;
+        if (data.p1) {
+            const p1X = typeof data.p1.relX === 'number' ? centerX + data.p1.relX : data.p1.x;
+            const p1Y = typeof data.p1.relY === 'number' ? groundY + data.p1.relY : data.p1.y;
+            this.player.setPosition(p1X, p1Y);
+            this.player.setFlipX(Boolean(data.p1.flipX));
+            if (data.p1.anim && this.player.anims.currentAnim?.key !== data.p1.anim) {
+                this.player.anims.play(data.p1.anim, true);
+            }
+            this.player.hp = data.p1.hp ?? this.player.hp;
+            window.dispatchEvent(new CustomEvent('playerHealthChanged', { detail: { playerId: 'local_player', hp: this.player.hp, maxHp: this.player.maxHp } }));
+        }
+        if (data.p2) {
+            const p2X = typeof data.p2.relX === 'number' ? centerX + data.p2.relX : data.p2.x;
+            const p2Y = typeof data.p2.relY === 'number' ? groundY + data.p2.relY : data.p2.y;
+            this.player2.setPosition(p2X, p2Y);
+            this.player2.setFlipX(Boolean(data.p2.flipX));
+            if (data.p2.anim && this.player2.anims.currentAnim?.key !== data.p2.anim) {
+                this.player2.anims.play(data.p2.anim, true);
+            }
+            this.player2.hp = data.p2.hp ?? this.player2.hp;
+            window.dispatchEvent(new CustomEvent('playerHealthChanged', { detail: { playerId: 'remote_player', hp: this.player2.hp, maxHp: this.player2.maxHp } }));
+        }
+    }
+
+    private emitHostSyncFrameIfNeeded() {
+        if (!this.isOnlineHost || !this.socket?.connected || !this.matchId || !this.player || !this.player2) return;
+        const now = this.time.now;
+        if (now - this.lastFrameBroadcastTime < 65) return;
+        this.lastFrameBroadcastTime = now;
+
+        const centerX = this.scale.width / 2;
+        const groundY = this.scale.height - 115 - 100;
+
+        this.socket.emit('host_sync_frame', {
+            matchId: this.matchId,
+            matchTimer: this.matchTimer,
+            currentRound: this.currentRound,
+            p1Wins: this.p1Wins,
+            p2Wins: this.p2Wins,
+            p1: {
+                x: Math.round(this.player.x),
+                y: Math.round(this.player.y),
+                relX: Math.round(this.player.x - centerX),
+                relY: Math.round(this.player.y - groundY),
+                flipX: this.player.flipX,
+                anim: this.player.anims.currentAnim?.key || `${this.p1CharType}_idle`,
+                hp: Math.max(0, Math.round(this.player.hp)),
+                maxHp: this.player.maxHp,
+            },
+            p2: {
+                x: Math.round(this.player2.x),
+                y: Math.round(this.player2.y),
+                relX: Math.round(this.player2.x - centerX),
+                relY: Math.round(this.player2.y - groundY),
+                flipX: this.player2.flipX,
+                anim: this.player2.anims.currentAnim?.key || `${this.p2CharType}_idle`,
+                hp: Math.max(0, Math.round(this.player2.hp)),
+                maxHp: this.player2.maxHp,
+            },
+        });
     }
 
     private updateTimer() {
@@ -367,17 +492,46 @@ export class GameScene extends Phaser.Scene {
         if (this.gameMode === 'AGENT_ARENA') {
             this.updateAutonomousAgent(this.player, this.player2, 'p1', this.p1Doctrine);
             this.updateAutonomousAgent(this.player2, this.player, 'p2', this.p2Doctrine);
+            this.emitHostSyncFrameIfNeeded();
+            return;
+        }
+
+        const combinedInput = {
+            left: this.moveInput.left || (this.cursors?.left.isDown ?? false),
+            right: this.moveInput.right || (this.cursors?.right.isDown ?? false),
+            up: this.moveInput.up || (this.cursors?.up.isDown ?? false),
+            down: this.moveInput.down || (this.cursors?.down.isDown ?? false)
+        };
+
+        if (this.gameMode === 'PVP' && !this.isOnlineHost) {
+            // P2 Guest sends inputs to P1 Host
+            const inputStr = JSON.stringify(combinedInput);
+            if (inputStr !== this.lastP2InputSentStr && this.socket?.connected && this.matchId) {
+                this.lastP2InputSentStr = inputStr;
+                this.socket.emit('p2_input', {
+                    matchId: this.matchId,
+                    input: { type: 'joystick', payload: combinedInput },
+                });
+            }
+            if (this.aKey && this.attackKey && this.blockKey && this.socket?.connected && this.matchId) {
+                if (
+                    (this.specialKey && Phaser.Input.Keyboard.JustDown(this.specialKey)) ||
+                    (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey))
+                ) {
+                    this.socket.emit('p2_input', { matchId: this.matchId, input: { type: 'action', payload: { action: 'special' } } });
+                } else if (Phaser.Input.Keyboard.JustDown(this.aKey) || Phaser.Input.Keyboard.JustDown(this.attackKey)) {
+                    this.socket.emit('p2_input', { matchId: this.matchId, input: { type: 'action', payload: { action: 'attack' } } });
+                }
+                if (Phaser.Input.Keyboard.JustDown(this.blockKey)) {
+                    this.socket.emit('p2_input', { matchId: this.matchId, input: { type: 'action', payload: { action: 'block_start' } } });
+                } else if (Phaser.Input.Keyboard.JustUp(this.blockKey)) {
+                    this.socket.emit('p2_input', { matchId: this.matchId, input: { type: 'action', payload: { action: 'block_end' } } });
+                }
+            }
             return;
         }
 
         if (this.player) {
-            const combinedInput = {
-                left: this.moveInput.left || (this.cursors?.left.isDown ?? false),
-                right: this.moveInput.right || (this.cursors?.right.isDown ?? false),
-                up: this.moveInput.up || (this.cursors?.up.isDown ?? false),
-                down: this.moveInput.down || (this.cursors?.down.isDown ?? false)
-            };
-
             this.player.update(undefined, combinedInput);
 
             if (this.aKey && this.attackKey && this.blockKey) {
@@ -405,6 +559,8 @@ export class GameScene extends Phaser.Scene {
                 this.updateAI();
             }
         }
+
+        this.emitHostSyncFrameIfNeeded();
     }
 
     private updateAutonomousAgent(
@@ -651,6 +807,15 @@ export class GameScene extends Phaser.Scene {
     };
 
     private handlePlayerAction = (e: CustomEvent<{ action: string }>) => {
+        if (this.gameMode === 'PVP' && !this.isOnlineHost) {
+            if (this.socket?.connected && this.matchId) {
+                this.socket.emit('p2_input', {
+                    matchId: this.matchId,
+                    input: { type: 'action', payload: e.detail },
+                });
+            }
+            return;
+        }
         if (!this.player) return;
 
         if (e.detail.action === 'attack') {
@@ -681,6 +846,17 @@ export class GameScene extends Phaser.Scene {
             attacker.stats.damageDealt += actualDamage;
             attacker.stats.hitsLanded += 1;
             if (isSpecial) attacker.stats.specialsLanded += 1;
+
+            if (this.isOnlineHost && this.socket?.connected && this.matchId) {
+                this.socket.emit('host_fire_event', {
+                    matchId: this.matchId,
+                    type: 'audio',
+                    data: {
+                        type: target.isBlocking ? 'block_hit' : 'hit',
+                        id: target.id,
+                    },
+                });
+            }
 
             // Grant Spirit to attacker when landing a normal strike
             if (!isSpecial) {
