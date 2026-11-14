@@ -115,17 +115,20 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
   }
 
   private parseJsonSafe(raw: string): any {
-    const cleaned = raw
+    const stripped = raw
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
       .trim()
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/, '')
       .trim();
-    return JSON.parse(cleaned || '{}');
+    const jsonMatch = stripped.match(/\{[\s\S]*\}/);
+    const candidate = jsonMatch ? jsonMatch[0] : stripped;
+    return JSON.parse(candidate || '{}');
   }
 
   /**
    * Calls NEAR AI Cloud API (https://cloud-api.near.ai/v1) first;
-   * if NEAR AI credits/tokens fail or are exhausted, automatically falls back to OpenAI,
+   * if NEAR AI credits/tokens fail or return an empty reply, automatically falls back to OpenAI,
    * and finally to deterministic rules.
    */
   private async callWithFallback(
@@ -140,11 +143,16 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
-          max_tokens: 220,
+          // Qwen3.8-27B emits internal reasoning_content before content, so give ample token headroom
+          max_tokens: 900,
           temperature: 0.9,
         });
-        const content = res.choices?.[0]?.message?.content || '{}';
-        return { provider: 'NEAR_AI', rawJson: this.parseJsonSafe(content) };
+        const content = res.choices?.[0]?.message?.content || '';
+        const parsed = this.parseJsonSafe(content);
+        if (!parsed?.reply || !String(parsed.reply).trim()) {
+          throw new Error('NEAR AI returned empty reply (exhausted tokens in reasoning)');
+        }
+        return { provider: 'NEAR_AI', rawJson: parsed };
       } catch (err) {
         this.logger.warn(
           `NEAR AI failed (${String(err)}). Falling back to OpenAI...`,
@@ -161,11 +169,15 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
             { role: 'user', content: userPrompt },
           ],
           response_format: { type: 'json_object' },
-          max_tokens: 220,
+          max_tokens: 260,
           temperature: 0.9,
         });
         const content = res.choices?.[0]?.message?.content || '{}';
-        return { provider: 'OPENAI', rawJson: JSON.parse(content) };
+        const parsed = this.parseJsonSafe(content);
+        if (!parsed?.reply || !String(parsed.reply).trim()) {
+          throw new Error('OpenAI returned empty reply');
+        }
+        return { provider: 'OPENAI', rawJson: parsed };
       } catch (err) {
         this.logger.warn(
           `OpenAI fallback failed (${String(err)}). Using deterministic fallback.`,
@@ -217,8 +229,33 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
     scrollType: 'ATK' | 'DEF' | 'SPD';
     amountShin: number;
     recentTexts: string[];
+    dmMode?: boolean;
+    speakerName?: string;
+    triggerText?: string;
   }): string {
-    const { actor, peer, action, scrollType, amountShin, recentTexts } = params;
+    const {
+      actor,
+      peer,
+      action,
+      scrollType,
+      amountShin,
+      recentTexts,
+      dmMode,
+      speakerName,
+      triggerText,
+    } = params;
+
+    if (dmMode && speakerName) {
+      const lower = (triggerText || '').toLowerCase();
+      if (lower.includes('skill') || lower.includes('special') || lower.includes('ability')) {
+        return `${speakerName}, as a ${actor.char_class} at Lv.${actor.power_level}, my edge is ${scrollType} precision and shadow-counter timing.`;
+      }
+      if (lower.includes("don't want") || lower.includes('no duel') || lower.includes('nope')) {
+        return `Understood, ${speakerName}. Whenever you want to spar or talk Dojo strategy, I'm right here.`;
+      }
+      return `${speakerName}, I hear you — ask me about my ${actor.char_class} style, Dojo scrolls, or send a Fight Request whenever you're ready.`;
+    }
+
     const peerName = peer?.name || 'rivals';
     const pool =
       action === 'TRAIN_AT_DOJO'
@@ -469,6 +506,9 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
             scrollType,
             amountShin,
             recentTexts,
+            dmMode: params.dmMode,
+            speakerName: params.speakerName,
+            triggerText: params.triggerText,
           });
     this.recentReplies.push(reply);
     if (this.recentReplies.length > 25) {

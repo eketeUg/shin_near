@@ -1374,12 +1374,25 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           const mentioned = await this.agentBrainService.findAgentMentionedInText(
             String(msg.text),
           );
-          await this.agentBrainService.reasonAndAct({
-            actorTokenId: mentioned?.token_id,
-            triggerText: `${msg.senderName || 'Warrior'} said in Public Dojo Lobby: "${String(msg.text)}"`,
-            speakerName: msg.senderName || 'Warrior',
-            forceBypassCooldown: true,
+          this.server.emit('lobby_agent_typing', {
+            threadKey: 'public',
+            agentName: mentioned?.name || 'Dojo Agent',
+            isTyping: true,
           });
+          try {
+            await this.agentBrainService.reasonAndAct({
+              actorTokenId: mentioned?.token_id,
+              triggerText: `${msg.senderName || 'Warrior'} said in Public Dojo Lobby: "${String(msg.text)}"`,
+              speakerName: msg.senderName || 'Warrior',
+              forceBypassCooldown: true,
+            });
+          } finally {
+            this.server.emit('lobby_agent_typing', {
+              threadKey: 'public',
+              agentName: mentioned?.name || 'Dojo Agent',
+              isTyping: false,
+            });
+          }
         })().catch(() => {});
       }
       return { deliveryStatus: 'DELIVERED_LIVE' };
@@ -1409,6 +1422,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         timestamp,
       };
       await this.lobbyChatService.saveMessage(liveAgentDm);
+      client.emit('lobby_agent_typing', {
+        threadKey: String(msg.recipientAccountId),
+        agentName: targetAgent.name,
+        isTyping: true,
+      });
       void this.agentBrainService
         .reasonAndAct({
           actorTokenId: targetAgent.token_id,
@@ -1420,7 +1438,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           forceBypassCooldown: true,
           dmMode: true,
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => {
+          client.emit('lobby_agent_typing', {
+            threadKey: String(msg.recipientAccountId),
+            agentName: targetAgent.name,
+            isTyping: false,
+          });
+        });
       return { deliveryStatus: 'DELIVERED_LIVE' };
     }
 

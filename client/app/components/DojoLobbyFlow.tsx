@@ -55,6 +55,7 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
   const [proposedWagerNear, setProposedWagerNear] = useState<number>(1.0); // 0 = Free Match
   const [roomCodeInput, setRoomCodeInput] = useState<string>('');
   const [wsConnected, setWsConnected] = useState<boolean>(false);
+  const [typingThreads, setTypingThreads] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
@@ -122,6 +123,13 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
 
       socket.on('lobby_receive_dm', (msg: LobbyChatMessage) => {
         nearArenaEngine.ingestRemoteLobbyMessage(msg);
+        if (msg.senderType === 'AGENT' && msg.senderAccountId) {
+          setTypingThreads((prev) => {
+            const next = { ...prev };
+            delete next[msg.senderAccountId];
+            return next;
+          });
+        }
         refreshAll();
         if (msg.deliveryStatus === 'READ_ON_WAKE') {
           showToast(`📩 Delivered offline message from @${msg.senderName}!`);
@@ -135,8 +143,31 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
 
       socket.on('lobby_receive_public', (msg: LobbyChatMessage) => {
         nearArenaEngine.ingestRemoteLobbyMessage(msg);
+        if (msg.senderType === 'AGENT') {
+          setTypingThreads((prev) => {
+            const next = { ...prev };
+            delete next.public;
+            return next;
+          });
+        }
         refreshAll();
       });
+
+      socket.on(
+        'lobby_agent_typing',
+        (data: { threadKey: string; agentName: string; isTyping: boolean }) => {
+          if (!data?.threadKey) return;
+          setTypingThreads((prev) => {
+            const next = { ...prev };
+            if (data.isTyping) {
+              next[data.threadKey] = data.agentName || 'Agent';
+            } else {
+              delete next[data.threadKey];
+            }
+            return next;
+          });
+        },
+      );
 
       socket.on(
         'lobby_dm_status_updated',
@@ -227,6 +258,12 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
 
     if (socketRef.current?.connected) {
       socketRef.current.emit('lobby_send_dm', res.sentMsg);
+      if (activeContact?.userType === 'AGENT') {
+        const key = activeContact.accountId;
+        setTypingThreads((prev) => ({ ...prev, [key]: activeContact.username }));
+      } else if (!activeThreadAccountId) {
+        setTypingThreads((prev) => ({ ...prev, public: 'Dojo Agent' }));
+      }
     }
 
     if (res.sentMsg.deliveryStatus === 'QUEUED_OFFLINE' && activeContact) {
@@ -770,6 +807,33 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
                 </div>
               );
             })}
+            {(() => {
+              const currentTypingKey = activeThreadAccountId || 'public';
+              const typingAgentName = typingThreads[currentTypingKey];
+              if (!typingAgentName) return null;
+              return (
+                <div className="flex justify-start animate-in fade-in duration-200">
+                  <div className="bg-purple-950/30 border border-purple-500/30 rounded-xl px-3.5 py-2.5 flex items-center gap-2.5 text-xs font-mono text-purple-200">
+                    <Bot size={13} className="text-purple-400 animate-pulse shrink-0" />
+                    <span>{typingAgentName} is thinking</span>
+                    <span className="inline-flex items-center gap-1 ml-0.5" aria-label="thinking">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-purple-300 animate-bounce"
+                        style={{ animationDelay: '0ms' }}
+                      />
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-purple-300 animate-bounce"
+                        style={{ animationDelay: '150ms' }}
+                      />
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-purple-300 animate-bounce"
+                        style={{ animationDelay: '300ms' }}
+                      />
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
             <div ref={chatBottomRef} />
           </div>
 
