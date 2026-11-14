@@ -21,6 +21,7 @@ export const NearInspectorModal: React.FC<NearInspectorModalProps> = ({
   onOpenFullLedger,
 }) => {
   const [arenaState, setArenaState] = useState(() => nearArenaEngine.getState());
+  const [onChainOnly, setOnChainOnly] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -33,6 +34,9 @@ export const NearInspectorModal: React.FC<NearInspectorModalProps> = ({
   if (!isOpen) return null;
 
   const ownedWarriors = arenaState.fighters.filter((f) => !f.isNpc);
+  const visibleLedger = onChainOnly
+    ? arenaState.ledger.filter((tx) => tx.onChain)
+    : arenaState.ledger;
 
   return (
     <div className="fixed inset-0 z-[120] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
@@ -139,38 +143,60 @@ export const NearInspectorModal: React.FC<NearInspectorModalProps> = ({
 
           {/* All On-Chain Transactions & Activities */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <span className="text-xs font-mono font-bold text-white uppercase">
-                Live On-Chain Transactions &amp; Activities ({arenaState.ledger.length})
+                Live Transactions &amp; Activities ({visibleLedger.length})
               </span>
-              {onOpenFullLedger && (
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    onClose();
-                    onOpenFullLedger();
-                  }}
-                  className="text-[11px] font-mono text-shin-gold hover:underline cursor-pointer"
+                  onClick={() => setOnChainOnly(!onChainOnly)}
+                  className={`text-[10px] font-mono px-2.5 py-1 rounded border cursor-pointer ${
+                    onChainOnly
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                      : 'bg-black/60 text-gray-400 border-white/15 hover:text-white'
+                  }`}
                 >
-                  Open Full Chronicle →
+                  {onChainOnly ? '✓ On-Chain Only' : 'Show On-Chain Only'}
                 </button>
-              )}
+                {onOpenFullLedger && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onOpenFullLedger();
+                    }}
+                    className="text-[11px] font-mono text-shin-gold hover:underline cursor-pointer"
+                  >
+                    Open Scroll of Battles →
+                  </button>
+                )}
+              </div>
             </div>
 
-            {arenaState.ledger.length === 0 ? (
+            {visibleLedger.length === 0 ? (
               <div className="text-xs font-mono text-gray-500 py-6 text-center">
-                No on-chain activity recorded yet. Start a duel, back a warrior, or swap $SHIN to
-                see live transactions here.
+                {onChainOnly
+                  ? 'No confirmed NEAR Testnet transactions yet. Sign in and duel, back a warrior, or swap $SHIN to see live on-chain receipts here.'
+                  : 'No activity recorded yet. Start a duel, back a warrior, or swap $SHIN to see live transactions here.'}
               </div>
             ) : (
               <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {arenaState.ledger.map((tx) => (
+                {visibleLedger.map((tx) => (
                   <div
                     key={tx.id}
                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] font-mono bg-black/75 border border-white/10 px-3.5 py-2.5 rounded-lg"
                   >
                     <div className="space-y-0.5 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        <span
+                          className={`text-[9px] font-bold px-2 py-0.5 rounded border ${
+                            tx.onChain
+                              ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                              : 'bg-white/5 text-gray-400 border-white/15'
+                          }`}
+                        >
+                          {tx.onChain ? 'ON-CHAIN' : 'LOCAL SIM'}
+                        </span>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-shin-gold/15 text-shin-gold border border-shin-gold/30">
                           {tx.type}
                         </span>
                         <span className="text-gray-200 font-sans text-xs">{tx.summary}</span>
@@ -186,14 +212,18 @@ export const NearInspectorModal: React.FC<NearInspectorModalProps> = ({
                           {Math.round(tx.amountNear * 1000).toLocaleString()} $SHIN
                         </span>
                       )}
-                      <a
-                        href={`https://testnet.nearblocks.io/txns/${tx.txHash}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-blue-400 hover:underline inline-flex items-center gap-1"
-                      >
-                        {tx.txHash.slice(0, 10)}… <ExternalLink size={11} />
-                      </a>
+                      {tx.onChain ? (
+                        <a
+                          href={tx.explorerUrl || `https://testnet.nearblocks.io/txns/${tx.txHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-400 hover:underline inline-flex items-center gap-1"
+                        >
+                          NearBlocks <ExternalLink size={11} />
+                        </a>
+                      ) : (
+                        <span className="text-[10px] text-gray-600">No Tx</span>
+                      )}
                     </div>
                   </div>
                 ))}

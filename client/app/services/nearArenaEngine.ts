@@ -683,6 +683,9 @@ class NearArenaEngine {
                 1,
               );
             }
+            parsed.ledger = (parsed.ledger || []).filter(
+              (tx: ArenaLedgerTx) => !tx.id?.startsWith('tx-init-'),
+            );
             return parsed;
           }
         } catch (e) {
@@ -800,35 +803,7 @@ class NearArenaEngine {
       socialContacts: this.buildInitialSocialContacts(),
       humanDailyTournament: this.buildInitialHumanTournament(defaultUsername, playerAccountId),
       agentContinuousTournament: this.buildInitialAgentTournament(fighters, 1),
-      ledger: [
-        {
-          id: 'tx-init-1',
-          txHash: makeTxHash(),
-          type: 'MINT_NFT',
-          summary: `Minted Dynamic Fighter NFT #shin-fighter-101 with Sub-Account Wallet (${starterFighter.agentWalletId})`,
-          amountNear: 0,
-          actorWallet: playerAccountId,
-          timestamp: Date.now() - 120000,
-        },
-        {
-          id: 'tx-init-2',
-          txHash: makeTxHash(),
-          type: 'AGENT_FUND',
-          summary: `Funded Agent Wallet ${starterFighter.agentWalletId} with 6.00 NEAR (Wager/Fight: 1.00 NEAR)`,
-          amountNear: 6.0,
-          actorWallet: starterFighter.agentWalletId,
-          timestamp: Date.now() - 80000,
-        },
-        {
-          id: 'tx-init-3',
-          txHash: makeTxHash(),
-          type: 'FIGHT_POOL_SETTLED',
-          summary: `Shogun Takeshi defeated Kage Shadowblade — won 4.00 NEAR Fighter Pool + 0.35 NEAR Spectator Royalty`,
-          amountNear: 4.35,
-          actorWallet: 'takeshi-npc.agent.shin-arena.testnet',
-          timestamp: Date.now() - 35000,
-        },
-      ],
+      ledger: [],
     };
 
     this.saveState(initial);
