@@ -18,12 +18,10 @@ import {
   Volume2,
   VolumeX,
   Coins,
-  ArrowLeftRight,
 } from 'lucide-react';
 import SpectateScreen from './SpectateScreen';
 import AuthModal from './AuthModal';
 import ProfilePage from './ProfilePage';
-import ShinSwapModal from './ShinSwapModal';
 import { nearArenaEngine, COMBAT_DOCTRINES } from '../services/nearArenaEngine';
 import { Roster, CharacterId } from './PreGameFlow';
 
@@ -58,7 +56,6 @@ const MainMenu = ({
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [arenaState, setArenaState] = useState(() => nearArenaEngine.getState());
   const [championIdx, setChampionIdx] = useState(0);
-  const [showSwapModal, setShowSwapModal] = useState(false);
   const [previewIdx, setPreviewIdx] = useState(0);
   const [topUpFeedback, setTopUpFeedback] = useState<string | null>(null);
   const [pendingFightMode, setPendingFightMode] = useState<'PVE' | 'PVP' | null>(null);
@@ -213,43 +210,34 @@ const MainMenu = ({
                 {currentUser
                   ? currentUser.isGuest
                     ? 'Guest • Sign In'
-                    : 'Champion'
-                  : 'Enter Dojo'}
+                    : 'Warrior'
+                  : 'Warrior'}
               </div>
               <div
                 className={`text-[11px] sm:text-xs font-cinzel font-black transition-colors truncate max-w-[110px] sm:max-w-none ${
                   currentUser ? 'text-white group-hover:text-shin-gold' : 'text-black'
                 }`}
               >
-                {isAuthLoading ? 'Loading...' : currentUser ? username : 'LOGIN'}
+                {isAuthLoading ? 'Loading...' : currentUser ? username : 'SIGN IN'}
               </div>
             </div>
           </button>
 
-          {/* War Chest Balance */}
+          {/* In-Game SHIN Balance (Zero-Web3 Header) */}
           <div className="flex items-center gap-1.5 sm:gap-2 bg-black/80 border border-white/15 px-2.5 sm:px-3.5 py-1.5 rounded-lg">
             <Coins size={14} className="text-shin-gold shrink-0" />
             <div>
-              <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider">War Chest</div>
-              <div className="text-[11px] sm:text-sm font-mono font-bold text-shin-gold flex items-center gap-2">
-                <span>{arenaState.playerWallet.NEAR.toFixed(2)} NEAR</span>
-                <span className="text-zinc-600">•</span>
-                <span className="text-amber-300">{(arenaState.playerWallet.SHIN ?? 0).toFixed(1)} $SHIN</span>
+              <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider">SHIN Pouch</div>
+              <div className="text-[11px] sm:text-sm font-mono font-bold text-shin-gold">
+                {(arenaState.playerWallet.SHIN ?? 0).toFixed(1)} SHIN
               </div>
             </div>
             <button
-              onClick={() => setShowSwapModal(true)}
-              className="ml-1 px-2 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 rounded text-[9px] sm:text-[10px] font-cinzel font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1"
-              title="Swap NEAR <-> $SHIN via x*y=k AMM"
-            >
-              <ArrowLeftRight size={10} /> Swap
-            </button>
-            <button
               onClick={handleQuickTopUp}
               className="ml-1 px-2 py-1 bg-shin-gold text-black hover:bg-yellow-400 rounded text-[9px] sm:text-[10px] font-cinzel font-black uppercase tracking-wider transition-all cursor-pointer"
-              title="Refill War Chest (Instant & Gasless)"
+              title="Top Up Balance"
             >
-              + Refill
+              + Top Up
             </button>
           </div>
 
@@ -1075,12 +1063,6 @@ const MainMenu = ({
           )}
         </div>
       )}
-
-      <ShinSwapModal
-        isOpen={showSwapModal}
-        onClose={() => setShowSwapModal(false)}
-        onSwapped={() => setArenaState({ ...nearArenaEngine.getState() })}
-      />
     </div>
   );
 };

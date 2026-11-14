@@ -17,9 +17,11 @@ import {
   Coins,
   Swords,
   Zap,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { nearArenaEngine, COMBAT_DOCTRINES } from '../services/nearArenaEngine';
 import { Roster } from './PreGameFlow';
+import ShinSwapModal from './ShinSwapModal';
 
 interface ProfilePageProps {
   user: any;
@@ -34,6 +36,7 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
     user?.username || user?.userName || arenaState.playerWallet.username || 'Warrior',
   );
   const [copySuccess, setCopySuccess] = useState(false);
+  const [showSwapModal, setShowSwapModal] = useState(false);
 
   const nearAccount = user?.walletAddress || arenaState.playerWallet.accountId;
 
@@ -196,6 +199,12 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
                 <div className="text-xs font-bold text-emerald-400">{ownedFighters.length}</div>
               </div>
             </div>
+            <button
+              onClick={() => setShowSwapModal(true)}
+              className="mt-3 w-full py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 rounded-lg text-[10px] font-cinzel font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+            >
+              <ArrowLeftRight size={12} /> Swap NEAR ↔ $SHIN (AMM)
+            </button>
           </div>
         </div>
 
@@ -376,6 +385,12 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
           Return to Menu
         </button>
       </div>
+
+      <ShinSwapModal
+        isOpen={showSwapModal}
+        onClose={() => setShowSwapModal(false)}
+        onSwapped={() => setArenaState({ ...nearArenaEngine.getState() })}
+      />
     </div>
   );
 }
