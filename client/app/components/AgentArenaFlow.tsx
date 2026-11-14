@@ -206,7 +206,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
             <Coins size={14} className="text-shin-gold shrink-0" />
             <div>
               <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider truncate max-w-[90px] sm:max-w-none">
-                {showNearUnderHood ? arenaState.playerWallet.accountId : 'War Chest'}
+                {showNearUnderHood ? arenaState.playerWallet.accountId : 'SHIN Pouch'}
               </div>
               <div className="text-[11px] sm:text-sm font-mono font-bold text-shin-gold">
                 {Math.round(arenaState.playerWallet.NEAR * 1000).toLocaleString()} $SHIN
@@ -238,7 +238,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
             { id: 'LIVE_ARENA', label: '🔥 Shōbu Pit', icon: Flame },
             {
               id: 'MY_AGENTS',
-              label: `⚔ Barracks (${ownedFighters.length})`,
+              label: `⚔ Shinobi Clan (${ownedFighters.length})`,
               icon: Shield,
             },
             { id: 'DOJO_MARKET', label: "🏮 Dojo & Bazaar", icon: Store },
@@ -271,7 +271,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
         >
           <div className="arcade-unskew flex items-center justify-center gap-2">
             <Play size={14} fill="currentColor" />
-            <span>Send {selectedFighter?.title || 'Champion'} Into Pit Now</span>
+            <span>Send {selectedFighter?.title || 'Shinobi'} Into Pit Now</span>
           </div>
         </button>
       </div>
@@ -292,8 +292,8 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                   <Sparkles size={15} /> Non-Stop Shadow Battles • Winner Takes The Fight Pot
                 </div>
                 <p className="text-xs md:text-sm text-gray-300 max-w-3xl">
-                  Champions in the Budōkan stake their own{' '}
-                  <span className="text-shin-gold font-semibold">War Chest</span> into each match
+                  Warriors in the Budōkan stake their own{' '}
+                  <span className="text-shin-gold font-semibold">SHIN Pouch</span> into each match
                   pot and fight autonomously using their learned Fighting Style. Back either corner
                   before or during the fight to win a share of the{' '}
                   <span className="text-emerald-400 font-semibold">Crowd Pot</span>!
@@ -420,7 +420,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                     {/* Quick Crowd Backing Bar */}
                     <div className="space-y-2 mb-4 bg-white/5 p-3 rounded-xl border border-white/10">
                       <div className="flex items-center justify-between text-[10px] text-gray-300 font-cinzel uppercase tracking-wider">
-                        <span>Toss Coins on Winner</span>
+                        <span>Back a Warrior ($SHIN)</span>
                         <div className="flex gap-1">
                           {[0.5, 1, 2, 5].map((val) => (
                             <button
@@ -531,7 +531,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         )}
                         <div className="flex items-center justify-between mt-2 text-xs font-mono">
                           <span className="text-shin-gold font-bold">
-                            War Chest: {Math.round(fighter.vaultBalanceNear * 1000).toLocaleString()} $SHIN
+                            Pouch: {Math.round(fighter.vaultBalanceNear * 1000).toLocaleString()} $SHIN
                           </span>
                           <span className="text-gray-400">
                             {fighter.wins}W - {fighter.losses}L
@@ -613,7 +613,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                       showToast(
                         !selectedFighter.isAgentActive
                           ? `${selectedFighter.title} entered the 24/7 Shadow Budōkan!`
-                          : `${selectedFighter.title} rested in Barracks.`,
+                          : `${selectedFighter.title} returned to the Dojo.`,
                       );
                     }}
                     className={`px-5 py-3 rounded-xl font-cinzel font-black text-xs uppercase tracking-widest border-2 transition-all cursor-pointer ${
@@ -633,14 +633,14 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                   <div className="bg-black/70 border border-shin-gold/40 rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-cinzel font-bold text-shin-gold uppercase tracking-wider">
-                        Champion&apos;s War Chest
+                        Warrior&apos;s SHIN Pouch
                       </span>
                       <span className="text-xl font-mono font-bold text-shin-gold">
                         {Math.round(selectedFighter.vaultBalanceNear * 1000).toLocaleString()} $SHIN
                       </span>
                     </div>
                     <p className="text-[11px] text-gray-400">
-                      Load $SHIN into this warrior&apos;s personal War Chest so they can keep entering
+                      Load $SHIN into this warrior&apos;s personal SHIN Pouch so they can keep entering
                       winner-takes-all Budōkan pools.
                     </p>
                     <div className="flex gap-1.5">
@@ -653,7 +653,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                               nearArenaEngine.fundFighterShin(selectedFighter.tokenId, quickAmt * 1000).catch(() => {});
                               setArenaState({ ...nearArenaEngine.getState() });
                               showToast(
-                                `Added +${(quickAmt * 1000).toLocaleString()} $SHIN to ${selectedFighter.title}'s War Chest!`,
+                                `Added +${(quickAmt * 1000).toLocaleString()} $SHIN to ${selectedFighter.title}'s SHIN Pouch!`,
                               );
                             } catch (e: any) {
                               showToast(e.message);
@@ -670,15 +670,15 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                   <div className="bg-black/70 border border-white/15 rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-cinzel font-bold text-gray-300 uppercase tracking-wider">
-                        Collect Champion Spoils
+                        Collect Warrior Spoils
                       </span>
                       <span className="text-xs font-mono text-emerald-400">
                         Instant Transfer
                       </span>
                     </div>
                     <p className="text-[11px] text-gray-400">
-                      Move winnings from this Champion&apos;s War Chest back into your main player
-                      chest at any time.
+                      Move winnings from this Warrior&apos;s SHIN Pouch back into your main SHIN Pouch
+                      at any time.
                     </p>
                     <div className="flex gap-2">
                       <input
@@ -827,8 +827,8 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         Continuous 24/7 Agent Tournament Enrollment
                       </div>
                       <p className="text-[11px] text-gray-400">
-                        Enrolled agents automatically enter bracket cups, win per-bout NEAR cuts +
-                        championship jackpots, and take a 2-minute rest cooldown between tournaments.
+                        Enrolled warriors automatically enter bracket cups, win per-bout $SHIN cuts +
+                        Budōkan jackpots, and take a 2-minute rest cooldown between tournaments.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1105,18 +1105,18 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
 
                         {/* NPC Treasury & Investor Status */}
                         <div className="bg-black/80 border border-white/15 rounded-xl px-3.5 py-2 text-right">
-                          <div className="text-[9px] text-gray-400 uppercase">NPC Wallet</div>
+                          <div className="text-[9px] text-gray-400 uppercase">Merchant Pouch</div>
                           <div
                             className={`text-lg font-mono font-bold ${
                               merchant.isShopOpen ? 'text-emerald-400' : 'text-red-400'
                             }`}
                           >
-                            {merchant.walletBalanceNear.toFixed(2)} NEAR
+                            {Math.round(merchant.walletBalanceNear * 1000).toLocaleString()} $SHIN
                           </div>
                           <div className="text-[9px] font-mono text-gray-400">
-                            Your LP Stake: {merchant.playerInvestmentNear.toFixed(1)}N (Earned:{' '}
+                            Patron Stake: {Math.round(merchant.playerInvestmentNear * 1000).toLocaleString()} $SHIN (Earned:{' '}
                             <span className="text-shin-gold">
-                              +{merchant.investorDividendsEarnedNear.toFixed(2)}N
+                              +{Math.round(merchant.investorDividendsEarnedNear * 1000).toLocaleString()} $SHIN
                             </span>
                             )
                           </div>
@@ -1141,8 +1141,8 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                             <strong className="text-white block font-cinzel uppercase">
                               ⚠️ Shop Closed — Merchant Went Broke!
                             </strong>
-                            Heavy material sell-offs drained {merchant.name}&apos;s wallet below{' '}
-                            {merchant.insolvencyThresholdNear} NEAR. Invest NEAR to reopen the shop
+                            Heavy material sell-offs drained {merchant.name}&apos;s pouch below{' '}
+                            {Math.round(merchant.insolvencyThresholdNear * 1000).toLocaleString()} $SHIN. Invest $SHIN to reopen the shop
                             and earn {Math.round(merchant.investorDividendRate * 100)}% of future
                             spreads!
                           </div>
@@ -1152,7 +1152,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                 nearArenaEngine.investInNpcMerchant(merchant.merchantId, 5.0);
                                 setArenaState({ ...nearArenaEngine.getState() });
                                 showToast(
-                                  `💎 Invested 5 NEAR in ${merchant.name}! Shop RE-OPENED & scrolls restocked!`,
+                                  `💎 Invested 5,000 $SHIN in ${merchant.name}! Shop RE-OPENED & scrolls restocked!`,
                                 );
                               } catch (e: any) {
                                 showToast(e.message);
@@ -1160,7 +1160,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                             }}
                             className="px-4 py-2.5 bg-shin-gold text-black font-cinzel font-black text-xs uppercase rounded-lg hover:bg-yellow-400 shrink-0 cursor-pointer"
                           >
-                            + Invest 5 NEAR (Re-Open)
+                            + Invest 5,000 $SHIN (Re-Open)
                           </button>
                         </div>
                       )}
@@ -1226,7 +1226,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                       showToast(
                                         item.category === 'SCROLL' && selectedFighter
                                           ? `📜 Bought ${item.name} & trained ${selectedFighter.title}!`
-                                          : `Bought 1x ${item.name} for ${item.askPriceNear.toFixed(2)} NEAR!`,
+                                          : `Bought 1x ${item.name} for ${Math.round(item.askPriceNear * 1000).toLocaleString()} $SHIN!`,
                                       );
                                     } catch (e: any) {
                                       showToast(e.message);
@@ -1235,7 +1235,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                   disabled={!merchant.isShopOpen || item.stock <= 0}
                                   className="px-3 py-1.5 bg-shin-gold text-black font-cinzel font-black text-[10px] uppercase rounded-lg hover:bg-yellow-400 disabled:opacity-40 cursor-pointer"
                                 >
-                                  Buy ({item.askPriceNear.toFixed(2)}N)
+                                  Buy ({Math.round(item.askPriceNear * 1000).toLocaleString()} $SHIN)
                                 </button>
 
                                 {/* Buy with $SHIN (Default Economy Currency) */}
@@ -1280,7 +1280,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                       );
                                       setArenaState({ ...nearArenaEngine.getState() });
                                       showToast(
-                                        `Sold 1x ${item.name} to ${merchant.name} for ${item.bidPriceNear.toFixed(2)} NEAR!`,
+                                        `Sold 1x ${item.name} to ${merchant.name} for ${Math.round(item.bidPriceNear * 1000).toLocaleString()} $SHIN!`,
                                       );
                                     } catch (e: any) {
                                       showToast(e.message);
@@ -1289,7 +1289,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                   disabled={!merchant.isShopOpen || playerOwnedQty < 1}
                                   className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 font-mono font-bold text-[10px] rounded-lg disabled:opacity-35 cursor-pointer"
                                 >
-                                  Sell 1x ({item.bidPriceNear.toFixed(2)}N)
+                                  Sell 1x ({Math.round(item.bidPriceNear * 1000).toLocaleString()} $SHIN)
                                 </button>
 
                                 {/* Flood 4x to test market crash / insolvency */}
@@ -1339,7 +1339,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                             nearArenaEngine.investInNpcMerchant(merchant.merchantId, 5.0);
                             setArenaState({ ...nearArenaEngine.getState() });
                             showToast(
-                              `💎 Invested 5.00 NEAR into ${merchant.name} (${merchant.walletId})!`,
+                              `💎 Invested 5,000 $SHIN into ${merchant.name}!`,
                             );
                           } catch (e: any) {
                             showToast(e.message);
@@ -1347,7 +1347,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         }}
                         className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg font-mono font-bold text-[10px] cursor-pointer"
                       >
-                        + Invest 5 NEAR in Shop
+                        + Invest 5,000 $SHIN in Shop
                       </button>
                     </div>
                   </div>
@@ -1394,7 +1394,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                       value={trainerFee}
                       onChange={(e) => setTrainerFee(e.target.value)}
                       className="w-24 bg-zinc-900 border border-white/15 rounded px-2.5 py-1.5 text-xs font-mono text-white"
-                      placeholder="Fee NEAR"
+                      placeholder="Fee (x1k $SHIN)"
                     />
                     <button
                       onClick={async () => {
@@ -1404,7 +1404,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         );
                         showToast(
                           res.ok
-                            ? `Registered as ${trainerSpecialty} Trainer (${trainerFee} NEAR)!`
+                            ? `Registered as ${trainerSpecialty} Sensei (${Math.round((parseFloat(trainerFee) || 0.5) * 1000).toLocaleString()} $SHIN)!`
                             : res.error || 'Registration failed',
                         );
                       }}
@@ -1446,7 +1446,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         setArenaState({ ...nearArenaEngine.getState() });
                         showToast(
                           res.ok
-                            ? `Trained ${selectedFighter.title} (+2 ${profile.specialty}) for ${feeNear} NEAR!`
+                            ? `Trained ${selectedFighter.title} (+2 ${profile.specialty}) for ${Math.round(feeNear * 1000).toLocaleString()} $SHIN!`
                             : res.error || 'Training failed',
                         );
                       }}
@@ -1469,7 +1469,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                   🏆 Player-Funded Tournaments
                 </h3>
                 <p className="text-xs text-gray-400">
-                  Create or join an on-chain tournament pool on NEAR Testnet. All entry fees go into the prize pot (95% to winners, 5% Dev Treasury).
+                  Create or join a Budōkan tournament pool. All entry fees go into the prize pot (95% to winners, 5% Dojo Treasury).
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1535,11 +1535,11 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-lg font-cinzel font-black text-white uppercase tracking-widest">
-                    ⚔ Warrior Bazaar (Recruit Veteran Champions)
+                    ⚔ Warrior Bazaar (Recruit Veteran Shinobi)
                   </h3>
                   <p className="text-xs text-gray-400">
-                    Every Champion carries their own War Chest. Recruiting a veteran transfers both
-                    the Warrior and all coins inside their chest!
+                    Every Shinobi carries their own SHIN Pouch. Recruiting a veteran transfers both
+                    the Warrior and all $SHIN inside their pouch!
                   </p>
                 </div>
 
@@ -1592,7 +1592,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                             Lv.{listed.powerLevel} • {listed.elo} ELO ({listed.wins}W/{listed.losses}L)
                           </div>
                           <div className="text-[10px] font-mono text-emerald-400 mt-1">
-                            Includes War Chest: {Math.round(listed.vaultBalanceNear * 1000).toLocaleString()} $SHIN
+                            Includes SHIN Pouch: {Math.round(listed.vaultBalanceNear * 1000).toLocaleString()} $SHIN
                           </div>
                         </div>
                       </div>
@@ -1628,7 +1628,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                 ).catch(() => {});
                                 setArenaState({ ...nearArenaEngine.getState() });
                                 showToast(
-                                  `Recruited ${listed.title} + their ${Math.round(listed.vaultBalanceNear * 1000).toLocaleString()} $SHIN War Chest!`,
+                                  `Recruited ${listed.title} + their ${Math.round(listed.vaultBalanceNear * 1000).toLocaleString()} $SHIN Pouch!`,
                                 );
                               } catch (e: any) {
                                 showToast(e.message);
@@ -1663,7 +1663,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                 </p>
               </div>
               <span className="text-xs font-mono text-emerald-400">
-                shin-arena.testnet
+                shin-arena-28d.testnet
               </span>
             </div>
 
