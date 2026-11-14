@@ -33,6 +33,19 @@ export class UsersService {
     return this.userModel.findOne({ walletAddress }).exec();
   }
 
+  async findByUsername(username: string): Promise<User | null> {
+    const clean = username.trim();
+    if (!clean) return null;
+    const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return this.userModel
+      .findOne({
+        username: { $regex: `^${escaped}$`, $options: 'i' },
+        walletAddress: { $exists: true, $nin: [null, ''] },
+        authProvider: { $ne: 'guest' },
+      })
+      .exec();
+  }
+
   async findAllRegistered() {
     return this.userModel
       .find({ walletAddress: { $exists: true, $nin: [null, ''] } })

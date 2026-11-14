@@ -19,10 +19,12 @@ import {
   Zap,
   ArrowLeftRight,
   LogOut,
+  Send,
 } from 'lucide-react';
 import { nearArenaEngine, COMBAT_DOCTRINES } from '../services/nearArenaEngine';
 import { Roster } from './PreGameFlow';
 import ShinSwapModal from './ShinSwapModal';
+import SendTokenModal from './SendTokenModal';
 
 interface ProfilePageProps {
   user: any;
@@ -39,6 +41,7 @@ export default function ProfilePage({ user, onClose, onLogout, onUpdateSuccess }
   );
   const [copySuccess, setCopySuccess] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
 
   const nearAccount = user?.walletAddress || arenaState.playerWallet.accountId;
 
@@ -201,12 +204,20 @@ export default function ProfilePage({ user, onClose, onLogout, onUpdateSuccess }
                 <div className="text-xs font-bold text-emerald-400">{ownedFighters.length}</div>
               </div>
             </div>
-            <button
-              onClick={() => setShowSwapModal(true)}
-              className="mt-3 w-full py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 rounded-lg text-[10px] font-cinzel font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all"
-            >
-              <ArrowLeftRight size={12} /> Swap NEAR ↔ $SHIN (AMM)
-            </button>
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <button
+                onClick={() => setShowSwapModal(true)}
+                className="w-full py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 rounded-lg text-[10px] font-cinzel font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+              >
+                <ArrowLeftRight size={12} /> Swap NEAR ↔ $SHIN
+              </button>
+              <button
+                onClick={() => setShowSendModal(true)}
+                className="w-full py-2 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 rounded-lg text-[10px] font-cinzel font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+              >
+                <Send size={12} /> Send Tokens
+              </button>
+            </div>
           </div>
         </div>
 
@@ -401,6 +412,14 @@ export default function ProfilePage({ user, onClose, onLogout, onUpdateSuccess }
         isOpen={showSwapModal}
         onClose={() => setShowSwapModal(false)}
         onSwapped={() => setArenaState({ ...nearArenaEngine.getState() })}
+      />
+
+      <SendTokenModal
+        isOpen={showSendModal}
+        onClose={() => setShowSendModal(false)}
+        onSent={() => setArenaState({ ...nearArenaEngine.getState() })}
+        currentWallet={nearAccount}
+        isGuest={Boolean(user?.isGuest)}
       />
     </div>
   );

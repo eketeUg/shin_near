@@ -154,4 +154,156 @@ export class NearRelayerController {
     }
     return this.nearRelayer.dripTestnetNear(target, '0.25');
   }
+
+  @Post('transfer')
+  async transferTokens(
+    @Req() req: Request,
+    @Body()
+    body: {
+      recipient: string;
+      token: 'NEAR' | 'SHIN' | 'USDC' | 'USDT';
+      amount: string | number;
+    },
+  ) {
+    const tokenCookie = req.cookies?.['jwt'] as string | undefined;
+    if (!tokenCookie) {
+      return {
+        ok: false,
+        simulated: true,
+        error: 'Login with Google or Email to send tokens',
+      };
+    }
+
+    let payload: any;
+    try {
+      payload = this.jwtService.verify(tokenCookie);
+    } catch {
+      return {
+        ok: false,
+        simulated: true,
+        error: 'Session expired. Please sign in again.',
+      };
+    }
+
+    const sender = payload?.sub
+      ? await this.usersService.findById(payload.sub)
+      : null;
+    if (!sender || sender.authProvider === 'guest') {
+      return {
+        ok: false,
+        simulated: true,
+        error: 'Guest players cannot send on-chain tokens. Sign in with Google or Email.',
+      };
+    }
+    if (!sender.walletAddress || !sender.walletDetails) {
+      return {
+        ok: false,
+        simulated: true,
+        error: 'Embedded NEAR wallet not found for your account.',
+      };
+    }
+
+    const tokenType = String(body?.token || '').toUpperCase() as
+      | 'NEAR'
+      | 'SHIN'
+      | 'USDC'
+      | 'USDT';
+    if (!['NEAR', 'SHIN', 'USDC', 'USDT'].includes(tokenType)) {
+      return { ok: false, simulated: true, error: 'Unsupported token type.' };
+    }
+
+    const amountNum = Number(body?.amount);
+    const amountStr = String(body?.amount ?? '').trim();
+    if (!Number.isFinite(amountNum) || amountNum <= 0 || !/^\d+(\.\d+)?$/.test(amountStr)) {
+      return { ok: false, simulated: true, error: 'Enter a valid positive amount.' };
+    }
+
+    const rawRecipient = String(body?.recipient || '').trim().replace(/^@/, '');
+    if (!rawRecipient) {
+      return {
+        ok: false,
+        simulated: true,
+        error: 'Enter a recipient username, .testnet address, or wallet address.',
+      };
+    }
+
+    const isImplicitHex = /^[0-9a-f]{64}$/i.test(rawRecipient);
+    const isNamedNear =
+      rawRecipient.length >= 2 &&
+      rawRecipient.length <= 64 &&
+      /^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/i.test(rawRecipient);
+
+    let resolvedRecipient = '';
+    let recipientUsername: string | undefined;
+
+    if (isImplicitHex || isNamedNear) {
+      resolvedRecipient = rawRecipient.toLowerCase();
+      const matchedUser = await this.usersService.findByWallet(resolvedRecipient);
+      if (matchedUser?.username) {
+        recipientUsername = matchedUser.username;
+      }
+    } else {
+      const targetUser = await this.usersService.findByUsername(rawRecipient);
+      if (!targetUser?.walletAddress) {
+        return {
+          ok: false,
+          simulated: true,
+          error: `Player "${rawRecipient}" not found. Enter a valid player username, .testnet address, or 64-char NEAR wallet address.`,
+        };
+      }
+      resolvedRecipient = targetUser.walletAddress;
+      recipientUsername = targetUser.username;
+    }
+
+    if (resolvedRecipient.toLowerCase() === sender.walletAddress.toLowerCase()) {
+      return {
+        ok: false,
+        simulated: true,
+        error: 'You cannot send tokens to your own wallet.',
+      };
+    }
+
+    let decryptedKey: string;
+    try {
+      const defaultPin = this.walletService.getDefaultWalletPin();
+      const decrypted = this.walletService.decryptSVMWallet(
+        defaultPin,
+        sender.walletDetails,
+      );
+      if (!decrypted?.privateKey) {
+        throw new Error('Missing private key');
+      }
+      decryptedKey = decrypted.privateKey;
+      if (decrypted.usedPin && decrypted.usedPin !== defaultPin) {
+        const reEncrypted = this.walletService.encryptSVMWallet(
+          defaultPin,
+          decrypted.privateKey,
+        );
+        sender.walletDetails = reEncrypted.json;
+        await sender.save();
+      }
+    } catch {
+      return {
+        ok: false,
+        simulated: true,
+        error: 'Unable to unlock your embedded NEAR wallet.',
+      };
+    }
+
+    const result = await this.nearRelayer.transferFromUserWallet({
+      senderAccountId: sender.walletAddress,
+      senderPrivateKey: decryptedKey,
+      recipientId: resolvedRecipient,
+      token: tokenType,
+      amount: amountStr,
+    });
+
+    return {
+      ...result,
+      recipient: resolvedRecipient,
+      recipientUsername,
+      token: tokenType,
+      amount: amountStr,
+    };
+  }
 }
