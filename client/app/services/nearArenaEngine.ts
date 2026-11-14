@@ -1472,7 +1472,7 @@ class NearArenaEngine {
                 implicitHexAddress: isOwnedByPlayer ? targetAddr : f.owner_id,
                 vaultBalanceNear: Number(((f.vault_balance_milli_near || 0) / 1000).toFixed(3)),
                 wagerPerFightNear: Number(((f.wager_per_fight_milli_near || 1000) / 1000).toFixed(2)),
-                isAgentActive: Boolean(f.is_agent_active),
+                isAgentActive: isOwnedByPlayer ? Boolean(f.is_agent_active) : true,
                 autoTrainAtDojo: Boolean(f.auto_train_at_dojo),
                 enrolledInAutoTournament: false,
                 withdrawAfterCurrentTournament: false,

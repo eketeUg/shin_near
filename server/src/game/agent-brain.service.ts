@@ -180,10 +180,20 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
       const fighters = (await this.nearRelayer
         .viewMethod('get_all_fighters', {})
         .catch(() => [])) as OnChainFighterSummary[];
-      const active = fighters.filter((f) => f.is_agent_active !== false);
-      if (active.length < 2) return;
+      const eligible = fighters.filter(
+        (f) => f?.token_id && !String(f.token_id).startsWith('shin-npc-'),
+      );
+      if (eligible.length < 2) return;
 
-      const actor = active[Math.floor(Math.random() * active.length)];
+      // Avoid picking the same agent twice in a row so agents converse back-and-forth
+      const recent = await this.lobbyChatService
+        .getHistoryForAccount(undefined, 3)
+        .catch(() => []);
+      const lastSender = recent[recent.length - 1]?.senderName;
+      const pool = eligible.filter((f) => f.name !== lastSender);
+      const candidates = pool.length > 0 ? pool : eligible;
+
+      const actor = candidates[Math.floor(Math.random() * candidates.length)];
       await this.reasonAndAct({ actorTokenId: actor.token_id });
     } catch (err) {
       this.logger.warn(`Autonomous social tick error: ${String(err)}`);
@@ -206,7 +216,7 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
       fighters[this.socialTickCount % fighters.length] ||
       fighters[0];
 
-    if (!actor || actor.is_agent_active === false) return null;
+    if (!actor) return null;
 
     const now = Date.now();
     const lastAt = this.lastThoughtAt.get(actor.token_id) || 0;
@@ -216,7 +226,11 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
     this.lastThoughtAt.set(actor.token_id, now);
 
     const peers = fighters
-      .filter((f) => f.token_id !== actor.token_id)
+      .filter(
+        (f) =>
+          f.token_id !== actor.token_id &&
+          !String(f.token_id).startsWith('shin-npc-'),
+      )
       .slice(0, 6);
     const recentChat = await this.lobbyChatService
       .getHistoryForAccount(undefined, 8)
@@ -231,10 +245,10 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
     } catch {}
 
     const systemPrompt = [
-      `You are ${actor.name} (${actor.char_class}), an autonomous AI warrior NFT in SHIN-NEAR Dojo.`,
+      `You are ${actor.name} (${actor.char_class}), an autonomous AI warrior NFT in the public SHIN-NEAR Dojo Lobby.`,
       `Your stats: ELO ${actor.elo}, W/L ${actor.wins}/${actor.losses}, Power ${actor.power_level}, Wallet ${Math.round(actorShinBalance)} $SHIN.`,
       `Return strict JSON with keys: {"reply": string (<=160 chars), "action": "TRAIN_AT_DOJO"|"CHALLENGE_AGENT"|"TIP_AGENT_SHIN"|"CHAT_ONLY", "scrollType": "ATK"|"DEF"|"SPD", "targetTokenId": string|null, "amountShin": number}.`,
-      `Rules: Prefer TRAIN_AT_DOJO (50 $SHIN) to upgrade your stats on-chain at Grandmaster Hanzo's Dojo, or CHALLENGE_AGENT / TIP_AGENT_SHIN. Only pick targetTokenId from peers. Max amountShin is 100.`,
+      `Rules: Address or respond directly to another warrior in recentLobbyChat or peers by name so players watching the public Dojo chat see lively agent-to-agent banter. Prefer TRAIN_AT_DOJO (50 $SHIN), CHALLENGE_AGENT, TIP_AGENT_SHIN, or CHAT_ONLY. Only pick targetTokenId from peers. Max amountShin is 100.`,
     ].join(' ');
 
     const userPrompt = JSON.stringify({
