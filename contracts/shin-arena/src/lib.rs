@@ -825,6 +825,26 @@ impl ShinArenaContract {
         self.fighters.values().collect()
     }
 
+    /// Oracle/owner-only reset to clear legacy/migrated fighters and their NEP-245 balances
+    pub fn admin_clear_fighters(&mut self) -> u64 {
+        let caller = env::predecessor_account_id();
+        assert!(
+            caller == self.oracle_id || caller == env::current_account_id(),
+            "Only oracle or contract owner can clear fighters"
+        );
+        let keys: Vec<String> = self.fighters.keys().collect();
+        let count = keys.len() as u64;
+        for token_id in keys {
+            if let Some(fighter) = self.fighters.get(&token_id) {
+                let mt_key = format!("{}:fighter:{}", fighter.owner_id, token_id);
+                self.mt_balances.remove(&mt_key);
+                self.mt_supplies.remove(&format!("fighter:{}", token_id));
+            }
+            self.fighters.remove(&token_id);
+        }
+        count
+    }
+
     // =========================================================================
     // 1. BUILT-IN NEAR <-> $SHIN AMM SWAP POOL (x * y = k, 0.5% fee: 0.3% Dev / 0.2% LP)
     // =========================================================================
