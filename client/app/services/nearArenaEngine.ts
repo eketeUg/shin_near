@@ -1172,6 +1172,38 @@ class NearArenaEngine {
       });
   }
 
+  private normalizeCharId(raw?: string): string {
+    const val = (raw || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    const map: Record<string, string> = {
+      fighter: 'fighter',
+      knight: 'knight_1',
+      knight_1: 'knight_1',
+      kunoichi: 'kunoichi',
+      monk: 'ninja_monk',
+      ninja_monk: 'ninja_monk',
+      peasant: 'ninja_peasant',
+      ninja_peasant: 'ninja_peasant',
+      samurai: 'samurai',
+      samurai_v1: 'samurai',
+      samurai_1: 'samurai_1',
+      samurai_v2: 'samurai_1',
+      archer: 'samurai_archer',
+      samurai_archer: 'samurai_archer',
+      commander: 'samurai_commander',
+      samurai_commander: 'samurai_commander',
+      shinobi: 'shinobi',
+    };
+    return map[val] || 'shinobi';
+  }
+
+  public resetSession() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    this.state = this.loadOrInitState();
+    this.saveState();
+  }
+
   public getState(): ArenaPersistentState {
     return this.state;
   }
@@ -1390,7 +1422,7 @@ class NearArenaEngine {
             .filter((f: any) => f?.owner_id === targetAddr)
             .map((f: any) => ({
               tokenId: f.token_id,
-              charId: f.char_class,
+              charId: this.normalizeCharId(f.char_class),
               name: f.name,
               title: f.name,
               ownerAccountId: f.owner_id,

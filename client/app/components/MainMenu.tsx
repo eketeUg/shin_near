@@ -176,6 +176,8 @@ const MainMenu = ({
       localStorage.removeItem('shin_near_user');
       localStorage.removeItem('shin_username');
     }
+    nearArenaEngine.resetSession();
+    setArenaState({ ...nearArenaEngine.getState() });
     setCurrentUser(null);
     setUsername('Guest');
     setActiveModal(null);
