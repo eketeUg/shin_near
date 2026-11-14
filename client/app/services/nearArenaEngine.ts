@@ -1047,10 +1047,10 @@ class NearArenaEngine {
     tournamentNumber: number,
   ): ContinuousAgentTournamentState {
     const enrolled = fighters.filter((f) => f.enrolledInAutoTournament !== false);
-    const f1 = enrolled[0] || fighters[0];
-    const f2 = enrolled[1] || fighters[1];
-    const f3 = enrolled[2] || fighters[2];
-    const f4 = enrolled[3] || fighters[3];
+    const f1 = enrolled[0] || fighters[0] || INITIAL_NPCS[0];
+    const f2 = enrolled[1] || fighters[1] || INITIAL_NPCS[1];
+    const f3 = enrolled[2] || fighters[2] || INITIAL_NPCS[2];
+    const f4 = enrolled[3] || fighters[3] || INITIAL_NPCS[3];
 
     const entryFeePerAgentNear = 1.5;
     const totalPoolNear = entryFeePerAgentNear * 4; // 6.0 NEAR pool
@@ -2226,9 +2226,13 @@ class NearArenaEngine {
     const f1 =
       (fighter1TokenId && this.state.fighters.find((f) => f.tokenId === fighter1TokenId)) ||
       eligible[0] ||
-      this.state.fighters[0];
+      this.state.fighters[0] ||
+      INITIAL_NPCS[0];
     const opponents = this.state.fighters.filter((f) => f.tokenId !== f1.tokenId);
-    const f2 = opponents[Math.floor(Math.random() * opponents.length)];
+    const f2 =
+      opponents[Math.floor(Math.random() * opponents.length)] ||
+      INITIAL_NPCS.find((n) => n.tokenId !== f1.tokenId) ||
+      INITIAL_NPCS[1];
 
     const stake = Math.min(f1.wagerPerFightNear, f2.wagerPerFightNear, 5.0) || 1.0;
 
@@ -2266,10 +2270,12 @@ class NearArenaEngine {
     match: ActiveArenaMatch;
     spectatorPayoutNear: number;
     fighterPotWonNear: number;
-  } {
-    let match = this.state.activeMatches.find((m) => m.matchId === matchId);
+  } | null {
+    const match =
+      this.state.activeMatches.find((m) => m.matchId === matchId) ||
+      this.state.activeMatches[0];
     if (!match) {
-      match = this.state.activeMatches[0];
+      return null;
     }
     if (match.status === 'SETTLED') {
       return { match, spectatorPayoutNear: 0, fighterPotWonNear: match.fighterPoolNear };

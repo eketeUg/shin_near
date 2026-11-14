@@ -130,14 +130,16 @@ const ControlsOverlay = ({
                     detail.matchId || activeMatchId || '',
                     detail.winnerId,
                 );
-                const winningFighter =
-                    detail.winnerId === 'p1' ? settled.match.p1 : settled.match.p2;
-                setSettlementReport({
-                    fighterPotWonNear: settled.fighterPotWonNear,
-                    spectatorPayoutNear: settled.spectatorPayoutNear,
-                    winnerWallet: winningFighter.agentWalletId,
-                    newPowerLevel: winningFighter.powerLevel,
-                });
+                if (settled && settled.match) {
+                    const winningFighter =
+                        detail.winnerId === 'p1' ? settled.match.p1 : settled.match.p2;
+                    setSettlementReport({
+                        fighterPotWonNear: settled.fighterPotWonNear,
+                        spectatorPayoutNear: settled.spectatorPayoutNear,
+                        winnerWallet: winningFighter.agentWalletId,
+                        newPowerLevel: winningFighter.powerLevel,
+                    });
+                }
                 refreshArenaState(detail.matchId);
             }
         };
