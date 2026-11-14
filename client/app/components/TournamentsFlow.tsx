@@ -10,7 +10,9 @@ import {
   FastForward,
   CheckCircle2,
   Coins,
+  Terminal,
 } from 'lucide-react';
+import NearInspectorModal from './NearInspectorModal';
 
 interface TournamentsFlowProps {
   onStartTournamentDuel: (duelConfig: {
@@ -31,6 +33,7 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
 }) => {
   const [arenaState, setArenaState] = useState(() => nearArenaEngine.getState());
   const [toast, setToast] = useState<string | null>(null);
+  const [showInspectorModal, setShowInspectorModal] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -97,7 +100,15 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => setShowInspectorModal(true)}
+            className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer bg-white/5 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/15 hover:border-emerald-400"
+            title="Inspect live on-chain transactions & contract activity"
+          >
+            <Terminal size={12} />
+            <span>NEAR Inspector</span>
+          </button>
           <div className="bg-white/5 border border-shin-gold/40 rounded-xl px-3 py-1.5 flex items-center gap-2">
             <Coins size={14} className="text-shin-gold" />
             <span className="text-xs font-mono font-bold text-shin-gold">
@@ -397,6 +408,11 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
           </div>
         </div>
       </div>
+
+      <NearInspectorModal
+        isOpen={showInspectorModal}
+        onClose={() => setShowInspectorModal(false)}
+      />
     </div>
   );
 };
