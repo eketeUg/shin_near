@@ -24,11 +24,7 @@ export class AgentWalletService {
   ) {}
 
   private getEncryptionPin(): string {
-    return (
-      process.env.DEFAULT_WALLET_PIN ||
-      process.env.JWT_SECRET ||
-      'shin_arena_default_wallet_pin'
-    );
+    return this.walletService.getDefaultWalletPin();
   }
 
   public deriveAgentAccountId(tokenId: string): string {

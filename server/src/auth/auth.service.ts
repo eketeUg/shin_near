@@ -240,9 +240,7 @@ export class AuthService {
 
     const encryptedSolanaWalletDetails =
       await this.walletService.encryptSVMWallet(
-        process.env.DEFAULT_WALLET_PIN ||
-          process.env.JWT_SECRET ||
-          'shin_arena_default_wallet_pin',
+        this.walletService.getDefaultWalletPin(),
         newSolanaWallet.privateKey,
       );
 

@@ -88,28 +88,23 @@ export class NearRelayerController {
       if (dbUser?.walletAddress && dbUser?.walletDetails) {
         const bal = await this.walletService.getNearBalance(dbUser.walletAddress);
         if ((bal?.balance ?? 0) >= 0.1) {
-          const candidatePins = [
-            process.env.DEFAULT_WALLET_PIN,
-            process.env.JWT_SECRET,
-            'shin_arena_default_wallet_pin',
-            'super_secret_shin_key_fallback',
-          ].filter((p): p is string => Boolean(p));
-
-          for (const pin of candidatePins) {
-            try {
-              const decrypted = this.walletService.decryptSVMWallet(
-                pin,
-                dbUser.walletDetails,
+          const defaultPin = this.walletService.getDefaultWalletPin();
+          const decrypted = this.walletService.decryptSVMWallet(
+            defaultPin,
+            dbUser.walletDetails,
+          );
+          if (decrypted?.privateKey) {
+            customSigner = {
+              accountId: dbUser.walletAddress,
+              privateKey: decrypted.privateKey,
+            };
+            if (decrypted.usedPin && decrypted.usedPin !== defaultPin) {
+              const reEncrypted = this.walletService.encryptSVMWallet(
+                defaultPin,
+                decrypted.privateKey,
               );
-              if (decrypted?.privateKey) {
-                customSigner = {
-                  accountId: dbUser.walletAddress,
-                  privateKey: decrypted.privateKey,
-                };
-                break;
-              }
-            } catch {
-              // Try next candidate pin
+              dbUser.walletDetails = reEncrypted.json;
+              await dbUser.save();
             }
           }
         }

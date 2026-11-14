@@ -12,8 +12,10 @@ import {
 } from 'crypto';
 import bs58 from 'bs58';
 import * as dotenv from 'dotenv';
+import * as path from 'path';
 import { KeyPair, providers, utils } from 'near-api-js';
 
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 dotenv.config();
 
 const ALGORITHM = 'aes-256-cbc';
@@ -112,13 +114,21 @@ export class WalletService {
   };
 
   /**
-   * Encrypts an embedded wallet private key using AES-256-CBC with a user-provided secret/PIN.
+   * Returns the canonical DEFAULT_WALLET_PIN used for all wallet encryption/decryption.
+   */
+  getDefaultWalletPin = (): string => {
+    return process.env.DEFAULT_WALLET_PIN || 'shin_arena_default_wallet_pin';
+  };
+
+  /**
+   * Encrypts an embedded wallet private key using AES-256-CBC with DEFAULT_WALLET_PIN (or provided secret).
    */
   encryptSVMWallet = (
     password: string,
     privateKey: string,
   ): Record<string, string> => {
-    const key = this.generateKey(password);
+    const effectivePin = password || this.getDefaultWalletPin();
+    const key = this.generateKey(effectivePin);
     const iv = randomBytes(IV_LENGTH);
     const cipher = createCipheriv(ALGORITHM, key, iv);
 
@@ -130,28 +140,45 @@ export class WalletService {
   };
 
   /**
-   * Decrypts an encrypted wallet string using the provided secret/PIN.
+   * Decrypts an encrypted wallet string using DEFAULT_WALLET_PIN (with fallback to legacy pins).
    */
   decryptSVMWallet = (
     password: string,
     encryptedWallet: string,
   ): Record<string, any> => {
-    try {
-      const key = this.generateKey(password);
-      const [ivHex, encrypted] = encryptedWallet.split(':');
-      const iv = Buffer.from(ivHex, 'hex');
+    const candidatePins = Array.from(
+      new Set(
+        [
+          password,
+          this.getDefaultWalletPin(),
+          'shin_arena_default_wallet_pin',
+          process.env.JWT_SECRET,
+          'super_secret_shin_key_fallback',
+        ].filter((p): p is string => Boolean(p)),
+      ),
+    );
 
-      const decipher = createDecipheriv(ALGORITHM, key, iv);
-      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
+    let lastError: any;
+    for (const pin of candidatePins) {
+      try {
+        const key = this.generateKey(pin);
+        const [ivHex, encrypted] = encryptedWallet.split(':');
+        const iv = Buffer.from(ivHex, 'hex');
 
-      return {
-        privateKey: decrypted,
-        address: this.getSVMAddressFromPrivateKey(decrypted).address,
-      };
-    } catch (error) {
-      throw new Error(`Failed to decrypt wallet: ${error.message}`);
+        const decipher = createDecipheriv(ALGORITHM, key, iv);
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+
+        return {
+          privateKey: decrypted,
+          address: this.getSVMAddressFromPrivateKey(decrypted).address,
+          usedPin: pin,
+        };
+      } catch (err) {
+        lastError = err;
+      }
     }
+    throw new Error(`Failed to decrypt wallet: ${lastError?.message || lastError}`);
   };
 
   /**
