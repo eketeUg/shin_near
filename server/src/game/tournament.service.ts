@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { Server } from 'socket.io';
+import { UsersService } from '../users/users.service';
 import { NearRelayerService } from './near-relayer.service';
 
 export interface TournamentBracketMatch {
@@ -109,7 +110,10 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
   private readonly ROUND_DURATION_MS = 15000;
   private readonly REST_DURATION_SEC = 120;
 
-  constructor(private readonly nearRelayer: NearRelayerService) {}
+  constructor(
+    private readonly nearRelayer: NearRelayerService,
+    private readonly usersService: UsersService,
+  ) {}
 
   public registerGatewayServer(server: Server) {
     this.ioServer = server;
@@ -118,6 +122,7 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
   private broadcastTournamentUpdate() {
     if (!this.ioServer) return;
     this.ioServer.emit('tournament_updated', this.getState());
+    this.ioServer.emit('leaderboard_updated', { ts: Date.now() });
   }
 
   async onModuleInit() {
@@ -444,10 +449,22 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
     const isP1 = match.p1Id === params.winnerAccountId;
     const winnerName = isP1 ? match.p1Name : match.p2Name;
     const winnerChar = isP1 ? match.p1CharId : match.p2CharId;
+    const loserAccountId = isP1 ? match.p2Id : match.p1Id;
 
     match.winnerId = params.winnerAccountId;
     match.winnerName = winnerName;
     match.status = 'COMPLETED';
+
+    const payoutIfFinal =
+      match.round === 'GRAND_FINAL' ? this.humanCup.winnerPayoutShin : 0;
+    void this.usersService.recordMatchOutcome(
+      params.winnerAccountId,
+      true,
+      payoutIfFinal,
+    );
+    if (loserAccountId) {
+      void this.usersService.recordMatchOutcome(loserAccountId, false, 0);
+    }
 
     const semi1 = this.humanCup.matches[4];
     const semi2 = this.humanCup.matches[5];

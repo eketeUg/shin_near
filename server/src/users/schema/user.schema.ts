@@ -74,6 +74,9 @@ export class User {
 
   @Prop({ default: 0 })
   losses!: number;
+
+  @Prop({ default: 0 })
+  totalShinEarned!: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

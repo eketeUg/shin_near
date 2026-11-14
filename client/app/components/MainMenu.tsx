@@ -33,6 +33,7 @@ interface MainMenuProps {
   onWatchLive: (match?: any) => void;
   onOpenDojoLobby?: () => void;
   onOpenTournaments?: () => void;
+  onOpenLeaderboard?: () => void;
   onOpenColosseum?: (initialTab?: 'LIVE_ARENA' | 'MY_AGENTS' | 'DOJO_MARKET' | 'LEDGER') => void;
   onAwakenWarrior?: (charId?: CharacterId) => void;
   isMuted: boolean;
@@ -45,6 +46,7 @@ const MainMenu = ({
   onWatchLive,
   onOpenDojoLobby,
   onOpenTournaments,
+  onOpenLeaderboard,
   onOpenColosseum,
   onAwakenWarrior,
   isMuted,
@@ -458,6 +460,20 @@ const MainMenu = ({
                 <div className="arcade-unskew flex items-center justify-center gap-1.5 font-cinzel font-bold text-[10px] sm:text-[11px] tracking-wider text-purple-300 group-hover:text-white uppercase">
                   <Trophy size={13} />
                   <span>Tournaments</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  playClickSound();
+                  onOpenLeaderboard?.();
+                }}
+                onMouseEnter={playHoverSound}
+                className="arcade-skew bg-black/80 hover:bg-emerald-500/20 border border-emerald-400/50 hover:border-emerald-400 px-2.5 py-2.5 sm:py-3 transition-all cursor-pointer group"
+              >
+                <div className="arcade-unskew flex items-center justify-center gap-1.5 font-cinzel font-bold text-[10px] sm:text-[11px] tracking-wider text-emerald-300 group-hover:text-white uppercase">
+                  <Trophy size={13} />
+                  <span>Leaderboards</span>
                 </div>
               </button>
 

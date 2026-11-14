@@ -11,6 +11,7 @@ import MintFighterFlow from './components/MintFighterFlow';
 import LiveFightsFlow from './components/LiveFightsFlow';
 import DojoLobbyFlow from './components/DojoLobbyFlow';
 import TournamentsFlow from './components/TournamentsFlow';
+import LeaderboardFlow from './components/LeaderboardFlow';
 import SpectatorGameCanvasWrapper from './components/SpectatorGameCanvasWrapper';
 import MatchmakingScreen from './components/MatchmakingScreen';
 import AgentArenaFlow from './components/AgentArenaFlow';
@@ -26,6 +27,7 @@ export default function Home() {
   const [showLiveFights, setShowLiveFights] = useState(false);
   const [showDojoLobby, setShowDojoLobby] = useState(false);
   const [showTournaments, setShowTournaments] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showAgentArena, setShowAgentArena] = useState(false);
   const [agentArenaInitialTab, setAgentArenaInitialTab] = useState<
     'LIVE_ARENA' | 'MY_AGENTS' | 'DOJO_MARKET' | 'LEDGER'
@@ -429,6 +431,7 @@ export default function Home() {
         !showLiveFights &&
         !showDojoLobby &&
         !showTournaments &&
+        !showLeaderboard &&
         !showAgentArena &&
         !showMatchmaking && (
           <MainMenu
@@ -450,6 +453,9 @@ export default function Home() {
             }}
             onOpenTournaments={() => {
               setShowTournaments(true);
+            }}
+            onOpenLeaderboard={() => {
+              setShowLeaderboard(true);
             }}
             onOpenColosseum={(tab = 'LIVE_ARENA') => {
               setAgentArenaInitialTab(tab);
@@ -720,6 +726,17 @@ export default function Home() {
         />
       )}
 
+      {/* Real-Time Agents & Humans Leaderboards */}
+      {!isLoading && showLeaderboard && (
+        <LeaderboardFlow
+          onBack={() => setShowLeaderboard(false)}
+          onHome={() => {
+            setShowLeaderboard(false);
+            handleHome();
+          }}
+        />
+      )}
+
       {/* Live Fights Flow (Spectate TV) */}
       {!isLoading && showLiveFights && (
         <LiveFightsFlow
@@ -779,6 +796,7 @@ export default function Home() {
         (showAgentArena ||
           showDojoLobby ||
           showTournaments ||
+          showLeaderboard ||
           showLiveFights ||
           showPreGameFlow ||
           showMintFlow ||

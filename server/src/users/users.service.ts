@@ -36,10 +36,47 @@ export class UsersService {
   async findAllRegistered() {
     return this.userModel
       .find({ walletAddress: { $exists: true, $nin: [null, ''] } })
-      .select('username walletAddress rating level authProvider updatedAt')
-      .sort({ updatedAt: -1 })
+      .select(
+        'username walletAddress rating level xp wins losses winStreak lossStreak totalShinEarned authProvider updatedAt',
+      )
+      .sort({ totalShinEarned: -1, wins: -1, rating: -1 })
       .lean()
       .exec();
+  }
+
+  async recordMatchOutcome(
+    walletAddress: string,
+    didWin: boolean,
+    shinEarned: number = 0,
+  ) {
+    if (!walletAddress) return;
+    if (didWin) {
+      await this.userModel
+        .findOneAndUpdate(
+          { walletAddress },
+          {
+            $inc: {
+              wins: 1,
+              winStreak: 1,
+              rating: 20,
+              xp: 30,
+              totalShinEarned: Math.max(0, Math.round(shinEarned)),
+            },
+            $set: { lossStreak: 0 },
+          },
+        )
+        .exec();
+    } else {
+      await this.userModel
+        .findOneAndUpdate(
+          { walletAddress },
+          {
+            $inc: { losses: 1, lossStreak: 1 },
+            $set: { winStreak: 0 },
+          },
+        )
+        .exec();
+    }
   }
 
   private detectProvider(dto: CreateUserDto) {
