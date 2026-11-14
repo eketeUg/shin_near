@@ -350,8 +350,8 @@ export const AGENT_PERSONALITY_ARCHETYPES: {
     id: 'ARROGANT_SHINOBI',
     name: 'Shadow Assassin',
     badge: '🗡️ SHADOW TAUNT',
-    desc: 'Sharp-tongued, psychological trash-talker who mocks slow stances and dares opponents to raise the NEAR pot.',
-    defaultGreeting: 'You move like a wooden training dummy. Care to lose some NEAR in the shadows?',
+    desc: 'Sharp-tongued, psychological trash-talker who mocks slow stances and dares opponents to raise the $SHIN pot.',
+    defaultGreeting: 'You move like a wooden training dummy. Care to lose some $SHIN in the shadows?',
     defaultChallengeReply: 'Easy coin! My shadow will strike before you even draw your steel.',
     defaultVictoryLine: 'Too slow! Keep training at Master Hanzo’s dojo before challenging me again.',
   },
@@ -359,9 +359,9 @@ export const AGENT_PERSONALITY_ARCHETYPES: {
     id: 'MERCENARY_BOUNTY',
     name: 'Bounty Mercenary',
     badge: '💰 BOUNTY HUNTER',
-    desc: 'Fights strictly for NEAR & Tamahagane Steel spoils. Always calculating odds, pot sizes, and War Chest profit.',
-    defaultGreeting: 'My katana only leaves its scabbard for real NEAR. Show me the pot.',
-    defaultChallengeReply: 'The NEAR escrow looks good. Let’s settle this contract in the pit!',
+    desc: 'Fights strictly for $SHIN & Tamahagane Steel spoils. Always calculating odds, pot sizes, and SHIN Pouch profit.',
+    defaultGreeting: 'My katana only leaves its scabbard for real $SHIN. Show me the pot.',
+    defaultChallengeReply: 'The $SHIN escrow looks good. Let’s settle this duel in the pit!',
     defaultVictoryLine: 'Another bounty collected straight into my .agent.shin-arena-28d.testnet vault.',
   },
   {
@@ -475,7 +475,7 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     personality: {
       archetype: 'ARROGANT_SHINOBI',
       greetingLine: 'Still blinking, mortal? My twin kunai move faster than your eyes can track.',
-      challengeAcceptLine: 'Free NEAR for my crimson vault! Try not to fall in the first 10 seconds.',
+      challengeAcceptLine: 'Free $SHIN for my crimson pouch! Try not to fall in the first 10 seconds.',
       victoryLine: 'Did you even swing? Thanks for funding my next shadow scroll.',
       minWagerNear: 1.0,
     },
@@ -508,7 +508,7 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     enrolledInAutoTournament: true,
     personality: {
       archetype: 'MERCENARY_BOUNTY',
-      greetingLine: 'Tamahagane armor isn’t cheap. Put real NEAR on the table if you want a duel.',
+      greetingLine: 'Tamahagane armor isn’t cheap. Put real $SHIN on the table if you want a duel.',
       challengeAcceptLine: 'Escrow locked. My iron guard will crush your stance and take the pot.',
       victoryLine: 'Contract complete. Another bounty added to kenshin-npc.agent.shin-arena-28d.testnet.',
       minWagerNear: 1.5,
@@ -543,7 +543,7 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     personality: {
       archetype: 'ARROGANT_SHINOBI',
       greetingLine: 'From the mist I watch every flaw in your footwork. Dare to test my counter-strike?',
-      challengeAcceptLine: 'Step into the fog. Your NEAR already belongs to the Shadow Clan.',
+      challengeAcceptLine: 'Step into the fog. Your $SHIN already belongs to the Shadow Clan.',
       victoryLine: 'One opening was all I needed. Vanish back to the barracks!',
       minWagerNear: 1.0,
     },
@@ -610,7 +610,7 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     enrolledInAutoTournament: true,
     personality: {
       archetype: 'MERCENARY_BOUNTY',
-      greetingLine: 'A masterless ronin fights only for NEAR and cold steel. Name your price.',
+      greetingLine: 'A masterless ronin fights only for $SHIN and cold steel. Name your price.',
       challengeAcceptLine: 'Good coin. Let’s see if your blade is worth the bounty!',
       victoryLine: 'Paid in full. Master Kenji’s forge awaits my Tamahagane steel.',
       minWagerNear: 1.0,
@@ -778,7 +778,7 @@ class NearArenaEngine {
           senderType: 'AGENT',
           senderCharId: 'samurai_commander',
           archetypeBadge: '⛩️ BUSHIDO HONOR',
-          text: 'My blade serves the Shogunate. Step forward if your Bushido spirit is unshaken — 2 NEAR on the line.',
+          text: 'My blade serves the Shogunate. Step forward if your Bushido spirit is unshaken — 2,000 $SHIN on the line.',
           timestamp: Date.now() - 95000,
         },
         {
@@ -798,7 +798,7 @@ class NearArenaEngine {
           senderType: 'AGENT',
           senderCharId: 'knight_1',
           archetypeBadge: '💰 BOUNTY HUNTER',
-          text: 'The Daily Blood-Moon Tournament window is open! 2 NEAR entry — bout winners take instant spoils and the Grand Champion claims the jackpot.',
+          text: 'The Daily Blood-Moon Tournament window is open! 2,000 $SHIN entry — bout winners take instant spoils and the Grand Champion claims the jackpot.',
           timestamp: Date.now() - 18000,
         },
       ],
@@ -2434,19 +2434,21 @@ class NearArenaEngine {
       let replyText = p.greetingLine;
       if (params.challengeWagerNear !== undefined || lower.includes('fight') || lower.includes('challenge') || lower.includes('duel') || lower.includes('wager')) {
         const offered = params.challengeWagerNear ?? responder.wagerPerFightNear;
+        const offeredShin = Math.round(offered * 1000).toLocaleString();
+        const minShin = Math.round(p.minWagerNear * 1000).toLocaleString();
         if (offered < p.minWagerNear) {
-          replyText = `@${player.username} Only ${offered} NEAR? My minimum contract is ${p.minWagerNear} NEAR (${responder.agentWalletId}). Raise the stakes if you want to cross blades!`;
+          replyText = `@${player.username} Only ${offeredShin} $SHIN? My minimum stake is ${minShin} $SHIN. Raise the stakes if you want to cross blades!`;
         } else {
-          replyText = `@${player.username} ${p.challengeAcceptLine} (${offered} NEAR stake locked on ${responder.agentWalletId} — click "⚔️ Challenge" to enter the pit!)`;
+          replyText = `@${player.username} ${p.challengeAcceptLine} (${offeredShin} $SHIN stake locked — click "⚔️ Challenge" to enter the pit!)`;
         }
       } else if (lower.includes('tournament') || lower.includes('bracket') || lower.includes('cup')) {
         replyText = `@${player.username} I am ${
-          responder.enrolledInAutoTournament !== false ? 'enrolled in the Continuous Agent Tournament' : 'resting in the barracks'
-        } with ${responder.vaultBalanceNear.toFixed(1)} NEAR in my War Chest. Meet me in the Grand Final!`;
+          responder.enrolledInAutoTournament !== false ? 'enrolled in the Budōkan Tournament' : 'resting in the Dojo'
+        } with ${Math.round(responder.vaultBalanceNear * 1000).toLocaleString()} $SHIN in my SHIN Pouch. Meet me in the Grand Final!`;
       } else if (lower.includes('hello') || lower.includes('hi') || lower.includes('yo') || lower.includes('hey')) {
         replyText = `@${player.username} ${p.greetingLine}`;
       } else {
-        replyText = `@${player.username} [${responder.doctrine.replace('_', ' ')}] ${p.greetingLine} (Record: ${responder.wins}W-${responder.losses}L • War Chest: ${responder.vaultBalanceNear.toFixed(1)} NEAR)`;
+        replyText = `@${player.username} [${responder.doctrine.replace('_', ' ')}] ${p.greetingLine} (Record: ${responder.wins}W-${responder.losses}L • SHIN Pouch: ${Math.round(responder.vaultBalanceNear * 1000).toLocaleString()} $SHIN)`;
       }
 
       agentReply = {
@@ -2657,18 +2659,20 @@ class NearArenaEngine {
         const lower = params.text.toLowerCase();
         let replyText =
           p?.greetingLine || 'My blade is ready. Send a Fight Request card to lock our wager!';
-        if (lower.includes('free') || lower.includes('0 near')) {
+        if (lower.includes('free') || lower.includes('0 near') || lower.includes('0 shin')) {
+          const minShin = Math.round((p?.minWagerNear || 0) * 1000).toLocaleString();
           replyText =
             (p?.minWagerNear || 0) > 0
-              ? `I usually fight for at least ${p?.minWagerNear} NEAR, ${player.username}, but send a Fight Request card if you want to negotiate!`
+              ? `I usually fight for at least ${minShin} $SHIN, ${player.username}, but send a Fight Request card if you want to negotiate!`
               : `A free sparring match? Send the Fight Request card and let's test your stance!`;
         } else if (
           lower.includes('fight') ||
           lower.includes('duel') ||
           lower.includes('wager') ||
+          lower.includes('shin') ||
           lower.includes('near')
         ) {
-          replyText = `${p?.challengeAcceptLine || 'I accept your terms!'} Use the "⚔️ Send Fight Request" button below to propose the exact NEAR stake or Free Match.`;
+          replyText = `${p?.challengeAcceptLine || 'I accept your terms!'} Use the "⚔️ Send Fight Request" button below to propose the exact $SHIN stake or Free Match.`;
         }
         autoReply = {
           id: 'dm-reply-' + (Date.now() + 1),
@@ -2686,11 +2690,12 @@ class NearArenaEngine {
         this.state.lobbyChat.push(autoReply);
       } else if (target.userType === 'HUMAN') {
         const lower = params.text.toLowerCase();
-        let replyText = `Yo ${player.username}! I'm online right now. Want to run a ${target.preferredWagerNear} NEAR wager match or a Free Match? Send me a Fight Request card!`;
+        const prefShin = Math.round((target.preferredWagerNear || 0) * 1000).toLocaleString();
+        let replyText = `Yo ${player.username}! I'm online right now. Want to run a ${prefShin} $SHIN wager match or a Free Match? Send me a Fight Request card!`;
         if (lower.includes('free')) {
-          replyText = `Sure, I'm down for a Free Match (0 NEAR) to warm up! Click "⚔️ Send Fight Request" and select Free Match.`;
-        } else if (lower.includes('wager') || lower.includes('near') || lower.includes('fight')) {
-          replyText = `Let's do it! Send the Fight Request card with the NEAR amount and I'll accept right here in chat.`;
+          replyText = `Sure, I'm down for a Free Match (0 $SHIN) to warm up! Click "⚔️ Send Fight Request" and select Free Match.`;
+        } else if (lower.includes('wager') || lower.includes('shin') || lower.includes('near') || lower.includes('fight')) {
+          replyText = `Let's do it! Send the Fight Request card with the $SHIN amount and I'll accept right here in chat.`;
         }
         autoReply = {
           id: 'dm-reply-' + (Date.now() + 1),
@@ -2821,8 +2826,8 @@ class NearArenaEngine {
       deliveryStatus: 'DELIVERED_LIVE',
       text:
         params.wagerNear > 0
-          ? `⚔️ Sent a ${params.wagerNear} NEAR Wager Fight Request to ${target.username}`
-          : `⚔️ Sent a Free Match (0 NEAR) Sparring Request to ${target.username}`,
+          ? `⚔️ Sent a ${Math.round(params.wagerNear * 1000).toLocaleString()} $SHIN Wager Fight Request to ${target.username}`
+          : `⚔️ Sent a Free Match (0 $SHIN) Sparring Request to ${target.username}`,
       timestamp: Date.now(),
       challengeOffer: {
         proposalId,
@@ -2853,10 +2858,10 @@ class NearArenaEngine {
       deliveryStatus: 'DELIVERED_LIVE',
       text:
         initialStatus === 'COUNTERED'
-          ? `I counter-propose ${counterWagerNear} NEAR! Click "Accept Counter (${counterWagerNear} NEAR)" on the card above or adjust the stake.`
+          ? `I counter-propose ${Math.round((counterWagerNear || 0) * 1000).toLocaleString()} $SHIN! Click "Agree to ${Math.round((counterWagerNear || 0) * 1000).toLocaleString()} $SHIN" on the card above or adjust the stake.`
           : params.wagerNear > 0
-          ? `Deal! I agreed to your ${params.wagerNear} NEAR wager. Click "⚔️ Enter Arena & Fight Now" on the card above!`
-          : `Deal! I agreed to a Free Match (0 NEAR). Click "⚔️ Enter Arena & Fight Now" on the card above!`,
+          ? `Deal! I agreed to your ${Math.round(params.wagerNear * 1000).toLocaleString()} $SHIN wager. Click "⚔️ Enter Arena & Fight Now" on the card above!`
+          : `Deal! I agreed to a Free Match (0 $SHIN). Click "⚔️ Enter Arena & Fight Now" on the card above!`,
       timestamp: Date.now() + 150,
     };
     this.state.lobbyChat.push(replyMsg);

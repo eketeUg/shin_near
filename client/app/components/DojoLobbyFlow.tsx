@@ -584,11 +584,11 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
                   Agree on Match Terms:
                 </span>
                 {[
-                  { label: 'Free Match (0 NEAR)', val: 0 },
-                  { label: '0.5 NEAR', val: 0.5 },
-                  { label: '1 NEAR', val: 1.0 },
-                  { label: '2 NEAR', val: 2.0 },
-                  { label: '5 NEAR', val: 5.0 },
+                  { label: 'Free Match (0 $SHIN)', val: 0 },
+                  { label: '500 $SHIN', val: 0.5 },
+                  { label: '1,000 $SHIN', val: 1.0 },
+                  { label: '2,000 $SHIN', val: 2.0 },
+                  { label: '5,000 $SHIN', val: 5.0 },
                 ].map((opt) => (
                   <button
                     key={opt.val}
@@ -618,7 +618,7 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
                 <Swords size={13} />
                 <span>
                   {activeContact.isOnline
-                    ? `Send Fight Request (${proposedWagerNear === 0 ? 'Free' : `${proposedWagerNear} NEAR`})`
+                    ? `Send Fight Request (${proposedWagerNear === 0 ? 'Free' : `${Math.round(proposedWagerNear * 1000).toLocaleString()} $SHIN`})`
                     : 'User Offline (DM Only)'}
                 </span>
               </button>
@@ -681,8 +681,8 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
                           </span>
                           <span className="px-2 py-0.5 rounded bg-shin-gold/20 text-shin-gold font-mono text-[10px] font-bold">
                             {offer.wagerNear === 0
-                              ? 'FREE MATCH (0 NEAR)'
-                              : `${offer.wagerNear} NEAR WAGER`}
+                              ? 'FREE MATCH (0 $SHIN)'
+                              : `${Math.round(offer.wagerNear * 1000).toLocaleString()} $SHIN WAGER`}
                           </span>
                         </div>
 
@@ -695,7 +695,7 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
                           <div className="p-2 rounded bg-amber-500/15 border border-amber-400/40 text-[11px] text-amber-200 flex items-center justify-between gap-2">
                             <span>
                               Opponent counter-proposed{' '}
-                              <strong>{offer.counterWagerNear} NEAR</strong>!
+                              <strong>{Math.round(offer.counterWagerNear * 1000).toLocaleString()} $SHIN</strong>!
                             </span>
                             <button
                               onClick={() => {
@@ -708,7 +708,7 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
                               }}
                               className="px-2.5 py-1 bg-amber-400 text-black font-cinzel font-black text-[10px] uppercase rounded cursor-pointer"
                             >
-                              Agree to {offer.counterWagerNear} NEAR
+                              Agree to {Math.round(offer.counterWagerNear * 1000).toLocaleString()} $SHIN
                             </button>
                           </div>
                         )}
