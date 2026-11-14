@@ -102,50 +102,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private spawnServerBroadcastMatch(slotIdx = 0) {
-    const fallbackPool = [
-      {
-        token_id: 'fighter-1',
-        name: 'Kenshin',
-        char_class: 'samurai',
-        agent_wallet_id: 'fighter-1.shin-arena-28d.testnet',
-        atk: 18,
-        def: 14,
-        elo: 1320,
-      },
-      {
-        token_id: 'fighter-2',
-        name: 'Shadow Kunoichi',
-        char_class: 'kunoichi',
-        agent_wallet_id: 'fighter-2.shin-arena-28d.testnet',
-        atk: 17,
-        def: 13,
-        elo: 1290,
-      },
-      {
-        token_id: 'fighter-3',
-        name: 'Ryuuko',
-        char_class: 'shinobi',
-        agent_wallet_id: 'fighter-3.shin-arena-28d.testnet',
-        atk: 19,
-        def: 12,
-        elo: 1345,
-      },
-      {
-        token_id: 'fighter-4',
-        name: 'Shogun Takeshi',
-        char_class: 'samurai_commander',
-        agent_wallet_id: 'takeshi-npc.shin-arena-28d.testnet',
-        atk: 20,
-        def: 16,
-        elo: 1380,
-      },
-    ];
-    const pool =
-      this.cachedOnChainAgents.length >= 2 ? this.cachedOnChainAgents : fallbackPool;
+    if (this.cachedOnChainAgents.length < 2) {
+      return;
+    }
+    const pool = this.cachedOnChainAgents;
     const f1 = pool[(slotIdx * 2 + Math.floor(Math.random() * pool.length)) % pool.length];
     let f2 = pool[(slotIdx * 2 + 1 + Math.floor(Math.random() * pool.length)) % pool.length];
     if (f2.token_id === f1.token_id) {
-      f2 = pool.find((x) => x.token_id !== f1.token_id) || fallbackPool[1];
+      f2 = pool.find((x) => x.token_id !== f1.token_id) || pool[0];
     }
 
     const matchId = `live_bcast_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;

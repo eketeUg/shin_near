@@ -688,6 +688,9 @@ class NearArenaEngine {
                 !tx.id?.startsWith('tx-init-') &&
                 !tx.summary?.includes('Session expired'),
             );
+            parsed.activeMatches = (parsed.activeMatches || []).filter(
+              (m: ActiveArenaMatch) => !m?.p1?.isNpc && !m?.p2?.isNpc,
+            );
             return parsed;
           }
         } catch (e) {
@@ -739,7 +742,7 @@ class NearArenaEngine {
     };
 
     const fighters = [...INITIAL_NPCS];
-    const activeMatches = this.buildInitialMatches(fighters);
+    const activeMatches: ActiveArenaMatch[] = [];
     const defaultImplicit = randomHex(64);
 
     const initial: ArenaPersistentState = {
@@ -2381,10 +2384,10 @@ class NearArenaEngine {
       } catch {}
     }
 
-    // Spawn a replacement match so the arena stays populated
+    // Clear finished match without spawning simulated NPC matches
     setTimeout(() => {
       this.state.activeMatches = this.state.activeMatches.filter((m) => m.matchId !== matchId);
-      this.createImmediateAgentMatch();
+      this.saveState();
     }, 500);
 
     this.saveState();

@@ -80,17 +80,8 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
     const sync = () => setArenaState({ ...nearArenaEngine.getState() });
     window.addEventListener('nearArenaStateUpdated', sync);
 
-    const interval = setInterval(() => {
-      const current = nearArenaEngine.getState();
-      if (current.activeMatches.length < 3) {
-        nearArenaEngine.createImmediateAgentMatch();
-      }
-      setArenaState({ ...nearArenaEngine.getState() });
-    }, 10000);
-
     return () => {
       window.removeEventListener('nearArenaStateUpdated', sync);
-      clearInterval(interval);
     };
   }, []);
 
