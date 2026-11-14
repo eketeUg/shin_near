@@ -143,6 +143,9 @@ export default function Home() {
       if (!Array.isArray(list)) return;
       setLiveDuelsCount(list.filter((m) => !m?.sim?.ending).length);
     });
+    socket.on('live_economy_activity', (evt: any) => {
+      nearArenaEngine.recordServerEconomyEvent(evt);
+    });
     socket.on('tournament_started', (cup: any) => checkMyReadyMatch(cup));
     socket.on('tournament_updated', (payload: any) => {
       if (payload?.humanCup) checkMyReadyMatch(payload.humanCup);
