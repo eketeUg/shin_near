@@ -77,26 +77,40 @@ export class NearRelayerController {
 
     // Sign directly from the user's own funded NEAR wallet when balance >= 0.1 NEAR
     let customSigner: { accountId: string; privateKey: string } | undefined;
+    let userWalletAddress: string | undefined = payload?.walletAddress;
     try {
       const dbUser = payload?.sub
         ? await this.usersService.findById(payload.sub)
         : null;
+      if (dbUser?.walletAddress) {
+        userWalletAddress = dbUser.walletAddress;
+      }
       if (dbUser?.walletAddress && dbUser?.walletDetails) {
         const bal = await this.walletService.getNearBalance(dbUser.walletAddress);
         if ((bal?.balance ?? 0) >= 0.1) {
-          const pin =
-            process.env.DEFAULT_WALLET_PIN ||
-            process.env.JWT_SECRET ||
-            'shin_arena_default_wallet_pin';
-          const decrypted = this.walletService.decryptSVMWallet(
-            pin,
-            dbUser.walletDetails,
-          );
-          if (decrypted?.privateKey) {
-            customSigner = {
-              accountId: dbUser.walletAddress,
-              privateKey: decrypted.privateKey,
-            };
+          const candidatePins = [
+            process.env.DEFAULT_WALLET_PIN,
+            process.env.JWT_SECRET,
+            'shin_arena_default_wallet_pin',
+            'super_secret_shin_key_fallback',
+          ].filter((p): p is string => Boolean(p));
+
+          for (const pin of candidatePins) {
+            try {
+              const decrypted = this.walletService.decryptSVMWallet(
+                pin,
+                dbUser.walletDetails,
+              );
+              if (decrypted?.privateKey) {
+                customSigner = {
+                  accountId: dbUser.walletAddress,
+                  privateKey: decrypted.privateKey,
+                };
+                break;
+              }
+            } catch {
+              // Try next candidate pin
+            }
           }
         }
       }
@@ -111,6 +125,7 @@ export class NearRelayerController {
       body.gas || '60000000000000',
       customSigner,
       body.contractId,
+      userWalletAddress,
     );
   }
 

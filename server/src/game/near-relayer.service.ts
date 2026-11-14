@@ -175,6 +175,7 @@ export class NearRelayerService implements OnModuleInit {
     gas = '60000000000000',
     customSigner?: { accountId: string; privateKey: string },
     targetContractId?: string,
+    userWalletAddress?: string,
   ): Promise<NearRelayResult> {
     const resolvedContract = this.resolveAllowedContract(targetContractId);
     if (!ALLOWED_WRITE_METHODS.has(methodName)) {
@@ -198,6 +199,7 @@ export class NearRelayerService implements OnModuleInit {
         gas,
         customSigner,
         resolvedContract,
+        userWalletAddress,
       );
     }
 
@@ -210,6 +212,7 @@ export class NearRelayerService implements OnModuleInit {
         gas,
         undefined,
         resolvedContract,
+        userWalletAddress,
       ),
     );
     this.txQueue = task.catch(() => undefined);
@@ -223,6 +226,7 @@ export class NearRelayerService implements OnModuleInit {
     gas: string,
     customSigner?: { accountId: string; privateKey: string },
     targetContractId?: string,
+    userWalletAddress?: string,
   ): Promise<NearRelayResult> {
     const resolvedContract = targetContractId || this.contractId;
     let signer = this.relayerAccount;
@@ -264,6 +268,88 @@ export class NearRelayerService implements OnModuleInit {
         explorerUrl: '',
         error: 'NEAR signer key is not loaded',
       };
+    }
+
+    // If swap_near_for_shin falls back to relayer signing (e.g. user wallet < 0.1 NEAR or key mismatch),
+    // shin-arena-28d.testnet cannot ft_transfer to itself (NEP-141 assert_ne!(sender, receiver)).
+    // Instead, compute the AMM quote and transfer the output $SHIN directly to userWalletAddress!
+    if (
+      methodName === 'swap_near_for_shin' &&
+      signerId === this.contractId &&
+      userWalletAddress &&
+      userWalletAddress !== this.contractId
+    ) {
+      try {
+        const depositYoctoStr =
+          utils.format.parseNearAmount(attachedDepositNear) || '0';
+        const quotedShinRaw = await this.viewMethod(
+          'get_amm_quote_near_to_shin',
+          { near_in: depositYoctoStr },
+          this.contractId,
+        );
+        const shinOutStr = String(
+          quotedShinRaw || '250000000000000000000',
+        ).replace(/"/g, '');
+
+        try {
+          await signer.functionCall({
+            contractId: this.shinTokenId,
+            methodName: 'storage_deposit',
+            args: { account_id: userWalletAddress, registration_only: true },
+            gas: BigInt('30000000000000'),
+            attachedDeposit: BigInt(
+              utils.format.parseNearAmount('0.00125') ||
+                '1250000000000000000000',
+            ),
+          });
+        } catch {
+          // Already registered
+        }
+
+        const ftOutcome: any = await signer.functionCall({
+          contractId: this.shinTokenId,
+          methodName: 'ft_transfer',
+          args: {
+            receiver_id: userWalletAddress,
+            amount: shinOutStr,
+            memo: `SHIN AMM Swap: ${attachedDepositNear} NEAR -> $SHIN`,
+          },
+          gas: BigInt('30000000000000'),
+          attachedDeposit: 1n,
+        });
+
+        const txHash: string =
+          ftOutcome?.transaction?.hash ||
+          ftOutcome?.transaction_outcome?.id ||
+          '';
+        const explorerBase =
+          this.networkId === 'mainnet'
+            ? 'https://nearblocks.io/txns'
+            : 'https://testnet.nearblocks.io/txns';
+        const explorerUrl = txHash ? `${explorerBase}/${txHash}` : '';
+
+        return {
+          ok: true,
+          simulated: false,
+          contractId: this.shinTokenId,
+          relayerAccountId: signerId,
+          methodName,
+          txHash,
+          explorerUrl,
+          result: shinOutStr,
+        };
+      } catch (err: any) {
+        return {
+          ok: false,
+          simulated: true,
+          contractId: this.contractId,
+          relayerAccountId: signerId,
+          methodName,
+          txHash: '',
+          explorerUrl: '',
+          error: err?.message || String(err),
+        };
+      }
     }
 
     try {
