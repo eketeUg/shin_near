@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
 import { nearArenaEngine } from '../services/nearArenaEngine';
 import {
   Trophy,
@@ -14,19 +15,23 @@ import {
   Users,
   Bot,
   Loader2,
+  Bell,
 } from 'lucide-react';
 import NearInspectorModal from './NearInspectorModal';
 
 interface BracketMatch {
   id: string;
-  round: 'SEMI_1' | 'SEMI_2' | 'GRAND_FINAL';
+  round: 'QF_1' | 'QF_2' | 'QF_3' | 'QF_4' | 'SEMI_1' | 'SEMI_2' | 'GRAND_FINAL';
   label: string;
+  roomCode?: string;
   p1Id: string | null;
   p1Name: string;
   p1CharId: string;
+  p1Ready?: boolean;
   p2Id: string | null;
   p2Name: string;
   p2CharId: string;
+  p2Ready?: boolean;
   winnerId?: string;
   winnerName?: string;
   status: 'WAITING' | 'READY' | 'COMPLETED';
@@ -89,6 +94,7 @@ interface AgentCupState {
 interface TournamentsFlowProps {
   onStartTournamentDuel: (duelConfig: {
     matchId: string;
+    roomCode?: string;
     p1AccountId: string;
     p2AccountId: string;
     p1Char: string;
@@ -121,10 +127,11 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [showInspectorModal, setShowInspectorModal] = useState(false);
+  const launchedMatchIdsRef = useRef<Set<string>>(new Set());
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3600);
+    setTimeout(() => setToast(null), 4000);
   };
 
   const refreshLiveTournaments = useCallback(async () => {
@@ -144,11 +151,23 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
     void refreshLiveTournaments();
     const poll = setInterval(() => {
       void refreshLiveTournaments();
-    }, 2000);
+    }, 3000);
+
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const socket = io(serverUrl, { reconnectionAttempts: 5 });
+    socket.on('tournament_updated', (payload: { humanCup?: HumanCupState; agentCup?: AgentCupState }) => {
+      if (payload?.humanCup) setHumanCup(payload.humanCup);
+      if (payload?.agentCup) setAgentCup(payload.agentCup);
+    });
+    socket.on('tournament_started', (cup: HumanCupState) => {
+      setHumanCup(cup);
+      showToast(`🏆 ${cup.title} is FULL (8/8)! Bracket is LIVE — enter your Wait Room!`);
+    });
 
     return () => {
       window.removeEventListener('nearArenaStateUpdated', sync);
       clearInterval(poll);
+      socket.disconnect();
     };
   }, [refreshLiveTournaments]);
 
@@ -177,6 +196,35 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
 
   const myAgents =
     agentCup?.enrolledAgents.filter((a) => a.ownerId === myAccountId) || [];
+
+  // Auto-launch PvP Arena for BOTH players simultaneously once both Ready Up in the Wait Room
+  useEffect(() => {
+    if (!humanCup || !myActiveHumanMatch) return;
+    if (
+      myActiveHumanMatch.p1Ready &&
+      myActiveHumanMatch.p2Ready &&
+      !launchedMatchIdsRef.current.has(myActiveHumanMatch.id)
+    ) {
+      launchedMatchIdsRef.current.add(myActiveHumanMatch.id);
+      const amP1 = myActiveHumanMatch.p1Id === myAccountId;
+      onStartTournamentDuel({
+        matchId: myActiveHumanMatch.id,
+        roomCode: myActiveHumanMatch.roomCode,
+        p1AccountId: myAccountId,
+        p2AccountId:
+          (amP1 ? myActiveHumanMatch.p2Id : myActiveHumanMatch.p1Id) || '',
+        p1Char: amP1
+          ? myActiveHumanMatch.p1CharId
+          : myActiveHumanMatch.p2CharId,
+        p2Char: amP1
+          ? myActiveHumanMatch.p2CharId
+          : myActiveHumanMatch.p1CharId,
+        p2Name: amP1 ? myActiveHumanMatch.p2Name : myActiveHumanMatch.p1Name,
+        wagerShin: humanCup.entryFeeShin,
+        isTournamentBout: true,
+      });
+    }
+  }, [humanCup, myActiveHumanMatch, myAccountId, onStartTournamentDuel]);
 
   return (
     <div className="min-h-screen w-full bg-black text-white flex flex-col overflow-y-auto">
@@ -303,7 +351,7 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                       {humanCup.title}
                     </h3>
                     <p className="text-xs text-gray-400 mt-1">
-                      Real 4-player human bracket settled on{' '}
+                      Real 8-player human bracket settled on{' '}
                       <span className="font-mono text-emerald-400">shin-arena-28d.testnet</span>.
                       Champion wins{' '}
                       <strong className="text-shin-gold">95% of the $SHIN pot</strong> directly to
@@ -337,64 +385,91 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                   </div>
                 </div>
 
-                {/* Human Bracket Matches */}
-                <div className="space-y-3">
-                  {humanCup.matches.map((m) => {
-                    const isMyMatch =
-                      m.p1Id === myAccountId || m.p2Id === myAccountId;
-                    return (
-                      <div
-                        key={m.id}
-                        className={`bg-black/75 border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                          isMyMatch
-                            ? 'border-shin-gold/60'
-                            : 'border-white/10'
-                        }`}
-                      >
-                        <div>
-                          <div className="text-[10px] font-mono text-shin-gold uppercase font-bold">
-                            {m.label} •{' '}
-                            {m.round === 'GRAND_FINAL'
-                              ? `Champion Payout: ${humanCup.winnerPayoutShin.toLocaleString()} $SHIN`
-                              : 'Winner Advances to Grand Final'}
-                          </div>
-                          <div className="text-xs sm:text-sm font-cinzel font-bold text-white mt-1 flex items-center gap-2 flex-wrap">
-                            <span
-                              className={
-                                m.winnerId && m.winnerId === m.p1Id
-                                  ? 'text-emerald-400'
-                                  : m.p1Id
-                                  ? 'text-white'
-                                  : 'text-gray-500'
-                              }
-                            >
-                              👤 {m.p1Name}
-                            </span>
-                            <span className="text-gray-500">VS</span>
-                            <span
-                              className={
-                                m.winnerId && m.winnerId === m.p2Id
-                                  ? 'text-emerald-400'
-                                  : m.p2Id
-                                  ? 'text-white'
-                                  : 'text-gray-500'
-                              }
-                            >
-                              👤 {m.p2Name}
-                            </span>
-                          </div>
-                        </div>
-
-                        <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-white/5 border border-white/10 text-gray-300 shrink-0 self-start sm:self-center">
-                          {m.status === 'COMPLETED'
-                            ? `🏆 Winner: ${m.winnerName}`
-                            : m.status === 'READY'
-                            ? '⚔️ Ready to Fight'
-                            : '⏳ Waiting for Human'}
-                        </span>
+                {/* 8-Player Human Bracket Tree (Quarterfinals -> Semifinals -> Grand Final) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {[
+                    {
+                      title: 'Quarterfinals (8 Players)',
+                      rounds: ['QF_1', 'QF_2', 'QF_3', 'QF_4'],
+                    },
+                    {
+                      title: 'Semifinals (4 Players)',
+                      rounds: ['SEMI_1', 'SEMI_2'],
+                    },
+                    {
+                      title: 'Grand Final (Championship)',
+                      rounds: ['GRAND_FINAL'],
+                    },
+                  ].map((col) => (
+                    <div key={col.title} className="space-y-2.5">
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-shin-gold/80 font-bold border-b border-white/10 pb-1.5">
+                        {col.title}
                       </div>
-                    );
-                  })}
+                      {humanCup.matches
+                        .filter((m) => col.rounds.includes(m.round))
+                        .map((m) => {
+                          const isMyMatch =
+                            m.p1Id === myAccountId || m.p2Id === myAccountId;
+                          return (
+                            <div
+                              key={m.id}
+                              className={`bg-black/75 border rounded-xl p-3 space-y-1.5 ${
+                                isMyMatch
+                                  ? 'border-shin-gold/70 shadow-[0_0_12px_rgba(251,191,36,0.15)]'
+                                  : 'border-white/10'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-mono text-shin-gold uppercase font-bold">
+                                  {m.label}
+                                </span>
+                                <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-300">
+                                  {m.status === 'COMPLETED'
+                                    ? `🏆 ${m.winnerName}`
+                                    : m.status === 'READY'
+                                    ? '⚔️ Ready'
+                                    : '⏳ Waiting'}
+                                </span>
+                              </div>
+                              <div className="text-xs font-cinzel font-bold space-y-1">
+                                <div
+                                  className={`flex items-center justify-between ${
+                                    m.winnerId && m.winnerId === m.p1Id
+                                      ? 'text-emerald-400'
+                                      : m.p1Id
+                                      ? 'text-white'
+                                      : 'text-gray-500'
+                                  }`}
+                                >
+                                  <span>👤 {m.p1Name}</span>
+                                  {m.status === 'READY' && (
+                                    <span className="text-[9px] font-mono">
+                                      {m.p1Ready ? '✅ Ready' : '⏳ Wait'}
+                                    </span>
+                                  )}
+                                </div>
+                                <div
+                                  className={`flex items-center justify-between ${
+                                    m.winnerId && m.winnerId === m.p2Id
+                                      ? 'text-emerald-400'
+                                      : m.p2Id
+                                      ? 'text-white'
+                                      : 'text-gray-500'
+                                  }`}
+                                >
+                                  <span>👤 {m.p2Name}</span>
+                                  {m.status === 'READY' && (
+                                    <span className="text-[9px] font-mono">
+                                      {m.p2Ready ? '✅ Ready' : '⏳ Wait'}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ))}
                 </div>
 
                 {/* Human Tournament Controls */}
@@ -484,38 +559,87 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                           <Trophy size={15} />
                         )}
                         {humanCup.entrants.length >= humanCup.maxPlayers
-                          ? 'Bracket Full (4/4 Humans)'
+                          ? `Bracket Full (${humanCup.maxPlayers}/${humanCup.maxPlayers} Humans)`
                           : `Stake ${humanCup.entryFeeShin.toLocaleString()} $SHIN On-Chain & Join Human Cup`}
                       </button>
                     </div>
                   ) : myActiveHumanMatch ? (
-                    <button
-                      onClick={() => {
-                        const amP1 = myActiveHumanMatch.p1Id === myAccountId;
-                        onStartTournamentDuel({
-                          matchId: myActiveHumanMatch.id,
-                          p1AccountId: myAccountId,
-                          p2AccountId:
-                            (amP1
-                              ? myActiveHumanMatch.p2Id
-                              : myActiveHumanMatch.p1Id) || '',
-                          p1Char: amP1
-                            ? myActiveHumanMatch.p1CharId
-                            : myActiveHumanMatch.p2CharId,
-                          p2Char: amP1
-                            ? myActiveHumanMatch.p2CharId
-                            : myActiveHumanMatch.p1CharId,
-                          p2Name: amP1
-                            ? myActiveHumanMatch.p2Name
-                            : myActiveHumanMatch.p1Name,
-                          wagerShin: humanCup.entryFeeShin,
-                          isTournamentBout: true,
-                        });
-                      }}
-                      className="w-full py-3.5 bg-shin-red hover:bg-red-600 text-white font-cinzel font-black text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Swords size={15} /> Fight Your {myActiveHumanMatch.label} in 2D Arena Now
-                    </button>
+                    (() => {
+                      const amP1 = myActiveHumanMatch.p1Id === myAccountId;
+                      const myReady = amP1
+                        ? !!myActiveHumanMatch.p1Ready
+                        : !!myActiveHumanMatch.p2Ready;
+                      const oppReady = amP1
+                        ? !!myActiveHumanMatch.p2Ready
+                        : !!myActiveHumanMatch.p1Ready;
+                      const oppName = amP1
+                        ? myActiveHumanMatch.p2Name
+                        : myActiveHumanMatch.p1Name;
+                      return (
+                        <div className="bg-red-950/30 border-2 border-shin-red/60 rounded-2xl p-4 space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <div className="text-xs font-cinzel font-black text-shin-gold uppercase flex items-center gap-1.5">
+                                <Bell size={14} className="text-shin-red" /> Tournament Wait Room •{' '}
+                                {myActiveHumanMatch.label}
+                              </div>
+                              <p className="text-[11px] font-mono text-gray-300 mt-0.5">
+                                Matched vs <strong className="text-white">{oppName}</strong> • Room{' '}
+                                <span className="text-emerald-400">{myActiveHumanMatch.roomCode}</span>
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] font-mono">
+                              <span
+                                className={`px-2.5 py-1 rounded border ${
+                                  myReady
+                                    ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                                    : 'bg-white/5 border-white/10 text-gray-300'
+                                }`}
+                              >
+                                You: {myReady ? '✅ Ready' : '⏳ Not Ready'}
+                              </span>
+                              <span
+                                className={`px-2.5 py-1 rounded border ${
+                                  oppReady
+                                    ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                                    : 'bg-white/5 border-white/10 text-gray-300'
+                                }`}
+                              >
+                                {oppName}: {oppReady ? '✅ Ready' : '⏳ Waiting'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            disabled={isSubmitting}
+                            onClick={async () => {
+                              setIsSubmitting(true);
+                              try {
+                                const updated = await nearArenaEngine.setHumanMatchReady(
+                                  myActiveHumanMatch.id,
+                                  !myReady,
+                                );
+                                setHumanCup(updated);
+                              } catch (e: any) {
+                                showToast(e.message);
+                              } finally {
+                                setIsSubmitting(false);
+                              }
+                            }}
+                            className={`w-full py-3.5 font-cinzel font-black text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                              myReady
+                                ? 'bg-white/10 hover:bg-white/15 border border-white/20 text-gray-200'
+                                : 'bg-shin-red hover:bg-red-600 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)]'
+                            }`}
+                          >
+                            <Swords size={15} />
+                            {myReady
+                              ? `Waiting for ${oppName} to Ready Up... (Click to Cancel)`
+                              : `Ready Up in Wait Room (Auto-Joins Arena with ${oppName})`}
+                          </button>
+                        </div>
+                      );
+                    })()
                   ) : myWaitingHumanMatch ? (
                     <div className="w-full py-3 px-4 bg-white/5 border border-shin-gold/30 rounded-xl text-center text-xs font-mono text-shin-gold">
                       ⏳ You are entered in {myWaitingHumanMatch.label}. Waiting for another human player to join on-chain!

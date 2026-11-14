@@ -1,16 +1,20 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import type { Server } from 'socket.io';
 import { NearRelayerService } from './near-relayer.service';
 
 export interface TournamentBracketMatch {
   id: string;
-  round: 'SEMI_1' | 'SEMI_2' | 'GRAND_FINAL';
+  round: 'QF_1' | 'QF_2' | 'QF_3' | 'QF_4' | 'SEMI_1' | 'SEMI_2' | 'GRAND_FINAL';
   label: string;
+  roomCode?: string;
   p1Id: string | null;
   p1Name: string;
   p1CharId: string;
+  p1Ready?: boolean;
   p2Id: string | null;
   p2Name: string;
   p2CharId: string;
+  p2Ready?: boolean;
   winnerId?: string;
   winnerName?: string;
   status: 'WAITING' | 'READY' | 'COMPLETED';
@@ -97,13 +101,24 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
   private tickInterval: NodeJS.Timeout | null = null;
   private nextRoundAt = Date.now() + 15000;
   private isAdvancingAgentCup = false;
+  private ioServer: Server | null = null;
 
   private readonly HUMAN_ENTRY_SHIN = 500;
+  private readonly HUMAN_MAX_PLAYERS = 8;
   private readonly AGENT_ENTRY_SHIN = 500;
   private readonly ROUND_DURATION_MS = 15000;
   private readonly REST_DURATION_SEC = 120;
 
   constructor(private readonly nearRelayer: NearRelayerService) {}
+
+  public registerGatewayServer(server: Server) {
+    this.ioServer = server;
+  }
+
+  private broadcastTournamentUpdate() {
+    if (!this.ioServer) return;
+    this.ioServer.emit('tournament_updated', this.getState());
+  }
 
   async onModuleInit() {
     this.humanCup = this.buildFreshHumanCup(1);
@@ -127,51 +142,121 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
 
   private buildFreshHumanCup(cupNumber: number): HumanCupState {
     const tournamentId = `human-cup-${cupNumber}-${Date.now().toString(36)}`;
+    const mkRoom = (id: string) => `T${cupNumber}-${id}`.toUpperCase();
     return {
       cupNumber,
       tournamentId,
       title: `Blood-Moon Human Championship #${cupNumber}`,
       entryFeeShin: this.HUMAN_ENTRY_SHIN,
-      maxPlayers: 4,
+      maxPlayers: this.HUMAN_MAX_PLAYERS,
       status: 'REGISTRATION',
       entrants: [],
       totalPoolShin: 0,
       winnerPayoutShin: 0,
       matches: [
         {
+          id: 'human-qf-1',
+          round: 'QF_1',
+          label: 'Quarterfinal 1',
+          roomCode: mkRoom('QF1'),
+          p1Id: null,
+          p1Name: 'Open Slot #1',
+          p1CharId: 'fighter',
+          p1Ready: false,
+          p2Id: null,
+          p2Name: 'Open Slot #2',
+          p2CharId: 'shinobi',
+          p2Ready: false,
+          status: 'WAITING',
+        },
+        {
+          id: 'human-qf-2',
+          round: 'QF_2',
+          label: 'Quarterfinal 2',
+          roomCode: mkRoom('QF2'),
+          p1Id: null,
+          p1Name: 'Open Slot #3',
+          p1CharId: 'kunoichi',
+          p1Ready: false,
+          p2Id: null,
+          p2Name: 'Open Slot #4',
+          p2CharId: 'samurai',
+          p2Ready: false,
+          status: 'WAITING',
+        },
+        {
+          id: 'human-qf-3',
+          round: 'QF_3',
+          label: 'Quarterfinal 3',
+          roomCode: mkRoom('QF3'),
+          p1Id: null,
+          p1Name: 'Open Slot #5',
+          p1CharId: 'fighter',
+          p1Ready: false,
+          p2Id: null,
+          p2Name: 'Open Slot #6',
+          p2CharId: 'shinobi',
+          p2Ready: false,
+          status: 'WAITING',
+        },
+        {
+          id: 'human-qf-4',
+          round: 'QF_4',
+          label: 'Quarterfinal 4',
+          roomCode: mkRoom('QF4'),
+          p1Id: null,
+          p1Name: 'Open Slot #7',
+          p1CharId: 'kunoichi',
+          p1Ready: false,
+          p2Id: null,
+          p2Name: 'Open Slot #8',
+          p2CharId: 'samurai',
+          p2Ready: false,
+          status: 'WAITING',
+        },
+        {
           id: 'human-semi-1',
           round: 'SEMI_1',
-          label: 'Human Semifinal A',
+          label: 'Semifinal A',
+          roomCode: mkRoom('SF1'),
           p1Id: null,
-          p1Name: 'Open Human Slot #1',
+          p1Name: 'Winner QF 1',
           p1CharId: 'fighter',
+          p1Ready: false,
           p2Id: null,
-          p2Name: 'Open Human Slot #2',
-          p2CharId: 'shinobi',
+          p2Name: 'Winner QF 2',
+          p2CharId: 'kunoichi',
+          p2Ready: false,
           status: 'WAITING',
         },
         {
           id: 'human-semi-2',
           round: 'SEMI_2',
-          label: 'Human Semifinal B',
+          label: 'Semifinal B',
+          roomCode: mkRoom('SF2'),
           p1Id: null,
-          p1Name: 'Open Human Slot #3',
-          p1CharId: 'kunoichi',
+          p1Name: 'Winner QF 3',
+          p1CharId: 'fighter',
+          p1Ready: false,
           p2Id: null,
-          p2Name: 'Open Human Slot #4',
-          p2CharId: 'samurai',
+          p2Name: 'Winner QF 4',
+          p2CharId: 'kunoichi',
+          p2Ready: false,
           status: 'WAITING',
         },
         {
           id: 'human-final',
           round: 'GRAND_FINAL',
-          label: 'Human Grand Final',
+          label: 'Grand Final',
+          roomCode: mkRoom('FINAL'),
           p1Id: null,
-          p1Name: 'Winner of Semifinal A',
+          p1Name: 'Winner Semifinal A',
           p1CharId: 'fighter',
+          p1Ready: false,
           p2Id: null,
-          p2Name: 'Winner of Semifinal B',
+          p2Name: 'Winner Semifinal B',
           p2CharId: 'shinobi',
+          p2Ready: false,
           status: 'WAITING',
         },
       ],
@@ -280,7 +365,9 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
       return this.humanCup;
     }
     if (this.humanCup.entrants.length >= this.humanCup.maxPlayers) {
-      throw new Error('Human Championship bracket is full (4/4 players).');
+      throw new Error(
+        `Human Championship bracket is full (${this.humanCup.maxPlayers}/${this.humanCup.maxPlayers} players).`,
+      );
     }
 
     const entrant: HumanEntrant = {
@@ -295,30 +382,47 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
     this.humanCup.winnerPayoutShin = Math.round(this.humanCup.totalPoolShin * 0.95);
 
     const idx = this.humanCup.entrants.length - 1;
-    const semi1 = this.humanCup.matches[0];
-    const semi2 = this.humanCup.matches[1];
-
-    if (idx === 0) {
-      semi1.p1Id = entrant.accountId;
-      semi1.p1Name = entrant.username;
-      semi1.p1CharId = entrant.charId;
-    } else if (idx === 1) {
-      semi1.p2Id = entrant.accountId;
-      semi1.p2Name = entrant.username;
-      semi1.p2CharId = entrant.charId;
-      semi1.status = 'READY';
-    } else if (idx === 2) {
-      semi2.p1Id = entrant.accountId;
-      semi2.p1Name = entrant.username;
-      semi2.p1CharId = entrant.charId;
-    } else if (idx === 3) {
-      semi2.p2Id = entrant.accountId;
-      semi2.p2Name = entrant.username;
-      semi2.p2CharId = entrant.charId;
-      semi2.status = 'READY';
-      this.humanCup.status = 'IN_PROGRESS';
+    const matchIndex = Math.floor(idx / 2); // 0..3 -> QF_1..QF_4
+    const targetMatch = this.humanCup.matches[matchIndex];
+    if (idx % 2 === 0) {
+      targetMatch.p1Id = entrant.accountId;
+      targetMatch.p1Name = entrant.username;
+      targetMatch.p1CharId = entrant.charId;
+    } else {
+      targetMatch.p2Id = entrant.accountId;
+      targetMatch.p2Name = entrant.username;
+      targetMatch.p2CharId = entrant.charId;
+      targetMatch.status = 'READY';
     }
 
+    if (this.humanCup.entrants.length >= this.humanCup.maxPlayers) {
+      this.humanCup.status = 'IN_PROGRESS';
+      if (this.ioServer) {
+        this.ioServer.emit('tournament_started', this.humanCup);
+      }
+    }
+
+    this.broadcastTournamentUpdate();
+    return this.humanCup;
+  }
+
+  public setHumanMatchReady(params: {
+    matchId: string;
+    accountId: string;
+    ready: boolean;
+  }): HumanCupState {
+    const match = this.humanCup.matches.find((m) => m.id === params.matchId);
+    if (!match) {
+      throw new Error('Tournament match not found.');
+    }
+    if (match.p1Id === params.accountId) {
+      match.p1Ready = params.ready;
+    } else if (match.p2Id === params.accountId) {
+      match.p2Ready = params.ready;
+    } else {
+      throw new Error('You are not a participant in this match.');
+    }
+    this.broadcastTournamentUpdate();
     return this.humanCup;
   }
 
@@ -345,8 +449,27 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
     match.winnerName = winnerName;
     match.status = 'COMPLETED';
 
-    const finalMatch = this.humanCup.matches[2];
-    if (match.round === 'SEMI_1') {
+    const semi1 = this.humanCup.matches[4];
+    const semi2 = this.humanCup.matches[5];
+    const finalMatch = this.humanCup.matches[6];
+
+    if (match.round === 'QF_1') {
+      semi1.p1Id = params.winnerAccountId;
+      semi1.p1Name = winnerName;
+      semi1.p1CharId = winnerChar;
+    } else if (match.round === 'QF_2') {
+      semi1.p2Id = params.winnerAccountId;
+      semi1.p2Name = winnerName;
+      semi1.p2CharId = winnerChar;
+    } else if (match.round === 'QF_3') {
+      semi2.p1Id = params.winnerAccountId;
+      semi2.p1Name = winnerName;
+      semi2.p1CharId = winnerChar;
+    } else if (match.round === 'QF_4') {
+      semi2.p2Id = params.winnerAccountId;
+      semi2.p2Name = winnerName;
+      semi2.p2CharId = winnerChar;
+    } else if (match.round === 'SEMI_1') {
       finalMatch.p1Id = params.winnerAccountId;
       finalMatch.p1Name = winnerName;
       finalMatch.p1CharId = winnerChar;
@@ -356,8 +479,10 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
       finalMatch.p2CharId = winnerChar;
     }
 
-    if (finalMatch.p1Id && finalMatch.p2Id && finalMatch.status === 'WAITING') {
-      finalMatch.status = 'READY';
+    for (const nextM of [semi1, semi2, finalMatch]) {
+      if (nextM.p1Id && nextM.p2Id && nextM.status === 'WAITING') {
+        nextM.status = 'READY';
+      }
     }
 
     if (match.round === 'GRAND_FINAL') {
@@ -379,6 +504,7 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
+    this.broadcastTournamentUpdate();
     return this.humanCup;
   }
 
@@ -388,6 +514,7 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
     }
     this.humanCup = this.buildFreshHumanCup(this.humanCup.cupNumber + 1);
     await this.ensureHumanCupOnChain();
+    this.broadcastTournamentUpdate();
     return this.humanCup;
   }
 

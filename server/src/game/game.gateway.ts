@@ -11,6 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { GameService } from './game.service';
 import { LobbyChatService } from './lobby-chat.service';
 import { NearRelayerService } from './near-relayer.service';
+import { TournamentService } from './tournament.service';
 import { createHash } from 'crypto';
 
 const NEAR_ARENA_CONTRACT_ID =
@@ -63,7 +64,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly gameService: GameService,
     private readonly nearRelayer: NearRelayerService,
     private readonly lobbyChatService: LobbyChatService,
+    private readonly tournamentService: TournamentService,
   ) {}
+
+  afterInit(server: Server) {
+    this.tournamentService.registerGatewayServer(server);
+  }
 
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);

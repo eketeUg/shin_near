@@ -3667,6 +3667,22 @@ class NearArenaEngine {
     return data.humanCup;
   }
 
+  public async setHumanMatchReady(matchId: string, ready: boolean) {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(`${serverUrl}/api/tournaments/human/ready`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matchId,
+        accountId: this.state.playerWallet.accountId,
+        ready,
+      }),
+    });
+    const data = await res.json();
+    if (!data?.ok) throw new Error(data?.error || 'Failed to update wait room ready state');
+    return data.humanCup;
+  }
+
   public async setAgentTournamentEnrollment(tokenId: string, enrolled: boolean) {
     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
     const res = await fetch(`${serverUrl}/api/tournaments/agent/enrollment`, {

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Volume2, VolumeX } from 'lucide-react';
+import { Volume2, VolumeX, Trophy } from 'lucide-react';
+import { io } from 'socket.io-client';
 import GameCanvasWrapper from './components/GameCanvasWrapper';
 import LoadingScreen from './components/LoadingScreen';
 import MainMenu from './components/MainMenu';
@@ -53,6 +54,11 @@ export default function Home() {
     p1AccountId: string;
     p2AccountId: string;
   } | null>(null);
+  const [tourneyAlert, setTourneyAlert] = useState<{
+    title: string;
+    matchLabel: string;
+    opponentName: string;
+  } | null>(null);
 
   useEffect(() => {
     const onGameOver = (e: Event) => {
@@ -72,6 +78,38 @@ export default function Home() {
     };
     window.addEventListener('gameOver', onGameOver);
     return () => window.removeEventListener('gameOver', onGameOver);
+  }, []);
+
+  useEffect(() => {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const socket = io(serverUrl, { reconnectionAttempts: 5 });
+
+    const checkMyReadyMatch = (cup: any) => {
+      if (!cup?.matches) return;
+      const myAcct = nearArenaEngine.getState().playerWallet.accountId;
+      const myMatch = cup.matches.find(
+        (m: any) =>
+          m.status === 'READY' && (m.p1Id === myAcct || m.p2Id === myAcct),
+      );
+      if (myMatch) {
+        const opponentName =
+          myMatch.p1Id === myAcct ? myMatch.p2Name : myMatch.p1Name;
+        setTourneyAlert({
+          title: cup.title,
+          matchLabel: myMatch.label,
+          opponentName,
+        });
+      }
+    };
+
+    socket.on('tournament_started', (cup: any) => checkMyReadyMatch(cup));
+    socket.on('tournament_updated', (payload: any) => {
+      if (payload?.humanCup) checkMyReadyMatch(payload.humanCup);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
   const [orientationPreference, setOrientationPreference] = useState<
     'AUTO_HYBRID' | 'FORCE_LANDSCAPE' | 'FORCE_PORTRAIT'
@@ -612,6 +650,40 @@ export default function Home() {
         />
       )}
 
+      {/* Global Tournament Bracket Ready Notification */}
+      {!isLoading && tourneyAlert && !showTournaments && !showMatchmaking && !isGameStarted && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] max-w-lg w-[92%] bg-gray-950/95 border-2 border-shin-gold rounded-2xl px-4 py-3 shadow-[0_0_30px_rgba(251,191,36,0.4)] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Trophy size={18} className="text-shin-gold shrink-0" />
+            <div className="min-w-0">
+              <div className="text-xs font-cinzel font-black text-shin-gold uppercase truncate">
+                {tourneyAlert.title} — {tourneyAlert.matchLabel} Ready!
+              </div>
+              <div className="text-[11px] font-mono text-gray-200 truncate">
+                Paired vs <strong className="text-white">{tourneyAlert.opponentName}</strong>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setTourneyAlert(null);
+                setShowTournaments(true);
+              }}
+              className="px-3 py-1.5 bg-shin-gold text-black font-cinzel font-black text-[10px] uppercase rounded-lg cursor-pointer"
+            >
+              Wait Room
+            </button>
+            <button
+              onClick={() => setTourneyAlert(null)}
+              className="text-gray-400 hover:text-white text-xs px-1.5 py-1 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Dedicated Humans-Only & Continuous Agent-Only Tournaments Flow */}
       {!isLoading && showTournaments && (
         <TournamentsFlow
@@ -621,18 +693,26 @@ export default function Home() {
               p1AccountId: duelConfig.p1AccountId,
               p2AccountId: duelConfig.p2AccountId,
             };
+            setTourneyAlert(null);
             setShowTournaments(false);
-            startPlayerFightWithLandscapeGate({
-              mode: 'PVE',
-              p1: duelConfig.p1Char,
-              p2: duelConfig.p2Char,
-              p1Name: username,
-              p2Name: duelConfig.p2Name,
-              difficulty: 'HARD',
-              rounds: 1,
-              wager: { token: 'SHIN', amount: duelConfig.wagerShin },
-              isTournamentBout: duelConfig.isTournamentBout,
-            });
+            if (duelConfig.roomCode) {
+              setWager({ token: 'SHIN', amount: duelConfig.wagerShin });
+              setMatchmakingP1Char(duelConfig.p1Char as CharacterId);
+              setMatchmakingRoomCode(duelConfig.roomCode);
+              setShowMatchmaking(true);
+            } else {
+              startPlayerFightWithLandscapeGate({
+                mode: 'PVE',
+                p1: duelConfig.p1Char,
+                p2: duelConfig.p2Char,
+                p1Name: username,
+                p2Name: duelConfig.p2Name,
+                difficulty: 'HARD',
+                rounds: 1,
+                wager: { token: 'SHIN', amount: duelConfig.wagerShin },
+                isTournamentBout: duelConfig.isTournamentBout,
+              });
+            }
           }}
           onBack={() => setShowTournaments(false)}
           onHome={handleHome}

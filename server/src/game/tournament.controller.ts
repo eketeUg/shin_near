@@ -49,6 +49,21 @@ export class TournamentController {
     }
   }
 
+  @Post('human/ready')
+  setHumanMatchReady(
+    @Body() body: { matchId: string; accountId: string; ready: boolean },
+  ) {
+    try {
+      const humanCup = this.tournamentService.setHumanMatchReady(body);
+      return { ok: true, humanCup };
+    } catch (err: unknown) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
   @Post('human/next-cup')
   async openNextHumanCup() {
     try {
