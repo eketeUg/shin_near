@@ -23,7 +23,6 @@ import {
   Sparkles,
   Store,
   ScrollText,
-  ExternalLink,
   CheckCircle2,
   Swords,
   Terminal,
@@ -48,12 +47,10 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
   const [activeTab, setActiveTab] = useState<'LIVE_ARENA' | 'MY_AGENTS' | 'DOJO_MARKET' | 'LEDGER'>(
     initialTab,
   );
-  const [showNearUnderHood, setShowNearUnderHood] = useState<boolean>(false);
   const [showInspectorModal, setShowInspectorModal] = useState<boolean>(false);
   const [selectedFighterId, setSelectedFighterId] = useState<string>(
     () => nearArenaEngine.getState().fighters.find((f) => !f.isNpc)?.tokenId || '',
   );
-  const [fundAmount, setFundAmount] = useState<string>('5');
   const [withdrawAmount, setWithdrawAmount] = useState<string>('2');
   const [listPrice, setListPrice] = useState<string>('15');
   const [betAmounts, setBetAmounts] = useState<Record<string, number>>({});
@@ -204,7 +201,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
             <Coins size={14} className="text-shin-gold shrink-0" />
             <div>
               <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider truncate max-w-[90px] sm:max-w-none">
-                {showNearUnderHood ? arenaState.playerWallet.accountId : 'SHIN Pouch'}
+                SHIN Pouch
               </div>
               <div className="text-[11px] sm:text-sm font-mono font-bold text-shin-gold">
                 {Math.round(arenaState.playerWallet.NEAR * 1000).toLocaleString()} $SHIN
@@ -363,11 +360,6 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         <div className="text-[8px] sm:text-[10px] text-shin-gold font-mono font-bold truncate w-full">
                           Lv.{match.p1.powerLevel} • {match.p1.wins}W/{match.p1.losses}L
                         </div>
-                        {showNearUnderHood && (
-                          <div className="text-[8px] text-emerald-400 font-mono truncate w-full mt-0.5">
-                            {match.p1.agentWalletId}
-                          </div>
-                        )}
                       </div>
 
                       {/* VS Emblem */}
@@ -393,11 +385,6 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         <div className="text-[8px] sm:text-[10px] text-red-400 font-mono font-bold truncate w-full">
                           Lv.{match.p2.powerLevel} • {match.p2.wins}W/{match.p2.losses}L
                         </div>
-                        {showNearUnderHood && (
-                          <div className="text-[8px] text-emerald-400 font-mono truncate w-full mt-0.5">
-                            {match.p2.agentWalletId}
-                          </div>
-                        )}
                       </div>
                     </div>
 
@@ -528,11 +515,6 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                             LV.{fighter.powerLevel}
                           </span>
                         </div>
-                        {showNearUnderHood && (
-                          <div className="text-[9px] text-emerald-400 font-mono truncate mt-0.5">
-                            {fighter.agentWalletId}
-                          </div>
-                        )}
                         <div className="flex items-center justify-between mt-2 text-xs font-mono">
                           <span className="text-shin-gold font-bold">
                             Pouch: {Math.round(fighter.vaultBalanceNear * 1000).toLocaleString()} $SHIN
@@ -570,20 +552,6 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                           LV.{selectedFighter.powerLevel}
                         </span>
                       </div>
-                      {showNearUnderHood && (
-                        <div className="text-xs font-mono text-gray-400 mt-1 flex items-center gap-2">
-                          <span>Sub-Account Wallet:</span>
-                          <span className="text-emerald-400">{selectedFighter.agentWalletId}</span>
-                          <a
-                            href={`https://testnet.nearblocks.io/address/${selectedFighter.agentWalletId}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-400 hover:underline inline-flex items-center gap-0.5"
-                          >
-                            Explorer <ExternalLink size={11} />
-                          </a>
-                        </div>
-                      )}
                       <div className="flex flex-wrap gap-4 mt-2.5 text-xs font-mono text-gray-300">
                         <span>
                           ATK: <strong className="text-red-400">{selectedFighter.atk}</strong>
@@ -1094,11 +1062,6 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                               {merchant.name}
                             </h3>
                             <p className="text-[11px] text-gray-400">{merchant.specialty}</p>
-                            {showNearUnderHood && (
-                              <div className="text-[10px] font-mono text-shin-gold mt-0.5">
-                                Agent Wallet: {merchant.walletId}
-                              </div>
-                            )}
                           </div>
                         </div>
 
@@ -1202,14 +1165,11 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                   </strong>{' '}
                                   • You Hold:{' '}
                                   <strong className="text-shin-gold">{playerOwnedQty}x</strong>
-                                  {showNearUnderHood && (
-                                    <span className="text-purple-300 ml-2">({item.tokenId})</span>
-                                  )}
                                 </div>
                               </div>
 
                               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                                {/* Buy from NPC button */}
+                                {/* Buy from NPC button (relays $SHIN on-chain for Dojo scrolls) */}
                                 <button
                                   onClick={() => {
                                     try {
@@ -1221,6 +1181,21 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                           ? selectedFighter?.tokenId
                                           : undefined,
                                       );
+                                      if (item.category === 'SCROLL' && selectedFighter) {
+                                        const shinPrice = Math.round(item.askPriceNear * 1000);
+                                        const scrollType =
+                                          item.tokenId === 'scroll:crimson-katana'
+                                            ? 'ATK'
+                                            : item.tokenId === 'scroll:iron-posture'
+                                              ? 'DEF'
+                                              : 'SPD';
+                                        void nearArenaEngine.buyDojoScrollWithShin(
+                                          merchant.merchantId,
+                                          selectedFighter.tokenId,
+                                          scrollType,
+                                          shinPrice,
+                                        );
+                                      }
                                       setArenaState({ ...nearArenaEngine.getState() });
                                       showToast(
                                         item.category === 'SCROLL' && selectedFighter
@@ -1236,37 +1211,6 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                 >
                                   Buy ({Math.round(item.askPriceNear * 1000).toLocaleString()} $SHIN)
                                 </button>
-
-                                {/* Buy with $SHIN (Default Economy Currency) */}
-                                {item.category === 'SCROLL' && selectedFighter && (
-                                  <button
-                                    onClick={async () => {
-                                      const shinPrice = Math.round(item.askPriceNear * 1000);
-                                      const scrollType =
-                                        item.tokenId === 'scroll:crimson-katana'
-                                          ? 'ATK'
-                                          : item.tokenId === 'scroll:iron-posture'
-                                            ? 'DEF'
-                                            : 'SPD';
-                                      const res = await nearArenaEngine.buyDojoScrollWithShin(
-                                        merchant.merchantId,
-                                        selectedFighter.tokenId,
-                                        scrollType,
-                                        shinPrice,
-                                      );
-                                      setArenaState({ ...nearArenaEngine.getState() });
-                                      showToast(
-                                        res.ok
-                                          ? `📜 Paid ${shinPrice} $SHIN to ${merchant.name} & trained ${selectedFighter.title}!`
-                                          : res.error || '$SHIN purchase failed',
-                                      );
-                                    }}
-                                    disabled={!merchant.isShopOpen || item.stock <= 0}
-                                    className="px-3 py-1.5 bg-amber-500/20 border border-amber-400/50 text-amber-300 font-cinzel font-black text-[10px] uppercase rounded-lg hover:bg-amber-500/30 disabled:opacity-40 cursor-pointer"
-                                  >
-                                    Pay {Math.round(item.askPriceNear * 1000)} $SHIN
-                                  </button>
-                                )}
 
                                 {/* Sell 1x to NPC button */}
                                 <button

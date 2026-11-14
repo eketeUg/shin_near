@@ -4,7 +4,7 @@
  * ============================================================================
  * Structured in a single readable configuration file per Track 09 (`09-games.md`):
  * - All items use NEP-245 Multi-Token IDs (`material:*`, `scroll:*`).
- * - Each NPC merchant is an autonomous agent with its own `.shin-arena.testnet`
+ * - Each NPC merchant is an autonomous agent with its own `.shin-arena-28d.testnet`
  *   wallet, NEP-245 inventory stock, and dynamic supply/demand pricing engine.
  * - Flooding a merchant with materials drives prices down and drains their NEAR
  *   wallet. If a merchant's wallet drops below `insolvencyThresholdNear`, the
@@ -108,7 +108,7 @@ export const NPC_MERCHANT_CONFIGS: NpcMerchantConfig[] = [
     merchantId: 'hanzo-dojo',
     name: 'Grandmaster Hanzo',
     title: 'Shadow Clan Scroll Merchant',
-    walletId: 'hanzo-dojo-npc.shin-arena.testnet',
+    walletId: 'hanzo-dojo-npc.shin-arena-28d.testnet',
     avatarGif: '/assets/Shin_gifs/Shinobi_AllActions.gif',
     specialty: 'Sells NEP-245 Shinobi Scrolls & buys Blood-Moon Spirit Embers',
     initialWalletNear: 12.0,
@@ -166,7 +166,7 @@ export const NPC_MERCHANT_CONFIGS: NpcMerchantConfig[] = [
     merchantId: 'kenji-forge',
     name: 'Master Blacksmith Kenji',
     title: 'Tamahagane Iron & Armory Agent',
-    walletId: 'kenji-forge-npc.shin-arena.testnet',
+    walletId: 'kenji-forge-npc.shin-arena-28d.testnet',
     avatarGif: '/assets/Shin_gifs/Samurai_AllActions.gif',
     specialty: 'Buys & trades Tamahagane Shadow Steel and forges Katana/Armor Scrolls',
     initialWalletNear: 6.5,

@@ -362,7 +362,7 @@ export default function AuthModal({
               required
             />
             <p className="text-[10px] text-emerald-400 font-mono text-center mt-2">
-              Creates: {(warriorName.trim() || 'warrior').toLowerCase().replace(/[^a-z0-9]/g, '')}.shin-arena.testnet
+              Warrior ID: {(warriorName.trim() || 'warrior').toLowerCase().replace(/[^a-z0-9]/g, '')}.shin-arena-28d.testnet
             </p>
           </div>
 
@@ -370,7 +370,7 @@ export default function AuthModal({
             type="submit"
             className="w-full py-4 bg-shin-gold hover:bg-yellow-400 text-black font-black tracking-[0.2em] uppercase text-sm rounded-lg cursor-pointer shadow-[0_0_20px_rgba(212,175,55,0.5)]"
           >
-            ENTER ARENA (+25 NEAR TESTNET)
+            ENTER DOJO (+25,000 $SHIN)
           </button>
         </form>
       )}

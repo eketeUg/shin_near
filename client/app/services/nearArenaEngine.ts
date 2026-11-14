@@ -362,7 +362,7 @@ export const AGENT_PERSONALITY_ARCHETYPES: {
     desc: 'Fights strictly for NEAR & Tamahagane Steel spoils. Always calculating odds, pot sizes, and War Chest profit.',
     defaultGreeting: 'My katana only leaves its scabbard for real NEAR. Show me the pot.',
     defaultChallengeReply: 'The NEAR escrow looks good. Let’s settle this contract in the pit!',
-    defaultVictoryLine: 'Another bounty collected straight into my .agent.shin-arena.testnet vault.',
+    defaultVictoryLine: 'Another bounty collected straight into my .agent.shin-arena-28d.testnet vault.',
   },
   {
     id: 'MYSTIC_SAGE',
@@ -428,10 +428,10 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     charId: 'samurai_commander',
     name: 'Commander',
     title: 'Shogun Takeshi',
-    ownerAccountId: 'arena-dao.shin-arena.testnet',
+    ownerAccountId: 'arena-dao.shin-arena-28d.testnet',
     ownerName: 'Shadow Clan Guild',
     isNpc: true,
-    agentWalletId: 'takeshi-npc.agent.shin-arena.testnet',
+    agentWalletId: 'takeshi-npc.agent.shin-arena-28d.testnet',
     implicitHexAddress: 'a81f9c2e40b17d33e89c4f12a09b6c77d12e8f34a90b12c3d4e5f6a7b8c9d0e1',
     vaultBalanceNear: 48.5,
     wagerPerFightNear: 2.0,
@@ -462,10 +462,10 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     charId: 'kunoichi',
     name: 'Kunoichi',
     title: 'Lady Akatsuki',
-    ownerAccountId: 'arena-dao.shin-arena.testnet',
+    ownerAccountId: 'arena-dao.shin-arena-28d.testnet',
     ownerName: 'Shadow Clan Guild',
     isNpc: true,
-    agentWalletId: 'akatsuki-npc.agent.shin-arena.testnet',
+    agentWalletId: 'akatsuki-npc.agent.shin-arena-28d.testnet',
     implicitHexAddress: 'b92e8d1f51c28e44f90d5a23b10c7d88e23f9a45b01c23d4e5f6a7b8c9d0e1f2',
     vaultBalanceNear: 39.2,
     wagerPerFightNear: 2.0,
@@ -496,10 +496,10 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     charId: 'knight_1',
     name: 'Knight',
     title: 'Kenshin Ironclad',
-    ownerAccountId: 'arena-dao.shin-arena.testnet',
+    ownerAccountId: 'arena-dao.shin-arena-28d.testnet',
     ownerName: 'Shadow Clan Guild',
     isNpc: true,
-    agentWalletId: 'kenshin-npc.agent.shin-arena.testnet',
+    agentWalletId: 'kenshin-npc.agent.shin-arena-28d.testnet',
     implicitHexAddress: 'c73f7e2a62d39f55a01e6b34c21d8e99f34a0b56c12d34e5f6a7b8c9d0e1f2a3',
     vaultBalanceNear: 52.0,
     wagerPerFightNear: 3.0,
@@ -510,7 +510,7 @@ const INITIAL_NPCS: FighterNftAsset[] = [
       archetype: 'MERCENARY_BOUNTY',
       greetingLine: 'Tamahagane armor isn’t cheap. Put real NEAR on the table if you want a duel.',
       challengeAcceptLine: 'Escrow locked. My iron guard will crush your stance and take the pot.',
-      victoryLine: 'Contract complete. Another bounty added to kenshin-npc.agent.shin-arena.testnet.',
+      victoryLine: 'Contract complete. Another bounty added to kenshin-npc.agent.shin-arena-28d.testnet.',
       minWagerNear: 1.5,
     },
     doctrine: 'IRON_GUARD',
@@ -530,10 +530,10 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     charId: 'shinobi',
     name: 'Shinobi',
     title: 'Kage Shadowblade',
-    ownerAccountId: 'arena-dao.shin-arena.testnet',
+    ownerAccountId: 'arena-dao.shin-arena-28d.testnet',
     ownerName: 'Shadow Clan Guild',
     isNpc: true,
-    agentWalletId: 'kage-npc.agent.shin-arena.testnet',
+    agentWalletId: 'kage-npc.agent.shin-arena-28d.testnet',
     implicitHexAddress: 'd64a6f3b73e40a66b12f7c45d32e9f00a45b1c67d23e45f6a7b8c9d0e1f2a3b4',
     vaultBalanceNear: 31.5,
     wagerPerFightNear: 1.5,
@@ -564,10 +564,10 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     charId: 'ninja_monk',
     name: 'Monk',
     title: 'Master Zenkai',
-    ownerAccountId: 'arena-dao.shin-arena.testnet',
+    ownerAccountId: 'arena-dao.shin-arena-28d.testnet',
     ownerName: 'Shadow Clan Guild',
     isNpc: true,
-    agentWalletId: 'zenkai-npc.agent.shin-arena.testnet',
+    agentWalletId: 'zenkai-npc.agent.shin-arena-28d.testnet',
     implicitHexAddress: 'e55b5a4c84f51b77c23a8d56e43f0a11b56c2d78e34f56a7b8c9d0e1f2a3b4c5',
     vaultBalanceNear: 28.0,
     wagerPerFightNear: 1.0,
@@ -598,10 +598,10 @@ const INITIAL_NPCS: FighterNftAsset[] = [
     charId: 'samurai',
     name: 'Samurai V1',
     title: 'Ronin Jin',
-    ownerAccountId: 'arena-dao.shin-arena.testnet',
+    ownerAccountId: 'arena-dao.shin-arena-28d.testnet',
     ownerName: 'Shadow Clan Guild',
     isNpc: true,
-    agentWalletId: 'jin-npc.agent.shin-arena.testnet',
+    agentWalletId: 'jin-npc.agent.shin-arena-28d.testnet',
     implicitHexAddress: 'f46c4b5d95a62c88d34b9e67f54a1b22c67d3e89f45a67b8c9d0e1f2a3b4c5d6',
     vaultBalanceNear: 35.0,
     wagerPerFightNear: 2.0,
@@ -674,7 +674,7 @@ class NearArenaEngine {
             if (!parsed.humanDailyTournament) {
               parsed.humanDailyTournament = this.buildInitialHumanTournament(
                 parsed.playerWallet.username || 'Warrior',
-                parsed.playerWallet.accountId || 'warrior.shin-arena.testnet',
+                parsed.playerWallet.accountId || 'warrior.shin-arena-28d.testnet',
               );
             }
             if (!parsed.agentContinuousTournament) {
@@ -699,7 +699,7 @@ class NearArenaEngine {
     const defaultUsername =
       (typeof window !== 'undefined' && localStorage.getItem('shin_username')) || 'Warrior';
     const cleanSlug = defaultUsername.toLowerCase().replace(/[^a-z0-9]/g, '') || 'warrior';
-    const playerAccountId = `${cleanSlug}.shin-arena.testnet`;
+    const playerAccountId = `${cleanSlug}.shin-arena-28d.testnet`;
 
     // Give the player 1 starter Fighter NFT with its own Agent Wallet right out of the box
     const starterFighter: FighterNftAsset = {
@@ -710,7 +710,7 @@ class NearArenaEngine {
       ownerAccountId: playerAccountId,
       ownerName: defaultUsername,
       isNpc: false,
-      agentWalletId: `fighter-101.${cleanSlug}.shin-arena.testnet`,
+      agentWalletId: `fighter-101.${cleanSlug}.shin-arena-28d.testnet`,
       implicitHexAddress: randomHex(64),
       vaultBalanceNear: 6.0,
       wagerPerFightNear: 1.0,
@@ -755,7 +755,7 @@ class NearArenaEngine {
       activeMatches,
       npcDojo: {
         npcName: 'Grandmaster Hanzo (Autonomous Shadow Dojo Sensei)',
-        npcWalletId: 'hanzo-dojo-npc.shin-arena.testnet',
+        npcWalletId: 'hanzo-dojo-npc.shin-arena-28d.testnet',
         treasuryBalanceNear: 12.0,
         totalTrainingsCompleted: 18,
         baseCostNear: 0.5,
@@ -774,7 +774,7 @@ class NearArenaEngine {
         {
           id: 'chat-init-1',
           senderName: 'Shogun Takeshi',
-          senderAccountId: 'takeshi-npc.agent.shin-arena.testnet',
+          senderAccountId: 'takeshi-npc.agent.shin-arena-28d.testnet',
           senderType: 'AGENT',
           senderCharId: 'samurai_commander',
           archetypeBadge: '⛩️ BUSHIDO HONOR',
@@ -784,7 +784,7 @@ class NearArenaEngine {
         {
           id: 'chat-init-2',
           senderName: 'Lady Akatsuki',
-          senderAccountId: 'akatsuki-npc.agent.shin-arena.testnet',
+          senderAccountId: 'akatsuki-npc.agent.shin-arena-28d.testnet',
           senderType: 'AGENT',
           senderCharId: 'kunoichi',
           archetypeBadge: '🗡️ SHADOW TAUNT',
@@ -794,7 +794,7 @@ class NearArenaEngine {
         {
           id: 'chat-init-3',
           senderName: 'Kenshin Ironclad',
-          senderAccountId: 'kenshin-npc.agent.shin-arena.testnet',
+          senderAccountId: 'kenshin-npc.agent.shin-arena-28d.testnet',
           senderType: 'AGENT',
           senderCharId: 'knight_1',
           archetypeBadge: '💰 BOUNTY HUNTER',
@@ -1000,7 +1000,7 @@ class NearArenaEngine {
           p2Name: 'Lady Akatsuki',
           p2CharId: 'kunoichi',
           p2IsAgent: true,
-          p2WalletId: 'akatsuki-npc.agent.shin-arena.testnet',
+          p2WalletId: 'akatsuki-npc.agent.shin-arena-28d.testnet',
           boutBountyPaidNear: boutBountyNear,
         },
         {
@@ -1010,11 +1010,11 @@ class NearArenaEngine {
           p1Name: 'Hanzo_Slayer (Human)',
           p1CharId: 'shinobi',
           p1IsAgent: false,
-          p1WalletId: 'hanzoslayer.shin-arena.testnet',
+          p1WalletId: 'hanzoslayer.shin-arena-28d.testnet',
           p2Name: 'Shogun Takeshi',
           p2CharId: 'samurai_commander',
           p2IsAgent: true,
-          p2WalletId: 'takeshi-npc.agent.shin-arena.testnet',
+          p2WalletId: 'takeshi-npc.agent.shin-arena-28d.testnet',
           winnerSide: 'p2',
           boutBountyPaidNear: boutBountyNear,
         },
@@ -1029,7 +1029,7 @@ class NearArenaEngine {
           p2Name: 'Shogun Takeshi',
           p2CharId: 'samurai_commander',
           p2IsAgent: true,
-          p2WalletId: 'takeshi-npc.agent.shin-arena.testnet',
+          p2WalletId: 'takeshi-npc.agent.shin-arena-28d.testnet',
           boutBountyPaidNear: championJackpotNear,
         },
       ],
@@ -1947,7 +1947,7 @@ class NearArenaEngine {
   }
 
   /**
-   * Invest NEAR into an NPC Merchant's wallet (`hanzo-dojo-npc.shin-arena.testnet` or `kenji-forge-npc.shin-arena.testnet`).
+   * Invest NEAR into an NPC Merchant's wallet (`hanzo-dojo-npc.shin-arena-28d.testnet` or `kenji-forge-npc.shin-arena-28d.testnet`).
    * Re-opens a broke shop immediately and entitles the player to a dividend on all subsequent shop trades!
    */
   public investInNpcMerchant(
@@ -2102,7 +2102,7 @@ class NearArenaEngine {
       type: 'MARKET_TRADE',
       summary: `[Fast-Forward Sim] ${headline}`,
       amountNear: 0,
-      actorWallet: 'shin-arena.testnet',
+      actorWallet: 'shin-arena-28d.testnet',
       timestamp: Date.now(),
     });
 
@@ -3059,7 +3059,7 @@ class NearArenaEngine {
       } else {
         t.currentStage = 'COMPLETED';
         t.championName = 'Shogun Takeshi';
-        t.championWalletId = 'takeshi-npc.agent.shin-arena.testnet';
+        t.championWalletId = 'takeshi-npc.agent.shin-arena-28d.testnet';
         t.matches[2].p1Name = t.matches[0].p2Name;
         t.matches[2].winnerSide = 'p2';
       }
