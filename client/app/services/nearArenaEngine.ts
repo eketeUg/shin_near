@@ -684,7 +684,9 @@ class NearArenaEngine {
               );
             }
             parsed.ledger = (parsed.ledger || []).filter(
-              (tx: ArenaLedgerTx) => !tx.id?.startsWith('tx-init-'),
+              (tx: ArenaLedgerTx) =>
+                !tx.id?.startsWith('tx-init-') &&
+                !tx.summary?.includes('Session expired'),
             );
             return parsed;
           }
@@ -1442,7 +1444,7 @@ class NearArenaEngine {
       id: ledgerId,
       txHash: makeTxHash(),
       type: 'INTENTS_SWAP',
-      summary: `Requesting 0.25 Testnet NEAR drip to ${this.state.playerWallet.accountId}...`,
+      summary: `Refilling +250 $SHIN into SHIN Pouch...`,
       amountNear: 0.25,
       actorWallet: this.state.playerWallet.accountId,
       timestamp: Date.now(),
@@ -1458,7 +1460,13 @@ class NearArenaEngine {
         credentials: 'include',
         body: JSON.stringify({ receiverId: this.state.playerWallet.accountId }),
       })
-        .then((res) => (res.ok ? res.json() : null))
+        .then(async (res) => {
+          const data = await res.json().catch(() => null);
+          if (!res.ok) {
+            return { ok: false, error: data?.message || data?.error || 'Sign in required for on-chain refill' };
+          }
+          return data;
+        })
         .then((data) => {
           const entry = this.state.ledger.find((t) => t.id === ledgerId);
           if (data?.ok && data?.txHash) {
@@ -1466,12 +1474,13 @@ class NearArenaEngine {
               entry.txHash = data.txHash;
               entry.explorerUrl = data.explorerUrl;
               entry.onChain = true;
-              entry.summary = `Funded +0.25 Testnet NEAR to ${this.state.playerWallet.accountId}`;
+              entry.summary = `Refilled +250 $SHIN (${this.state.playerWallet.accountId})`;
             }
             this.saveState();
             void this.syncOnChainState(this.state.playerWallet.accountId);
           } else if (data?.error && entry) {
-            entry.summary = data.error;
+            // Remove failed auth/session error from the Scroll of Battles so it doesn't show a fake +250 $SHIN
+            this.state.ledger = this.state.ledger.filter((t) => t.id !== ledgerId);
             this.saveState();
           }
         })
