@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { Volume2, VolumeX } from 'lucide-react';
 import GameCanvasWrapper from './components/GameCanvasWrapper';
 import LoadingScreen from './components/LoadingScreen';
 import MainMenu from './components/MainMenu';
@@ -661,6 +662,31 @@ export default function Home() {
           </button>
         )}
       </div>
+
+      {/* Global Quick Mute / Unmute Speaker Button across all sub-pages */}
+      {!isLoading &&
+        (showAgentArena ||
+          showDojoLobby ||
+          showTournaments ||
+          showLiveFights ||
+          showPreGameFlow ||
+          showMintFlow ||
+          showMatchmaking ||
+          isGameStarted ||
+          isSpectating) && (
+          <button
+            onClick={toggleMute}
+            className={`fixed bottom-4 right-4 z-[95] p-2.5 rounded-full border backdrop-blur-md shadow-lg transition-all cursor-pointer ${
+              isMuted
+                ? 'bg-red-950/80 border-shin-red/60 text-shin-red hover:bg-red-900/90'
+                : 'bg-black/80 border-white/20 text-gray-200 hover:border-shin-gold hover:text-shin-gold'
+            }`}
+            title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+            aria-label={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+          >
+            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
+        )}
 
       {/* Website Background Music */}
       {!isGameStarted && !isSpectating && (
