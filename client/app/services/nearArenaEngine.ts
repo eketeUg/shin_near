@@ -3027,15 +3027,16 @@ class NearArenaEngine {
     }
 
     const t = this.state.humanDailyTournament;
-    if (this.state.playerWallet.NEAR < t.entryFeeNear) {
+    const entryFeeShin = Math.round(t.entryFeeNear * 1000);
+    const totalPoolShin = Math.round(t.totalPoolNear * 1000);
+    const walletShin = this.state.playerWallet.SHIN ?? 0;
+    if (walletShin < entryFeeShin) {
       throw new Error(
-        `Insufficient NEAR (${this.state.playerWallet.NEAR.toFixed(2)} NEAR). Need ${t.entryFeeNear} NEAR entry stake.`,
+        `Insufficient $SHIN (${Math.round(walletShin).toLocaleString()} $SHIN). Need ${entryFeeShin.toLocaleString()} $SHIN entry stake.`,
       );
     }
 
-    this.state.playerWallet.NEAR = Number(
-      (this.state.playerWallet.NEAR - t.entryFeeNear).toFixed(2),
-    );
+    this.state.playerWallet.SHIN = Number((walletShin - entryFeeShin).toFixed(3));
     t.playerJoined = true;
     t.playerCharId = playerCharId;
     t.currentStage = 'SEMI_1';
@@ -3048,7 +3049,7 @@ class NearArenaEngine {
       id: 'tx-tourney-join-' + Date.now(),
       txHash: makeTxHash(),
       type: 'SPECTATOR_BET',
-      summary: `${this.state.playerWallet.username} staked ${t.entryFeeNear.toFixed(2)} NEAR to enter ${t.title} (Pool: ${t.totalPoolNear.toFixed(2)} NEAR)`,
+      summary: `${this.state.playerWallet.username} staked ${entryFeeShin.toLocaleString()} $SHIN to enter ${t.title} (Pool: ${totalPoolShin.toLocaleString()} $SHIN)`,
       amountNear: t.entryFeeNear,
       actorWallet: this.state.playerWallet.accountId,
       timestamp: Date.now(),
@@ -3078,8 +3079,9 @@ class NearArenaEngine {
       t.matches[0].winnerSide = didPlayerWin ? 'p1' : 'p2';
       if (didPlayerWin) {
         bountyPaidNear = t.boutBountyNear;
-        this.state.playerWallet.NEAR = Number(
-          (this.state.playerWallet.NEAR + bountyPaidNear).toFixed(2),
+        const bountyPaidShin = Math.round(bountyPaidNear * 1000);
+        this.state.playerWallet.SHIN = Number(
+          ((this.state.playerWallet.SHIN ?? 0) + bountyPaidShin).toFixed(3),
         );
         t.currentStage = 'GRAND_FINAL';
         t.matches[2].p1Name = this.state.playerWallet.username;
@@ -3088,7 +3090,7 @@ class NearArenaEngine {
           id: 'tx-tourney-semi-' + Date.now(),
           txHash: makeTxHash(),
           type: 'FIGHT_POOL_SETTLED',
-          summary: `Tournament Semifinal Victory! Paid +${bountyPaidNear.toFixed(2)} NEAR Bout Bounty to ${this.state.playerWallet.accountId}. Advanced to Grand Final!`,
+          summary: `Tournament Semifinal Victory! Paid +${bountyPaidShin.toLocaleString()} $SHIN Bout Bounty to ${this.state.playerWallet.accountId}. Advanced to Grand Final!`,
           amountNear: bountyPaidNear,
           actorWallet: this.state.playerWallet.accountId,
           timestamp: Date.now(),
@@ -3105,8 +3107,9 @@ class NearArenaEngine {
       t.currentStage = 'COMPLETED';
       if (didPlayerWin) {
         jackpotPaidNear = t.championJackpotNear;
-        this.state.playerWallet.NEAR = Number(
-          (this.state.playerWallet.NEAR + jackpotPaidNear).toFixed(2),
+        const jackpotPaidShin = Math.round(jackpotPaidNear * 1000);
+        this.state.playerWallet.SHIN = Number(
+          ((this.state.playerWallet.SHIN ?? 0) + jackpotPaidShin).toFixed(3),
         );
         t.championName = this.state.playerWallet.username;
         t.championWalletId = this.state.playerWallet.accountId;
@@ -3114,7 +3117,7 @@ class NearArenaEngine {
           id: 'tx-tourney-final-' + Date.now(),
           txHash: makeTxHash(),
           type: 'FIGHT_POOL_SETTLED',
-          summary: `🏆 GRAND TOURNAMENT CHAMPION! ${this.state.playerWallet.username} won the ${jackpotPaidNear.toFixed(2)} NEAR Championship Jackpot!`,
+          summary: `🏆 GRAND TOURNAMENT CHAMPION! ${this.state.playerWallet.username} won the ${jackpotPaidShin.toLocaleString()} $SHIN Championship Jackpot!`,
           amountNear: jackpotPaidNear,
           actorWallet: this.state.playerWallet.accountId,
           timestamp: Date.now(),
@@ -3205,12 +3208,12 @@ class NearArenaEngine {
       payAgentBout(
         w1Wallet,
         agT.boutBountyNear,
-        `[Agent Cup #${agT.tournamentNumber}] ${w1Name} won Semifinal A (+${agT.boutBountyNear.toFixed(2)} NEAR Bout Cut)`,
+        `[Agent Cup #${agT.tournamentNumber}] ${w1Name} won Semifinal A (+${Math.round(agT.boutBountyNear * 1000).toLocaleString()} $SHIN Bout Cut)`,
       );
       payAgentBout(
         w2Wallet,
         agT.boutBountyNear,
-        `[Agent Cup #${agT.tournamentNumber}] ${w2Name} won Semifinal B (+${agT.boutBountyNear.toFixed(2)} NEAR Bout Cut)`,
+        `[Agent Cup #${agT.tournamentNumber}] ${w2Name} won Semifinal B (+${Math.round(agT.boutBountyNear * 1000).toLocaleString()} $SHIN Bout Cut)`,
       );
 
       finalM.p1Name = w1Name;
@@ -3228,7 +3231,7 @@ class NearArenaEngine {
       payAgentBout(
         champWallet,
         agT.championJackpotNear,
-        `🏆 [Agent Cup #${agT.tournamentNumber} Champion] ${champName} won the ${agT.championJackpotNear.toFixed(2)} NEAR Grand Jackpot! Entering 2m Rest Cooldown.`,
+        `🏆 [Agent Cup #${agT.tournamentNumber} Champion] ${champName} won the ${Math.round(agT.championJackpotNear * 1000).toLocaleString()} $SHIN Grand Jackpot! Entering 2m Rest Cooldown.`,
       );
 
       agT.lastChampionTitle = champName;

@@ -58,6 +58,8 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
 
   const humanTourney = arenaState.humanDailyTournament;
   const agentTourney = arenaState.agentContinuousTournament;
+  const toShin = (nearAmt: number) => Math.round((nearAmt || 0) * 1000).toLocaleString();
+  const walletShin = Math.round(arenaState.playerWallet.SHIN ?? 0).toLocaleString();
 
   const formatCooldown = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -99,7 +101,7 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
           <div className="bg-white/5 border border-shin-gold/40 rounded-xl px-3 py-1.5 flex items-center gap-2">
             <Coins size={14} className="text-shin-gold" />
             <span className="text-xs font-mono font-bold text-shin-gold">
-              {arenaState.playerWallet.NEAR.toFixed(2)} NEAR
+              {walletShin} $SHIN
             </span>
           </div>
           <button
@@ -127,11 +129,11 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                 <p className="text-xs text-gray-400 mt-1">
                   Each bout winner immediately takes the{' '}
                   <strong className="text-emerald-400">
-                    +{humanTourney.boutBountyNear.toFixed(2)} NEAR Bout Cut
+                    +{toShin(humanTourney.boutBountyNear)} $SHIN Bout Cut
                   </strong>
                   , and the overall Tournament Champion takes the{' '}
                   <strong className="text-shin-gold">
-                    +{humanTourney.championJackpotNear.toFixed(2)} NEAR Grand Jackpot
+                    +{toShin(humanTourney.championJackpotNear)} $SHIN Grand Jackpot
                   </strong>
                   !
                 </p>
@@ -139,10 +141,10 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
               <div className="text-right shrink-0 bg-black/80 border border-shin-gold/30 rounded-xl px-3.5 py-2">
                 <div className="text-[9px] font-mono text-gray-400 uppercase">Total Pool</div>
                 <div className="text-lg font-mono font-bold text-shin-gold">
-                  {humanTourney.totalPoolNear.toFixed(1)} NEAR
+                  {toShin(humanTourney.totalPoolNear)} $SHIN
                 </div>
                 <div className="text-[9px] font-mono text-emerald-400">
-                  Entry: {humanTourney.entryFeeNear} NEAR
+                  Entry: {toShin(humanTourney.entryFeeNear)} $SHIN
                 </div>
               </div>
             </div>
@@ -156,7 +158,7 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                 >
                   <div>
                     <div className="text-[10px] font-mono text-shin-gold uppercase font-bold">
-                      {m.label} • Immediate Bounty: +{m.boutBountyPaidNear.toFixed(2)} NEAR
+                      {m.label} • Immediate Bounty: +{toShin(m.boutBountyPaidNear)} $SHIN
                     </div>
                     <div className="text-xs sm:text-sm font-cinzel font-bold text-white mt-1 flex items-center gap-2">
                       <span className={m.winnerSide === 'p1' ? 'text-emerald-400' : ''}>
@@ -188,7 +190,7 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                       nearArenaEngine.joinHumanDailyTournament(myChar);
                       setArenaState({ ...nearArenaEngine.getState() });
                       showToast(
-                        `Joined ${humanTourney.title}! Staked ${humanTourney.entryFeeNear} NEAR.`,
+                        `Joined ${humanTourney.title}! Staked ${toShin(humanTourney.entryFeeNear)} $SHIN.`,
                       );
                     } catch (e: any) {
                       showToast(e.message);
@@ -196,8 +198,8 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                   }}
                   className="w-full py-3 bg-shin-gold text-black font-cinzel font-black text-xs uppercase tracking-widest rounded-xl hover:bg-yellow-400 transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <Trophy size={15} /> Join Daily Tournament Window ({humanTourney.entryFeeNear}{' '}
-                  NEAR Entry)
+                  <Trophy size={15} /> Join Daily Tournament Window ({toShin(humanTourney.entryFeeNear)}{' '}
+                  $SHIN Entry)
                 </button>
               ) : (
                 <div className="w-full space-y-2">
@@ -226,11 +228,11 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                       setArenaState({ ...nearArenaEngine.getState() });
                       if (res.jackpotPaidNear > 0) {
                         showToast(
-                          `🏆 GRAND CHAMPION! +${res.jackpotPaidNear.toFixed(2)} NEAR Jackpot credited to your wallet!`,
+                          `🏆 GRAND CHAMPION! +${toShin(res.jackpotPaidNear)} $SHIN Jackpot credited to your wallet!`,
                         );
                       } else {
                         showToast(
-                          `Semifinal Won! +${res.bountyPaidNear.toFixed(2)} NEAR Bout Cut paid. Ready for Grand Final!`,
+                          `Semifinal Won! +${toShin(res.bountyPaidNear)} $SHIN Bout Cut paid. Ready for Grand Final!`,
                         );
                       }
                     }}
@@ -263,10 +265,10 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
               <div className="text-right shrink-0 bg-black/80 border border-purple-500/30 rounded-xl px-3.5 py-2">
                 <div className="text-[9px] font-mono text-gray-400 uppercase">Agent Pool</div>
                 <div className="text-lg font-mono font-bold text-purple-300">
-                  {agentTourney.totalPoolNear.toFixed(1)} NEAR
+                  {toShin(agentTourney.totalPoolNear)} $SHIN
                 </div>
                 <div className="text-[9px] font-mono text-shin-gold">
-                  Jackpot: {agentTourney.championJackpotNear.toFixed(1)} NEAR
+                  Jackpot: {toShin(agentTourney.championJackpotNear)} $SHIN
                 </div>
               </div>
             </div>
@@ -281,7 +283,7 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                   <p className="text-[11px] text-gray-200 mt-0.5">
                     Last Champion:{' '}
                     <strong className="text-shin-gold">{agentTourney.lastChampionTitle}</strong> (+
-                    {agentTourney.lastChampionWonNear?.toFixed(2)} NEAR). Next tournament starts in{' '}
+                    {toShin(agentTourney.lastChampionWonNear || 0)} $SHIN). Next tournament starts in{' '}
                     <strong className="font-mono text-amber-300">
                       {formatCooldown(agentTourney.restSecondsRemaining)}
                     </strong>
@@ -314,7 +316,7 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                         `🏆 ${updated.lastChampionTitle} won Cup #${updated.tournamentNumber}! 2-Min Rest Cooldown started.`,
                       );
                     } else {
-                      showToast('Resolved Agent Semifinals & paid per-bout NEAR cuts!');
+                      showToast('Resolved Agent Semifinals & paid per-bout $SHIN cuts!');
                     }
                   }}
                   className="px-3.5 py-1.5 bg-purple-500 hover:bg-purple-400 text-white font-cinzel font-black text-[10px] uppercase rounded-lg cursor-pointer"
@@ -333,7 +335,7 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                 >
                   <div>
                     <div className="text-[10px] font-mono text-purple-300 uppercase">
-                      {m.label} • Payout: +{m.boutBountyPaidNear.toFixed(2)} NEAR
+                      {m.label} • Payout: +{toShin(m.boutBountyPaidNear)} $SHIN
                     </div>
                     <div className="text-xs font-cinzel font-bold text-white mt-0.5">
                       🤖 {m.p1Name} <span className="text-gray-500">VS</span> 🤖 {m.p2Name}
@@ -363,7 +365,7 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                     <div>
                       <span className="font-cinzel font-bold text-white">{myF.title}</span>
                       <span className="text-[10px] font-mono text-shin-gold ml-2">
-                        ({myF.vaultBalanceNear.toFixed(1)} NEAR Vault)
+                        ({toShin(myF.vaultBalanceNear)} $SHIN Pouch)
                       </span>
                     </div>
                     <button
