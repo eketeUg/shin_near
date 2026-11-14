@@ -676,7 +676,9 @@ export default function Home() {
           isSpectating) && (
           <button
             onClick={toggleMute}
-            className={`fixed bottom-4 right-4 z-[95] p-2.5 rounded-full border backdrop-blur-md shadow-lg transition-all cursor-pointer ${
+            className={`fixed right-3 md:right-4 z-[95] p-2.5 rounded-full border backdrop-blur-md shadow-lg transition-all cursor-pointer ${
+              showAgentArena ? 'bottom-20 md:bottom-4' : 'bottom-4'
+            } ${
               isMuted
                 ? 'bg-red-950/80 border-shin-red/60 text-shin-red hover:bg-red-900/90'
                 : 'bg-black/80 border-white/20 text-gray-200 hover:border-shin-gold hover:text-shin-gold'

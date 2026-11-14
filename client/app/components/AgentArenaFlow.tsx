@@ -228,10 +228,10 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       </div>
 
       {/* =====================================================================
-          ARCADE NAVIGATION BLADES
+          ARCADE NAVIGATION BLADES (Desktop Top Bar + Mobile Fixed Bottom Bar)
          ===================================================================== */}
       <div className="px-3 sm:px-6 md:px-8 pt-3 sm:pt-5 pb-2 max-w-7xl mx-auto w-full flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 w-full lg:w-auto">
+        <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1 w-full lg:w-auto">
           {[
             { id: 'LIVE_ARENA', label: '🔥 Shōbu Pit', icon: Flame },
             {
@@ -263,6 +263,37 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
           })}
         </div>
 
+        {/* Mobile Fixed Bottom Navbar */}
+        <nav
+          aria-label="Shadow Budōkan Navigation"
+          className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-black/95 backdrop-blur-md border-t border-white/15 px-2 py-1.5 grid grid-cols-4 gap-1"
+          style={{ paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}
+        >
+          {[
+            { id: 'LIVE_ARENA', label: 'Shōbu Pit', icon: Flame },
+            { id: 'MY_AGENTS', label: `Clan (${ownedFighters.length})`, icon: Shield },
+            { id: 'DOJO_MARKET', label: 'Dojo', icon: Store },
+            { id: 'LEDGER', label: 'Chronicle', icon: ScrollText },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg font-cinzel text-[10px] font-bold uppercase tracking-wide transition-all cursor-pointer ${
+                  active
+                    ? 'bg-shin-red/20 text-shin-gold border border-shin-red/50'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Icon size={16} />
+                <span className="truncate max-w-full">{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
         <button
           onClick={handleSpawnMyAgentMatch}
           className="w-full lg:w-auto arcade-skew px-5 py-2.5 bg-shin-gold text-black font-cinzel font-black text-xs tracking-widest uppercase hover:bg-yellow-400 transition-all shadow-[0_0_25px_rgba(251,191,36,0.45)] cursor-pointer"
@@ -277,7 +308,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       {/* =====================================================================
           MAIN CONTENT CONTAINER
          ===================================================================== */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 py-5">
+      <div className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 py-5 pb-24 md:pb-5">
         {/* ============================================================
             TAB 1: COLOSSEUM PIT (LIVE AI DUELS & CROWD BACKING)
            ============================================================ */}
