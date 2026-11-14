@@ -11,7 +11,10 @@ import { NearRelayerController } from './near-relayer.controller';
 import { NearRelayerService } from './near-relayer.service';
 import { TournamentController } from './tournament.controller';
 import { TournamentService } from './tournament.service';
+import { AgentWalletController } from './agent-wallet.controller';
+import { AgentWalletService } from './agent-wallet.service';
 import { LobbyMessage, LobbyMessageSchema } from './schema/lobby-message.schema';
+import { AgentWallet, AgentWalletSchema } from './schema/agent-wallet.schema';
 
 @Module({
   imports: [
@@ -20,10 +23,28 @@ import { LobbyMessage, LobbyMessageSchema } from './schema/lobby-message.schema'
     WalletModule,
     MongooseModule.forFeature([
       { name: LobbyMessage.name, schema: LobbyMessageSchema },
+      { name: AgentWallet.name, schema: AgentWalletSchema },
     ]),
   ],
-  controllers: [NearRelayerController, LobbyChatController, TournamentController],
-  providers: [GameGateway, GameService, NearRelayerService, LobbyChatService, TournamentService],
-  exports: [NearRelayerService, LobbyChatService, TournamentService],
+  controllers: [
+    NearRelayerController,
+    LobbyChatController,
+    TournamentController,
+    AgentWalletController,
+  ],
+  providers: [
+    GameGateway,
+    GameService,
+    NearRelayerService,
+    LobbyChatService,
+    TournamentService,
+    AgentWalletService,
+  ],
+  exports: [
+    NearRelayerService,
+    LobbyChatService,
+    TournamentService,
+    AgentWalletService,
+  ],
 })
 export class GameModule {}

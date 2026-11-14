@@ -28,6 +28,7 @@ const ALLOWED_WRITE_METHODS = new Set([
   'join_tournament',
   'settle_tournament',
   'nft_transfer',
+  'ft_transfer',
   'ft_transfer_call',
   'withdraw_agent_shin',
   'settle_shin_match',
@@ -119,6 +120,14 @@ export class NearRelayerService implements OnModuleInit {
       relayerAccountId: this.relayerAccountId,
       relayerReady: Boolean(this.relayerAccount),
     };
+  }
+
+  getRelayerAccount(): Account | null {
+    return this.relayerAccount;
+  }
+
+  getRpcProvider() {
+    return this.provider;
   }
 
   private resolveAllowedContract(targetContractId?: string): string {

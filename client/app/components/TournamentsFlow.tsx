@@ -131,6 +131,23 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [showInspectorModal, setShowInspectorModal] = useState(false);
+  const [agentsDirectory, setAgentsDirectory] = useState<
+    Array<{
+      tokenId: string;
+      name: string;
+      charClass: string;
+      ownerId: string;
+      powerLevel: number;
+      wins: number;
+      losses: number;
+      elo: number;
+      hasStandaloneWallet: boolean;
+      agentAccountId: string;
+      nearBalance: number;
+      shinBalance: number;
+      nearblocksUrl: string;
+    }>
+  >([]);
   const launchedMatchIdsRef = useRef<Set<string>>(new Set());
 
   const showToast = (msg: string) => {
@@ -148,13 +165,26 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
     }
   }, []);
 
+  const refreshAgentsDirectory = useCallback(async () => {
+    try {
+      const list = await nearArenaEngine.fetchAgentsDirectory();
+      setAgentsDirectory(list);
+    } catch {
+      // Ignore transient RPC/server errors
+    }
+  }, []);
+
   useEffect(() => {
     const sync = () => setArenaState({ ...nearArenaEngine.getState() });
     window.addEventListener('nearArenaStateUpdated', sync);
 
     void refreshLiveTournaments();
+    void refreshAgentsDirectory();
     const poll = setInterval(() => {
       void refreshLiveTournaments();
+      if (activeTab === 'AGENT') {
+        void refreshAgentsDirectory();
+      }
     }, 3000);
 
     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
@@ -828,6 +858,128 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                         </button>
                       </div>
                     ))
+                  )}
+                </div>
+
+                {/* Public Standalone Agent Wallets Directory (Nearblocks Verifiable + Owner-Only Withdraw) */}
+                <div className="bg-black/80 border border-purple-500/30 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[10px] font-cinzel font-bold text-purple-300 uppercase tracking-wider">
+                      Autonomous Agent Standalone Wallets (Verify on Nearblocks • Owner-Only Withdraw)
+                    </div>
+                    <button
+                      onClick={() => void refreshAgentsDirectory()}
+                      className="text-[10px] font-mono text-gray-400 hover:text-white cursor-pointer"
+                    >
+                      ↻ Refresh
+                    </button>
+                  </div>
+
+                  {agentsDirectory.length === 0 ? (
+                    <div className="text-xs font-mono text-gray-500">
+                      No on-chain Fighter NFTs indexed yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {agentsDirectory.map((ag) => {
+                        const isOwner = ag.ownerId === myAccountId;
+                        return (
+                          <div
+                            key={ag.tokenId}
+                            className="bg-white/5 border border-white/10 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-cinzel font-bold text-xs text-white">
+                                  🤖 {ag.name}
+                                </span>
+                                <span className="text-[10px] font-mono text-gray-400">
+                                  Lv.{ag.powerLevel} • ELO {ag.elo} • {ag.wins}W-{ag.losses}L
+                                </span>
+                                {isOwner && (
+                                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/50 text-emerald-300">
+                                    YOUR AGENT
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] font-mono text-gray-400 mt-0.5 truncate">
+                                Wallet:{' '}
+                                <a
+                                  href={ag.nearblocksUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-purple-300 hover:underline inline-flex items-center gap-1"
+                                >
+                                  {ag.agentAccountId} <ExternalLink size={9} />
+                                </a>{' '}
+                                • Owner: <span className="text-gray-300">{ag.ownerId}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                              <div className="text-right bg-black/60 border border-shin-gold/30 rounded-lg px-2.5 py-1">
+                                <div className="text-[11px] font-mono font-bold text-shin-gold">
+                                  {Math.round(ag.shinBalance).toLocaleString()} $SHIN
+                                </div>
+                                <div className="text-[9px] font-mono text-gray-400">
+                                  {ag.nearBalance.toFixed(3)} NEAR
+                                </div>
+                              </div>
+
+                              {!ag.hasStandaloneWallet && (
+                                <button
+                                  disabled={isSubmitting}
+                                  onClick={async () => {
+                                    setIsSubmitting(true);
+                                    try {
+                                      const res = await nearArenaEngine.provisionAgentWallet(
+                                        ag.tokenId,
+                                      );
+                                      if (!res?.ok) throw new Error(res?.error || 'Provision failed');
+                                      await refreshAgentsDirectory();
+                                      showToast(`Provisioned ${res.agentAccountId} on-chain!`);
+                                    } catch (e: any) {
+                                      showToast(e.message);
+                                    } finally {
+                                      setIsSubmitting(false);
+                                    }
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-lg bg-purple-500/20 border border-purple-400 text-purple-200 font-mono text-[10px] font-bold uppercase cursor-pointer"
+                                >
+                                  Provision Wallet
+                                </button>
+                              )}
+
+                              {isOwner && ag.hasStandaloneWallet && ag.shinBalance > 0 && (
+                                <button
+                                  disabled={isSubmitting}
+                                  onClick={async () => {
+                                    setIsSubmitting(true);
+                                    try {
+                                      const res = await nearArenaEngine.withdrawAgentWalletShin(
+                                        ag.tokenId,
+                                        Math.floor(ag.shinBalance),
+                                      );
+                                      await refreshAgentsDirectory();
+                                      showToast(
+                                        `Withdrew ${Math.floor(ag.shinBalance).toLocaleString()} $SHIN to your wallet! (${res.txHash?.slice(0, 10)}...)`,
+                                      );
+                                    } catch (e: any) {
+                                      showToast(e.message);
+                                    } finally {
+                                      setIsSubmitting(false);
+                                    }
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-lg bg-shin-gold text-black font-mono text-[10px] font-bold uppercase cursor-pointer"
+                                >
+                                  Withdraw $SHIN
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </>

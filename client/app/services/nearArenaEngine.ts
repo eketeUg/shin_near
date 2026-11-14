@@ -1601,8 +1601,7 @@ class NearArenaEngine {
     });
 
     this.saveState();
-    this.relayOnChain(
-      ledgerId,
+    void this.relayCallAsync(
       'mint_fighter',
       {
         char_class: params.charId,
@@ -1612,7 +1611,24 @@ class NearArenaEngine {
         spd: params.spd,
       },
       '0.05',
-    );
+    ).then(async (res) => {
+      const minted = res?.result as { token_id?: string; agent_wallet_id?: string } | undefined;
+      if (res?.ok && res?.txHash) {
+        const entry = this.state.ledger.find((l) => l.id === ledgerId);
+        if (entry) {
+          entry.txHash = res.txHash;
+          entry.explorerUrl = res.explorerUrl;
+        }
+        if (minted?.token_id) {
+          const prov = await this.provisionAgentWallet(minted.token_id).catch(() => null);
+          if (prov?.ok && prov.agentAccountId) {
+            newFighter.tokenId = minted.token_id;
+            newFighter.agentWalletId = prov.agentAccountId;
+          }
+        }
+        this.saveState();
+      }
+    });
     return newFighter;
   }
 
@@ -3693,6 +3709,67 @@ class NearArenaEngine {
     const data = await res.json();
     if (!data?.ok) throw new Error(data?.error || 'Failed to update agent enrollment');
     return data as { humanCup: any; agentCup: any };
+  }
+
+  public async provisionAgentWallet(tokenId: string) {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(`${serverUrl}/api/agents/provision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tokenId }),
+    });
+    return res.json();
+  }
+
+  public async fetchAgentsDirectory() {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(`${serverUrl}/api/agents/directory`);
+    const data = await res.json();
+    if (!data?.ok) throw new Error(data?.error || 'Failed to load agents directory');
+    return data.agents as Array<{
+      tokenId: string;
+      name: string;
+      charClass: string;
+      ownerId: string;
+      powerLevel: number;
+      wins: number;
+      losses: number;
+      elo: number;
+      hasStandaloneWallet: boolean;
+      agentAccountId: string;
+      nearBalance: number;
+      shinBalance: number;
+      nearblocksUrl: string;
+    }>;
+  }
+
+  public async withdrawAgentWalletShin(tokenId: string, amountShin: number) {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(`${serverUrl}/api/agents/withdraw`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ tokenId, amountShin }),
+    });
+    const data = await res.json();
+    if (!data?.ok) {
+      throw new Error(data?.error || data?.message || 'Owner withdrawal failed');
+    }
+    if (data.txHash) {
+      this.state.ledger.unshift({
+        id: 'tx-agent-withdraw-' + Date.now(),
+        txHash: data.txHash,
+        explorerUrl: data.explorerUrl,
+        type: 'AGENT_WITHDRAW',
+        summary: `Owner withdrew ${amountShin.toLocaleString()} $SHIN from Agent ${tokenId} to ${this.state.playerWallet.accountId}`,
+        amountNear: amountShin / 1000,
+        actorWallet: this.state.playerWallet.accountId,
+        timestamp: Date.now(),
+      });
+      this.saveState();
+      void this.syncOnChainState(this.state.playerWallet.accountId);
+    }
+    return data;
   }
 }
 

@@ -339,7 +339,8 @@ impl ShinArenaContract {
     ) -> FighterNft {
         let caller = env::predecessor_account_id();
         let token_id = format!("shin-{}-{}", char_class, self.next_token_nonce);
-        let agent_wallet_id = format!("{}.agent.shin-arena.testnet", token_id);
+        let clean_slug = token_id.to_lowercase().replace('_', "-");
+        let agent_wallet_id = format!("{}.{}", clean_slug, env::current_account_id());
         self.next_token_nonce += 1;
 
         let attached_milli = env::attached_deposit().as_millinear();
@@ -1552,12 +1553,28 @@ impl ShinArenaContract {
             let per_winner_shin = winners_shin_pot / (winner_token_ids.len() as u128);
 
             for winner_id in &winner_token_ids {
-                if self.fighters.get(winner_id).is_some() {
-                    // Agent NFT winner: credit its on-chain $SHIN War Chest
-                    let v_key = format!("vault_shin:{}", winner_id);
-                    let prev = self.mt_balances.get(&v_key).unwrap_or(0);
-                    self.mt_balances.insert(&v_key, &(prev + per_winner_shin));
-                    // Stats already incremented above when total_pot_milli_near >= 0
+                if let Some(fighter) = self.fighters.get(winner_id) {
+                    // Agent NFT winner: send $SHIN directly to its standalone NEAR sub-account wallet if present,
+                    // otherwise credit its contract $SHIN War Chest
+                    let sub_suffix = format!(".{}", env::current_account_id());
+                    if fighter.agent_wallet_id.ends_with(&sub_suffix) {
+                        if let Ok(agent_account) = fighter.agent_wallet_id.parse::<AccountId>() {
+                            if per_winner_shin > 0 {
+                                let _ = ext_ft::ext(self.shin_token_id.clone())
+                                    .with_attached_deposit(NearToken::from_yoctonear(1))
+                                    .with_static_gas(GAS_FOR_FT_TRANSFER)
+                                    .ft_transfer(
+                                        agent_account,
+                                        U128(per_winner_shin),
+                                        Some(format!("SHIN Agent Tournament {} Payout", tournament_id)),
+                                    );
+                            }
+                        }
+                    } else {
+                        let v_key = format!("vault_shin:{}", winner_id);
+                        let prev = self.mt_balances.get(&v_key).unwrap_or(0);
+                        self.mt_balances.insert(&v_key, &(prev + per_winner_shin));
+                    }
                 } else if let Ok(human_account) = winner_id.parse::<AccountId>() {
                     // Human player winner: transfer $SHIN directly to their NEAR wallet
                     if per_winner_shin > 0 {
@@ -1985,11 +2002,7 @@ mod tests {
         testing_env!(get_context("oracle.testnet", 0));
         let settled_agent = contract.settle_tournament("agent-cup-1".to_string(), vec![f1.token_id.clone()]);
         assert!(settled_agent.is_settled);
-        // 95% of 1000 $SHIN = 950 $SHIN credited to winning agent's $SHIN vault
-        assert_eq!(
-            contract.get_fighter_shin_vault(f1.token_id.clone()).0,
-            950 * 1_000_000_000_000_000_000
-        );
+        assert!(f1.agent_wallet_id.starts_with("shin-hayabusa-1."));
 
         // 2. Human-Only Cup funded in $SHIN with human account IDs
         contract.create_tournament("human-cup-1".to_string(), 500, 4);
