@@ -538,7 +538,7 @@ const MainMenu = ({
                 <img
                   src={getCharGif(activeChampion.charId)}
                   alt={activeChampion.name}
-                  className="w-44 h-44 object-contain scale-125 origin-bottom animate-float-idle z-10"
+                  className="w-44 h-44 [@media(max-height:540px)]:w-auto [@media(max-height:540px)]:h-[85%] [@media(max-height:540px)]:max-w-full [@media(max-height:540px)]:scale-100 object-contain scale-125 origin-bottom animate-float-idle z-10"
                   style={{ imageRendering: 'pixelated' }}
                 />
 
@@ -649,7 +649,7 @@ const MainMenu = ({
                   key={previewFighter.id}
                   src={`/assets/Shin_gifs/${previewFighter.gif}`}
                   alt={previewFighter.name}
-                  className="w-44 h-44 [@media(max-height:540px)]:w-20 [@media(max-height:540px)]:h-20 object-contain scale-125 origin-bottom animate-float-idle z-10"
+                  className="w-44 h-44 [@media(max-height:540px)]:w-auto [@media(max-height:540px)]:h-[85%] [@media(max-height:540px)]:max-w-full [@media(max-height:540px)]:scale-100 object-contain scale-125 origin-bottom animate-float-idle z-10"
                   style={{ imageRendering: 'pixelated' }}
                 />
                 <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/80 border border-shin-gold/40 text-[10px] font-cinzel text-shin-gold uppercase tracking-wider">
