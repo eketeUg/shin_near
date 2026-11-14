@@ -1,7 +1,14 @@
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedMap};
+use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{env, near, AccountId, NearToken, PanicOnDefault, Promise};
+use near_sdk::{
+    assert_one_yocto, env, ext_contract, near, AccountId, Gas, NearToken, PanicOnDefault, Promise,
+    PromiseOrValue,
+};
+use std::collections::HashMap;
+
+const GAS_FOR_FT_TRANSFER: Gas = Gas::from_tgas(10);
 
 /// Combat AI Doctrine assigned to an autonomous Fighter Agent
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -81,6 +88,102 @@ pub struct NpcDojoMaster {
     pub total_investor_capital_milli_near: u128,
 }
 
+#[ext_contract(ext_ft)]
+pub trait FungibleToken {
+    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct TrainerProfile {
+    pub trainer_id: AccountId,
+    pub fee_milli_near: u128,
+    pub specialty: String, // "ATK" | "DEF" | "SPD"
+    pub sessions_completed: u64,
+    pub is_active: bool,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct TournamentPool {
+    pub tournament_id: String,
+    pub entry_fee_milli_near: u128,
+    pub max_players: u32,
+    pub entrants: Vec<String>, // fighter token_ids
+    pub total_pot_milli_near: u128,
+    pub is_settled: bool,
+    pub winner_token_ids: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct AmmInfo {
+    pub shin_token_id: AccountId,
+    pub dev_treasury_id: AccountId,
+    pub near_reserve: U128,
+    pub shin_reserve: U128,
+    pub total_swap_volume_near: U128,
+    pub swap_fee_bps: u32,
+    pub dev_fee_bps: u32,
+    pub lp_fee_bps: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct NftContractMetadata {
+    pub spec: String,
+    pub name: String,
+    pub symbol: String,
+    pub icon: Option<String>,
+    pub base_uri: Option<String>,
+    pub reference: Option<String>,
+    pub reference_hash: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct TokenMetadata {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub media: Option<String>,
+    pub media_hash: Option<String>,
+    pub copies: Option<u64>,
+    pub issued_at: Option<String>,
+    pub expires_at: Option<String>,
+    pub starts_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub extra: Option<String>,
+    pub reference: Option<String>,
+    pub reference_hash: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Nep171Token {
+    pub token_id: String,
+    pub owner_id: AccountId,
+    pub metadata: Option<TokenMetadata>,
+    pub approved_account_ids: Option<HashMap<AccountId, u64>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Payout {
+    pub payout: HashMap<AccountId, U128>,
+}
+
+/// Legacy state layout (pre-economy upgrade) for safe state migration
+#[derive(BorshDeserialize)]
+pub struct LegacyShinArenaContract {
+    pub oracle_id: AccountId,
+    pub fighters: UnorderedMap<String, FighterNft>,
+    pub matches: LookupMap<String, ArenaMatchPool>,
+    pub npc_dojo: NpcDojoMaster,
+    pub next_token_nonce: u64,
+    pub mt_balances: LookupMap<String, u128>,
+    pub mt_supplies: LookupMap<String, u128>,
+}
+
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
 pub struct ShinArenaContract {
@@ -93,12 +196,25 @@ pub struct ShinArenaContract {
     pub mt_balances: LookupMap<String, u128>,
     /// NEP-245 Multi-Token total supply keyed by "{token_id}"
     pub mt_supplies: LookupMap<String, u128>,
+    // === V2 Economy & Standards Fields ===
+    pub shin_token_id: AccountId,
+    pub dev_treasury_id: AccountId,
+    pub dev_treasury_milli: u128,
+    pub amm_near_reserve: u128,
+    pub amm_shin_reserve: u128,
+    pub total_swap_volume_near: u128,
+    pub original_minters: LookupMap<String, AccountId>,
+    pub fighter_xp: LookupMap<String, u64>,
+    pub trainers: LookupMap<AccountId, TrainerProfile>,
+    pub tournaments: LookupMap<String, TournamentPool>,
 }
 
 #[near]
 impl ShinArenaContract {
     #[init]
     pub fn new(oracle_id: AccountId) -> Self {
+        let current = env::current_account_id();
+        let shin_token: AccountId = "shin.shin-arena-28d.testnet".parse().unwrap();
         Self {
             oracle_id,
             fighters: UnorderedMap::new(b"f"),
@@ -115,6 +231,42 @@ impl ShinArenaContract {
             next_token_nonce: 1,
             mt_balances: LookupMap::new(b"b"),
             mt_supplies: LookupMap::new(b"s"),
+            shin_token_id: shin_token,
+            dev_treasury_id: current,
+            dev_treasury_milli: 0,
+            amm_near_reserve: 0,
+            amm_shin_reserve: 0,
+            total_swap_volume_near: 0,
+            original_minters: LookupMap::new(b"o"),
+            fighter_xp: LookupMap::new(b"x"),
+            trainers: LookupMap::new(b"t"),
+            tournaments: LookupMap::new(b"p"),
+        }
+    }
+
+    /// Upgrade existing deployed contract state safely without losing minted fighters
+    #[init(ignore_state)]
+    pub fn migrate(shin_token_id: AccountId, dev_treasury_id: AccountId) -> Self {
+        let legacy: LegacyShinArenaContract =
+            env::state_read().expect("Failed to read legacy contract state");
+        Self {
+            oracle_id: legacy.oracle_id,
+            fighters: legacy.fighters,
+            matches: legacy.matches,
+            npc_dojo: legacy.npc_dojo,
+            next_token_nonce: legacy.next_token_nonce,
+            mt_balances: legacy.mt_balances,
+            mt_supplies: legacy.mt_supplies,
+            shin_token_id,
+            dev_treasury_id,
+            dev_treasury_milli: 0,
+            amm_near_reserve: 0,
+            amm_shin_reserve: 0,
+            total_swap_volume_near: 0,
+            original_minters: LookupMap::new(b"o"),
+            fighter_xp: LookupMap::new(b"x"),
+            trainers: LookupMap::new(b"t"),
+            tournaments: LookupMap::new(b"p"),
         }
     }
 
@@ -209,6 +361,14 @@ impl ShinArenaContract {
         };
 
         self.fighters.insert(&token_id, &fighter);
+        self.original_minters.insert(&token_id, &caller);
+        self.fighter_xp.insert(&token_id, &0);
+
+        // Emit standard NEP-171 nft_mint event so explorers & wallets index the Fighter NFT
+        env::log_str(&format!(
+            "EVENT_JSON:{{\"standard\":\"nep171\",\"version\":\"1.0.0\",\"event\":\"nft_mint\",\"data\":[{{\"owner_id\":\"{}\",\"token_ids\":[\"{}\"]}}]}}",
+            caller, token_id
+        ));
 
         // Register Fighter NFT and starter Shinobi Scroll in NEP-245 Multi-Token ledger
         let nep245_fighter_id = format!("fighter:{}", token_id);
@@ -355,20 +515,28 @@ impl ShinArenaContract {
         let mut winner = self.fighters.get(&winner_token_id).expect("Winner not found");
         let mut loser = self.fighters.get(&loser_token_id).expect("Loser not found");
 
-        // 1. Credit Fighter Wager Pool to Winning Fighter's Agent Wallet
+        // 1. Credit 95% of Fighter Wager Pool + 5% Spectator Royalty to Winning Fighter's War Chest
+        //    and 5% of Fighter Wager Pool to Dev Treasury
         let total_spectator_pool =
             pool.total_spectator_bets_f1_milli_near + pool.total_spectator_bets_f2_milli_near;
-        let fighter_royalty = total_spectator_pool * 5 / 100; // 5% spectator royalty to winning Fighter NFT!
-        winner.vault_balance_milli_near += pool.total_fighter_pot_milli_near + fighter_royalty;
+        let fighter_royalty = total_spectator_pool * 5 / 100; // 5% spectator royalty to winning Fighter NFT
+        let dev_match_fee = pool.total_fighter_pot_milli_near * 5 / 100; // 5% Dev Treasury fee
+        let winner_pot = pool.total_fighter_pot_milli_near - dev_match_fee;
+        self.dev_treasury_milli += dev_match_fee;
+        winner.vault_balance_milli_near += winner_pot + fighter_royalty;
 
-        // 2. Evolve Dynamic NFT Combat Stats & ELO
+        // 2. Evolve Dynamic NFT Combat Stats, XP & ELO
         winner.wins += 1;
         winner.power_level += 1;
         winner.elo += 24;
         winner.atk += 1;
+        let w_xp = self.fighter_xp.get(&winner_token_id).unwrap_or(0) + 25;
+        self.fighter_xp.insert(&winner_token_id, &w_xp);
 
         loser.losses += 1;
         loser.elo = loser.elo.saturating_sub(18);
+        let l_xp = self.fighter_xp.get(&loser_token_id).unwrap_or(0) + 10;
+        self.fighter_xp.insert(&loser_token_id, &l_xp);
         if loser.vault_balance_milli_near < loser.wager_per_fight_milli_near {
             loser.is_agent_active = false; // Auto-pause agent if bankroll depleted
         }
@@ -534,9 +702,30 @@ impl ShinArenaContract {
             Some("Bazaar Fighter NFT Ownership Transfer (NEP-245)"),
         );
 
+        // Emit standard NEP-171 nft_transfer event
+        env::log_str(&format!(
+            "EVENT_JSON:{{\"standard\":\"nep171\",\"version\":\"1.0.0\",\"event\":\"nft_transfer\",\"data\":[{{\"old_owner_id\":\"{}\",\"new_owner_id\":\"{}\",\"token_ids\":[\"{}\"]}}]}}",
+            seller, buyer, token_id
+        ));
+
+        // Finalized NEP-199 Secondary Sale Split: 92.5% Seller / 2.5% Original Minter / 5% Dev Treasury
+        let orig_minter = self
+            .original_minters
+            .get(&token_id)
+            .unwrap_or_else(|| seller.clone());
+        let dev_fee = attached * 50 / 1000;
+        let minter_royalty = attached * 25 / 1000;
+        let seller_payout = attached - dev_fee - minter_royalty;
+        self.dev_treasury_milli += dev_fee;
+
         Promise::new(seller)
-            .transfer(NearToken::from_millinear(attached))
+            .transfer(NearToken::from_millinear(seller_payout))
             .detach();
+        if minter_royalty > 0 {
+            Promise::new(orig_minter)
+                .transfer(NearToken::from_millinear(minter_royalty))
+                .detach();
+        }
         fighter
     }
 
@@ -615,6 +804,488 @@ impl ShinArenaContract {
 
     pub fn get_all_fighters(&self) -> Vec<FighterNft> {
         self.fighters.values().collect()
+    }
+
+    // =========================================================================
+    // 1. BUILT-IN NEAR <-> $SHIN AMM SWAP POOL (x * y = k, 0.5% fee: 0.3% Dev / 0.2% LP)
+    // =========================================================================
+
+    /// Seed or add initial liquidity to the built-in NEAR <-> $SHIN AMM pool.
+    /// Caller (oracle/treasury) must have already transferred `shin_amount` of $SHIN
+    /// to this contract and attach the corresponding NEAR liquidity.
+    #[payable]
+    pub fn seed_amm_pool(&mut self, shin_amount: U128) -> AmmInfo {
+        let caller = env::predecessor_account_id();
+        assert!(
+            caller == self.oracle_id || caller == self.dev_treasury_id || caller == env::current_account_id(),
+            "Only oracle or dev treasury can seed the AMM pool"
+        );
+        let near_in = env::attached_deposit().as_yoctonear();
+        assert!(near_in > 0 && shin_amount.0 > 0, "Both NEAR and $SHIN amounts must be > 0");
+        self.amm_near_reserve += near_in;
+        self.amm_shin_reserve += shin_amount.0;
+        self.get_amm_info()
+    }
+
+    pub fn get_amm_info(&self) -> AmmInfo {
+        AmmInfo {
+            shin_token_id: self.shin_token_id.clone(),
+            dev_treasury_id: self.dev_treasury_id.clone(),
+            near_reserve: U128(self.amm_near_reserve),
+            shin_reserve: U128(self.amm_shin_reserve),
+            total_swap_volume_near: U128(self.total_swap_volume_near),
+            swap_fee_bps: 50,
+            dev_fee_bps: 30,
+            lp_fee_bps: 20,
+        }
+    }
+
+    /// Overflow-safe (a * b) / c for full 128-bit AMM reserves (NEAR 24 decimals x SHIN 18 decimals)
+    fn mul_div_u128(a: u128, b: u128, c: u128) -> u128 {
+        assert!(c > 0, "Division by zero");
+        // Shift-and-subtract / peasant multiplication in 256 bits via (hi, lo)
+        let mut res: u128 = 0;
+        let mut cur_a = a;
+        let mut cur_b = b;
+        // Scale down by common powers of 10 if both are large, or use 128-bit wide mul-div:
+        // Since NEAR has 24 decimals and SHIN has 18 decimals, we can do exact 256-bit (a * b) / c:
+        let a_lo = a & 0xFFFF_FFFF_FFFF_FFFF;
+        let a_hi = a >> 64;
+        let b_lo = b & 0xFFFF_FFFF_FFFF_FFFF;
+        let b_hi = b >> 64;
+
+        let p0 = a_lo * b_lo;
+        let p1 = a_lo * b_hi;
+        let p2 = a_hi * b_lo;
+        let p3 = a_hi * b_hi;
+
+        let mid = (p0 >> 64) + (p1 & 0xFFFF_FFFF_FFFF_FFFF) + (p2 & 0xFFFF_FFFF_FFFF_FFFF);
+        let lo = (p0 & 0xFFFF_FFFF_FFFF_FFFF) | (mid << 64);
+        let hi = p3 + (p1 >> 64) + (p2 >> 64) + (mid >> 64);
+
+        if hi == 0 {
+            return lo / c;
+        }
+        // Binary long division of 256-bit (hi, lo) by 128-bit c
+        let mut rem: u128 = 0;
+        let mut q: u128 = 0;
+        for i in (0..128).rev() {
+            let bit = (hi >> i) & 1;
+            rem = (rem << 1) | bit;
+            if rem >= c {
+                rem -= c;
+            }
+        }
+        for i in (0..128).rev() {
+            let bit = (lo >> i) & 1;
+            let overflow = rem >> 127;
+            rem = (rem << 1) | bit;
+            if overflow != 0 || rem >= c {
+                rem = rem.wrapping_sub(c);
+                q |= 1 << i;
+            }
+        }
+        let _ = (cur_a, cur_b, res);
+        q
+    }
+
+    pub fn get_amm_quote_near_to_shin(&self, near_in: U128) -> U128 {
+        if self.amm_near_reserve == 0 || self.amm_shin_reserve == 0 || near_in.0 == 0 {
+            return U128(0);
+        }
+        // 0.5% total swap fee (9950 / 10000 effective input for x * y = k)
+        let dx_effective = near_in.0.saturating_mul(9_950) / 10_000;
+        let denominator = self.amm_near_reserve.saturating_add(dx_effective);
+        U128(Self::mul_div_u128(self.amm_shin_reserve, dx_effective, denominator))
+    }
+
+    pub fn get_amm_quote_shin_to_near(&self, shin_in: U128) -> U128 {
+        if self.amm_near_reserve == 0 || self.amm_shin_reserve == 0 || shin_in.0 == 0 {
+            return U128(0);
+        }
+        // 0.5% total swap fee (9950 / 10000 effective input for x * y = k)
+        let dx_effective = shin_in.0.saturating_mul(9_950) / 10_000;
+        let denominator = self.amm_shin_reserve.saturating_add(dx_effective);
+        U128(Self::mul_div_u128(self.amm_near_reserve, dx_effective, denominator))
+    }
+
+    /// Swap attached NEAR for $SHIN using x * y = k AMM (0.5% fee: 0.3% Dev Treasury, 0.2% stays in LP)
+    #[payable]
+    pub fn swap_near_for_shin(&mut self, min_shin_out: Option<U128>) -> Promise {
+        let near_in = env::attached_deposit().as_yoctonear();
+        assert!(near_in > 0, "Attach NEAR to swap for $SHIN");
+        assert!(self.amm_near_reserve > 0 && self.amm_shin_reserve > 0, "AMM pool not seeded");
+
+        let shin_out = self.get_amm_quote_near_to_shin(U128(near_in)).0;
+        assert!(shin_out > 0 && shin_out < self.amm_shin_reserve, "Insufficient $SHIN liquidity");
+        if let Some(min_out) = min_shin_out {
+            assert!(shin_out >= min_out.0, "Slippage exceeded: output below min_shin_out");
+        }
+
+        // 0.3% Dev Treasury fee; 0.2% stays in AMM NEAR reserve as LP fee
+        let dev_fee_near = near_in.saturating_mul(30) / 10_000;
+        let near_to_reserve = near_in.saturating_sub(dev_fee_near);
+
+        self.amm_near_reserve += near_to_reserve;
+        self.amm_shin_reserve -= shin_out;
+        self.total_swap_volume_near += near_in;
+        self.dev_treasury_milli += dev_fee_near / 1_000_000_000_000_000_000_000;
+
+        let caller = env::predecessor_account_id();
+        env::log_str(&format!(
+            "AMM_SWAP_NEAR_TO_SHIN:{{\"trader\":\"{}\",\"near_in\":\"{}\",\"shin_out\":\"{}\",\"dev_fee_near\":\"{}\"}}",
+            caller, near_in, shin_out, dev_fee_near
+        ));
+
+        if dev_fee_near > 0 && self.dev_treasury_id != env::current_account_id() {
+            let _ = Promise::new(self.dev_treasury_id.clone()).transfer(NearToken::from_yoctonear(dev_fee_near));
+        }
+
+        ext_ft::ext(self.shin_token_id.clone())
+            .with_attached_deposit(NearToken::from_yoctonear(1))
+            .with_static_gas(GAS_FOR_FT_TRANSFER)
+            .ft_transfer(caller, U128(shin_out), Some("SHIN AMM Swap: NEAR -> $SHIN".to_string()))
+    }
+
+    /// NEP-141 receiver callback for `$SHIN` -> `NEAR` swaps via `ft_transfer_call`
+    pub fn ft_on_transfer(
+        &mut self,
+        sender_id: AccountId,
+        amount: U128,
+        msg: String,
+    ) -> PromiseOrValue<U128> {
+        assert_eq!(
+            env::predecessor_account_id(),
+            self.shin_token_id,
+            "Only official $SHIN token accepted"
+        );
+
+        if msg == "swap_to_near" {
+            assert!(self.amm_near_reserve > 0 && self.amm_shin_reserve > 0, "AMM pool not seeded");
+            let near_out = self.get_amm_quote_shin_to_near(amount).0;
+            assert!(near_out > 0 && near_out < self.amm_near_reserve, "Insufficient NEAR liquidity");
+
+            let dev_fee_shin = amount.0.saturating_mul(30) / 10_000;
+            let shin_to_reserve = amount.0.saturating_sub(dev_fee_shin);
+
+            self.amm_shin_reserve += shin_to_reserve;
+            self.amm_near_reserve -= near_out;
+            self.total_swap_volume_near += near_out;
+
+            env::log_str(&format!(
+                "AMM_SWAP_SHIN_TO_NEAR:{{\"trader\":\"{}\",\"shin_in\":\"{}\",\"near_out\":\"{}\",\"dev_fee_shin\":\"{}\"}}",
+                sender_id, amount.0, near_out, dev_fee_shin
+            ));
+
+            if dev_fee_shin > 0 && self.dev_treasury_id != env::current_account_id() {
+                let _ = ext_ft::ext(self.shin_token_id.clone())
+                    .with_attached_deposit(NearToken::from_yoctonear(1))
+                    .with_static_gas(GAS_FOR_FT_TRANSFER)
+                    .ft_transfer(
+                        self.dev_treasury_id.clone(),
+                        U128(dev_fee_shin),
+                        Some("SHIN AMM 0.3% Dev Fee".to_string()),
+                    );
+            }
+
+            let _ = Promise::new(sender_id).transfer(NearToken::from_yoctonear(near_out));
+            PromiseOrValue::Value(U128(0))
+        } else {
+            // Refund unused tokens for unrecognized messages
+            PromiseOrValue::Value(amount)
+        }
+    }
+
+    // =========================================================================
+    // 2. NEP-171 / NEP-177 / NEP-181 / NEP-199 FIGHTER NFT STANDARDS
+    // =========================================================================
+
+    fn internal_fighter_to_nep171(&self, fighter: &FighterNft) -> Nep171Token {
+        let xp = self.fighter_xp.get(&fighter.token_id).unwrap_or(0);
+        Nep171Token {
+            token_id: fighter.token_id.clone(),
+            owner_id: fighter.owner_id.clone(),
+            metadata: Some(TokenMetadata {
+                title: Some(format!("{} [{}]", fighter.name, fighter.char_class)),
+                description: Some(format!(
+                    "SHIN Fighter NFT | ELO: {} | W/L: {}/{} | XP: {} | ATK/DEF/SPD: {}/{}/{}",
+                    fighter.elo, fighter.wins, fighter.losses, xp, fighter.atk, fighter.def, fighter.spd
+                )),
+                media: None,
+                media_hash: None,
+                copies: Some(1),
+                issued_at: None,
+                expires_at: None,
+                starts_at: None,
+                updated_at: None,
+                extra: Some(format!(
+                    "{{\"char_class\":\"{}\",\"elo\":{},\"wins\":{},\"losses\":{},\"xp\":{}}}",
+                    fighter.char_class, fighter.elo, fighter.wins, fighter.losses, xp
+                )),
+                reference: None,
+                reference_hash: None,
+            }),
+            approved_account_ids: None,
+        }
+    }
+
+    pub fn nft_metadata(&self) -> NftContractMetadata {
+        NftContractMetadata {
+            spec: "nft-1.0.0".to_string(),
+            name: "SHIN Arena Fighters".to_string(),
+            symbol: "SHINNFT".to_string(),
+            icon: None,
+            base_uri: None,
+            reference: None,
+            reference_hash: None,
+        }
+    }
+
+    pub fn nft_token(&self, token_id: String) -> Option<Nep171Token> {
+        self.fighters.get(&token_id).map(|f| self.internal_fighter_to_nep171(&f))
+    }
+
+    pub fn nft_total_supply(&self) -> U128 {
+        U128(self.fighters.len() as u128)
+    }
+
+    pub fn nft_tokens(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<Nep171Token> {
+        let start = from_index.map(|i| i.0 as usize).unwrap_or(0);
+        let max = limit.unwrap_or(50) as usize;
+        self.fighters
+            .values()
+            .skip(start)
+            .take(max)
+            .map(|f| self.internal_fighter_to_nep171(&f))
+            .collect()
+    }
+
+    pub fn nft_supply_for_owner(&self, account_id: AccountId) -> U128 {
+        let count = self.fighters.values().filter(|f| f.owner_id == account_id).count();
+        U128(count as u128)
+    }
+
+    pub fn nft_tokens_for_owner(
+        &self,
+        account_id: AccountId,
+        from_index: Option<U128>,
+        limit: Option<u64>,
+    ) -> Vec<Nep171Token> {
+        let start = from_index.map(|i| i.0 as usize).unwrap_or(0);
+        let max = limit.unwrap_or(50) as usize;
+        self.fighters
+            .values()
+            .filter(|f| f.owner_id == account_id)
+            .skip(start)
+            .take(max)
+            .map(|f| self.internal_fighter_to_nep171(&f))
+            .collect()
+    }
+
+    #[payable]
+    pub fn nft_transfer(
+        &mut self,
+        receiver_id: AccountId,
+        token_id: String,
+        #[allow(unused_variables)] approval_id: Option<u64>,
+        memo: Option<String>,
+    ) {
+        assert_one_yocto();
+        let caller = env::predecessor_account_id();
+        let mut fighter = self.fighters.get(&token_id).expect("Fighter NFT not found");
+        let old_owner = fighter.owner_id.clone();
+        assert_eq!(caller, old_owner, "NEP-171: caller is not the token owner");
+        assert_ne!(old_owner, receiver_id, "NEP-171: receiver must differ from current owner");
+
+        fighter.owner_id = receiver_id.clone();
+        fighter.market_price_milli_near = 0;
+        self.fighters.insert(&token_id, &fighter);
+
+        let nep245_fighter_id = format!("fighter:{}", token_id);
+        self.internal_mt_transfer(
+            old_owner.as_str(),
+            receiver_id.as_str(),
+            &[nep245_fighter_id],
+            &[1],
+            memo.as_deref(),
+        );
+
+        env::log_str(&format!(
+            "EVENT_JSON:{{\"standard\":\"nep171\",\"version\":\"1.0.0\",\"event\":\"nft_transfer\",\"data\":[{{\"authorized_id\":null,\"old_owner_id\":\"{}\",\"new_owner_id\":\"{}\",\"token_ids\":[\"{}\"],\"memo\":{}}}]}}",
+            old_owner,
+            receiver_id,
+            token_id,
+            memo.as_ref().map(|m| format!("\"{}\"", m)).unwrap_or_else(|| "null".to_string())
+        ));
+    }
+
+    /// NEP-199 Royalties: 92.5% Seller / 2.5% Original Minter / 5% Dev Treasury
+    pub fn nft_payout(&self, token_id: String, balance: U128, max_len_payout: Option<u32>) -> Payout {
+        let fighter = self.fighters.get(&token_id).expect("Fighter NFT not found");
+        let minter = self.original_minters.get(&token_id).unwrap_or_else(|| fighter.owner_id.clone());
+
+        let minter_cut = balance.0.saturating_mul(25) / 1_000; // 2.5%
+        let dev_cut = balance.0.saturating_mul(50) / 1_000;    // 5.0%
+        let seller_cut = balance.0.saturating_sub(minter_cut).saturating_sub(dev_cut); // 92.5%
+
+        let mut payout: HashMap<AccountId, U128> = HashMap::new();
+        *payout.entry(fighter.owner_id).or_insert(U128(0)) = U128(seller_cut);
+        let prev_minter = payout.get(&minter).map(|v| v.0).unwrap_or(0);
+        payout.insert(minter, U128(prev_minter + minter_cut));
+        let prev_dev = payout.get(&self.dev_treasury_id).map(|v| v.0).unwrap_or(0);
+        payout.insert(self.dev_treasury_id.clone(), U128(prev_dev + dev_cut));
+
+        if let Some(max_len) = max_len_payout {
+            assert!(payout.len() <= max_len as usize, "Payout exceeds max_len_payout");
+        }
+        Payout { payout }
+    }
+
+    // =========================================================================
+    // 3. PLAYER TRAINERS (90% Trainer / 10% Dev Treasury)
+    // =========================================================================
+
+    pub fn register_trainer(&mut self, fee_milli_near: u128, specialty: String) -> TrainerProfile {
+        assert!(fee_milli_near > 0, "Trainer fee must be > 0");
+        assert!(
+            specialty == "ATK" || specialty == "DEF" || specialty == "SPD",
+            "Specialty must be ATK, DEF, or SPD"
+        );
+        let trainer_id = env::predecessor_account_id();
+        let existing_sessions = self.trainers.get(&trainer_id).map(|t| t.sessions_completed).unwrap_or(0);
+        let profile = TrainerProfile {
+            trainer_id: trainer_id.clone(),
+            fee_milli_near,
+            specialty,
+            sessions_completed: existing_sessions,
+            is_active: true,
+        };
+        self.trainers.insert(&trainer_id, &profile);
+        profile
+    }
+
+    pub fn get_trainer(&self, trainer_id: AccountId) -> Option<TrainerProfile> {
+        self.trainers.get(&trainer_id)
+    }
+
+    #[payable]
+    pub fn train_fighter_with_trainer(&mut self, token_id: String, trainer_id: AccountId) -> FighterNft {
+        let caller = env::predecessor_account_id();
+        let mut fighter = self.fighters.get(&token_id).expect("Fighter NFT not found");
+        assert_eq!(caller, fighter.owner_id, "Only fighter owner can train");
+
+        let mut trainer = self.trainers.get(&trainer_id).expect("Trainer not registered");
+        assert!(trainer.is_active, "Trainer is not active");
+
+        let attached = env::attached_deposit().as_millinear();
+        assert!(attached >= trainer.fee_milli_near, "Insufficient NEAR for trainer fee");
+
+        // 90% Trainer / 10% Dev Treasury
+        let dev_cut = attached.saturating_mul(10) / 100;
+        let trainer_cut = attached.saturating_sub(dev_cut);
+
+        match trainer.specialty.as_str() {
+            "ATK" => fighter.atk += 2,
+            "DEF" => fighter.def += 2,
+            _ => fighter.spd += 2,
+        }
+        let xp = self.fighter_xp.get(&token_id).unwrap_or(0) + 15;
+        self.fighter_xp.insert(&token_id, &xp);
+        self.fighters.insert(&token_id, &fighter);
+
+        trainer.sessions_completed += 1;
+        self.trainers.insert(&trainer_id, &trainer);
+        self.dev_treasury_milli += dev_cut;
+
+        if trainer_cut > 0 {
+            let _ = Promise::new(trainer_id).transfer(NearToken::from_millinear(trainer_cut));
+        }
+        if dev_cut > 0 && self.dev_treasury_id != env::current_account_id() {
+            let _ = Promise::new(self.dev_treasury_id.clone()).transfer(NearToken::from_millinear(dev_cut));
+        }
+
+        fighter
+    }
+
+    // =========================================================================
+    // 4. PLAYER-FUNDED TOURNAMENTS (95% Winners / 5% Dev Treasury)
+    // =========================================================================
+
+    pub fn create_tournament(
+        &mut self,
+        tournament_id: String,
+        entry_fee_milli_near: u128,
+        max_players: u32,
+    ) -> TournamentPool {
+        assert!(self.tournaments.get(&tournament_id).is_none(), "Tournament already exists");
+        assert!(entry_fee_milli_near > 0 && max_players >= 2, "Invalid tournament parameters");
+        let pool = TournamentPool {
+            tournament_id: tournament_id.clone(),
+            entry_fee_milli_near,
+            max_players,
+            entrants: Vec::new(),
+            total_pot_milli_near: 0,
+            is_settled: false,
+            winner_token_ids: Vec::new(),
+        };
+        self.tournaments.insert(&tournament_id, &pool);
+        pool
+    }
+
+    #[payable]
+    pub fn join_tournament(&mut self, tournament_id: String, token_id: String) -> TournamentPool {
+        let mut pool = self.tournaments.get(&tournament_id).expect("Tournament not found");
+        assert!(!pool.is_settled, "Tournament already settled");
+        assert!((pool.entrants.len() as u32) < pool.max_players, "Tournament is full");
+        assert!(!pool.entrants.contains(&token_id), "Fighter already entered");
+
+        let fighter = self.fighters.get(&token_id).expect("Fighter NFT not found");
+        assert_eq!(env::predecessor_account_id(), fighter.owner_id, "Only fighter owner can enter");
+
+        let attached = env::attached_deposit().as_millinear();
+        assert!(attached >= pool.entry_fee_milli_near, "Insufficient entry fee attached");
+
+        pool.entrants.push(token_id);
+        pool.total_pot_milli_near += attached;
+        self.tournaments.insert(&tournament_id, &pool);
+        pool
+    }
+
+    pub fn settle_tournament(&mut self, tournament_id: String, winner_token_ids: Vec<String>) -> TournamentPool {
+        assert_eq!(env::predecessor_account_id(), self.oracle_id, "Only oracle can settle tournament");
+        let mut pool = self.tournaments.get(&tournament_id).expect("Tournament not found");
+        assert!(!pool.is_settled, "Tournament already settled");
+        assert!(!winner_token_ids.is_empty(), "Must specify at least one winner");
+
+        // 95% Winners / 5% Dev Treasury
+        let dev_cut = pool.total_pot_milli_near.saturating_mul(5) / 100;
+        let winners_pot = pool.total_pot_milli_near.saturating_sub(dev_cut);
+        let per_winner = winners_pot / (winner_token_ids.len() as u128);
+
+        for winner_id in &winner_token_ids {
+            if let Some(mut fighter) = self.fighters.get(winner_id) {
+                fighter.vault_balance_milli_near += per_winner;
+                fighter.wins += 1;
+                fighter.elo += 25;
+                self.fighters.insert(winner_id, &fighter);
+                let xp = self.fighter_xp.get(winner_id).unwrap_or(0) + 50;
+                self.fighter_xp.insert(winner_id, &xp);
+            }
+        }
+
+        self.dev_treasury_milli += dev_cut;
+        if dev_cut > 0 && self.dev_treasury_id != env::current_account_id() {
+            let _ = Promise::new(self.dev_treasury_id.clone()).transfer(NearToken::from_millinear(dev_cut));
+        }
+
+        pool.is_settled = true;
+        pool.winner_token_ids = winner_token_ids;
+        self.tournaments.insert(&tournament_id, &pool);
+        pool
+    }
+
+    pub fn get_tournament(&self, tournament_id: String) -> Option<TournamentPool> {
+        self.tournaments.get(&tournament_id)
     }
 }
 
@@ -719,9 +1390,9 @@ mod tests {
         let winner = fighters.iter().find(|f| f.token_id == f1.token_id).unwrap();
         let loser = fighters.iter().find(|f| f.token_id == f2.token_id).unwrap();
 
-        // f1 started with 5000, staked 1000 -> 4000, won 2000 pot + 100 (5% of 2000 bet) = 6100,
-        // auto_train_at_dojo paid 500 -> 5600
-        assert_eq!(winner.vault_balance_milli_near, 5_600);
+        // f1 started with 5000, staked 1000 -> 4000, won 1900 (95% of 2000 pot) + 100 (5% of 2000 bet) = 6000,
+        // auto_train_at_dojo paid 500 -> 5500
+        assert_eq!(winner.vault_balance_milli_near, 5_500);
         assert_eq!(winner.wins, 1);
         assert_eq!(winner.elo, 1024);
         assert_eq!(winner.power_level, 3); // +1 from win, +1 from auto-train
@@ -816,5 +1487,98 @@ mod tests {
             contract.mt_batch_balance_of("alice.testnet".parse().unwrap(), token_ids),
             vec!["0".to_string(), "0".to_string()]
         );
+    }
+
+    #[test]
+    fn test_amm_swap_quotes_and_fee_splits() {
+        testing_env!(get_context("oracle.testnet", 2_000)); // 2 NEAR
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let two_thousand_shin: u128 = 2_000 * 1_000_000_000_000_000_000;
+        let info = contract.seed_amm_pool(U128(two_thousand_shin));
+        assert_eq!(info.near_reserve.0, 2_000_000_000_000_000_000_000_000);
+        assert_eq!(info.shin_reserve.0, two_thousand_shin);
+        assert_eq!(info.swap_fee_bps, 50);
+
+        // Quote 1 NEAR -> $SHIN (should be slightly less than 1000 * 1 / (2 + 1) = ~663.33 $SHIN due to 0.5% fee + slippage)
+        let one_near: u128 = 1_000_000_000_000_000_000_000_000;
+        let quote = contract.get_amm_quote_near_to_shin(U128(one_near)).0;
+        assert!(quote > 660 * 1_000_000_000_000_000_000 && quote < 667 * 1_000_000_000_000_000_000);
+
+        // Execute swap
+        testing_env!(get_context("alice.testnet", 1_000));
+        let _ = contract.swap_near_for_shin(Some(U128(quote)));
+        let after = contract.get_amm_info();
+        assert_eq!(after.shin_reserve.0, two_thousand_shin - quote);
+        // 0.3% of 1 NEAR = 3 milliNEAR to dev treasury
+        assert_eq!(contract.dev_treasury_milli, 3);
+    }
+
+    #[test]
+    fn test_nep171_and_nep199_payout_splits() {
+        testing_env!(get_context("alice.testnet", 1_000));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let f1 = contract.mint_fighter("ryu".to_string(), "Ryu".to_string(), 80, 80, 80);
+
+        assert_eq!(contract.nft_total_supply().0, 1);
+        assert_eq!(contract.nft_supply_for_owner("alice.testnet".parse().unwrap()).0, 1);
+        let tok = contract.nft_token(f1.token_id.clone()).unwrap();
+        assert_eq!(tok.owner_id.as_str(), "alice.testnet");
+
+        // Transfer to bob.testnet (1 yoctoNEAR)
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id("alice.testnet".parse().unwrap())
+            .attached_deposit(NearToken::from_yoctonear(1))
+            .build());
+        contract.nft_transfer("bob.testnet".parse().unwrap(), f1.token_id.clone(), None, None);
+        assert_eq!(contract.nft_supply_for_owner("bob.testnet".parse().unwrap()).0, 1);
+        assert_eq!(contract.nft_supply_for_owner("alice.testnet".parse().unwrap()).0, 0);
+
+        // Check NEP-199 payout for 1000 units: 925 bob (seller), 25 alice (minter), 50 dev_treasury
+        let payout = contract.nft_payout(f1.token_id, U128(1_000), None);
+        assert_eq!(payout.payout.get(&"bob.testnet".parse::<AccountId>().unwrap()).unwrap().0, 925);
+        assert_eq!(payout.payout.get(&"alice.testnet".parse::<AccountId>().unwrap()).unwrap().0, 25);
+    }
+
+    #[test]
+    fn test_player_trainer_90_10_split() {
+        testing_env!(get_context("sensei.testnet", 0));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let trainer = contract.register_trainer(1_000, "ATK".to_string());
+        assert_eq!(trainer.fee_milli_near, 1_000);
+
+        testing_env!(get_context("alice.testnet", 1_000));
+        let f1 = contract.mint_fighter("ken".to_string(), "Ken".to_string(), 70, 70, 70);
+        let trained = contract.train_fighter_with_trainer(f1.token_id.clone(), "sensei.testnet".parse().unwrap());
+        assert_eq!(trained.atk, 72);
+        // 10% of 1000 milliNEAR = 100 milliNEAR to dev treasury
+        assert_eq!(contract.dev_treasury_milli, 100);
+        assert_eq!(contract.get_trainer("sensei.testnet".parse().unwrap()).unwrap().sessions_completed, 1);
+    }
+
+    #[test]
+    fn test_player_funded_tournament_95_5_split() {
+        testing_env!(get_context("alice.testnet", 1_000));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let f1 = contract.mint_fighter("f1".to_string(), "Fighter 1".to_string(), 80, 70, 80);
+
+        testing_env!(get_context("bob.testnet", 1_000));
+        let f2 = contract.mint_fighter("f2".to_string(), "Fighter 2".to_string(), 75, 75, 80);
+
+        contract.create_tournament("cup-1".to_string(), 1_000, 4);
+
+        testing_env!(get_context("alice.testnet", 1_000));
+        contract.join_tournament("cup-1".to_string(), f1.token_id.clone());
+
+        testing_env!(get_context("bob.testnet", 1_000));
+        let pool = contract.join_tournament("cup-1".to_string(), f2.token_id.clone());
+        assert_eq!(pool.total_pot_milli_near, 2_000);
+
+        testing_env!(get_context("oracle.testnet", 0));
+        let settled = contract.settle_tournament("cup-1".to_string(), vec![f1.token_id.clone()]);
+        assert!(settled.is_settled);
+        // 95% of 2000 = 1900 milliNEAR added to winner's 1000 vault -> 2900
+        assert_eq!(contract.fighters.get(&f1.token_id).unwrap().vault_balance_milli_near, 2_900);
+        // 5% of 2000 = 100 milliNEAR to dev treasury
+        assert_eq!(contract.dev_treasury_milli, 100);
     }
 }

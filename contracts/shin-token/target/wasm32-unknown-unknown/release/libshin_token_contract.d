@@ -1,0 +1,1 @@
+/Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-token/target/wasm32-unknown-unknown/release/libshin_token_contract.rlib: /Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-token/src/lib.rs

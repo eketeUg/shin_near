@@ -22,7 +22,7 @@ let WalletController = class WalletController {
     }
     async getBalance(walletAddress) {
         try {
-            const balances = await this.walletService.getWalletBalance(walletAddress, process.env.SOLANA_RPC_URL);
+            const balances = await this.walletService.getWalletBalance(walletAddress, process.env.NEAR_RPC_URL);
             if (!balances) {
                 throw new common_1.NotFoundException('Could not fetch balances for this wallet');
             }

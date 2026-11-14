@@ -16,16 +16,22 @@ exports.GameGateway = void 0;
 const websockets_1 = require("@nestjs/websockets");
 const socket_io_1 = require("socket.io");
 const game_service_1 = require("./game.service");
-const web3_js_1 = require("@solana/web3.js");
-const anchor_1 = require("@coral-xyz/anchor");
-const PROGRAM_ID = new web3_js_1.PublicKey("2exTZQktysE3gATBrRkmymsz35E5reE5ZGmtoedPhyFp");
+const near_relayer_service_1 = require("./near-relayer.service");
+const crypto_1 = require("crypto");
+const NEAR_ARENA_CONTRACT_ID = process.env.NEAR_CONTRACT_ID || 'shin-arena-28d.testnet';
+const NEAR_RPC_URL = process.env.NEAR_RPC_URL || 'https://test.rpc.fastnear.com';
 let GameGateway = class GameGateway {
     gameService;
+    nearRelayer;
     server;
     activeMatches = new Map();
     matchmakingBuckets = new Map();
-    constructor(gameService) {
+    lobbyUsers = new Map();
+    offlineMessageQueue = new Map();
+    chatFightProposals = new Map();
+    constructor(gameService, nearRelayer) {
         this.gameService = gameService;
+        this.nearRelayer = nearRelayer;
     }
     handleConnection(client) {
         console.log(`Client connected: ${client.id}`);
@@ -35,6 +41,19 @@ let GameGateway = class GameGateway {
         this.gameService.removePlayer(client.id);
         for (const [key, queue] of this.matchmakingBuckets.entries()) {
             this.matchmakingBuckets.set(key, queue.filter((p) => p.socket.id !== client.id));
+        }
+        let presenceChanged = false;
+        for (const [acct, user] of this.lobbyUsers.entries()) {
+            if (user.socketId === client.id) {
+                user.isOnline = false;
+                user.socketId = null;
+                user.lastSeenLabel = 'Last seen just now';
+                this.lobbyUsers.set(acct, user);
+                presenceChanged = true;
+            }
+        }
+        if (presenceChanged) {
+            this.server.emit('lobby_presence_updated', Array.from(this.lobbyUsers.values()));
         }
         let matchEnded = false;
         for (const [mid, match] of this.activeMatches.entries()) {
@@ -50,20 +69,22 @@ let GameGateway = class GameGateway {
         }
     }
     handleCreateMatch(client, matchData) {
-        const matchId = matchData?.matchId || 'local_' + Math.random().toString(36).substring(2, 9);
+        const matchId = matchData?.matchId ||
+            'near_match_' + Math.random().toString(36).substring(2, 9);
         this.activeMatches.set(matchId, {
             hostId: client.id,
             matchId: matchId,
-            hostName: matchData?.hostName || 'Unknown Player',
-            p1Type: matchData?.p1Type || 'Unknown',
-            p2Type: matchData?.p2Type || 'Unknown',
-            mode: matchData?.mode || 'PvE',
+            hostName: matchData?.hostName || 'Unknown Warrior',
+            p1Type: matchData?.p1Type || 'shinobi',
+            p2Type: matchData?.p2Type || 'samurai',
+            mode: matchData?.mode || 'AGENT_ARENA',
+            wagerNear: matchData?.wagerNear || 1.0,
             viewers: 0,
-            encryptedWagers: [],
+            spectatorBets: [],
         });
-        console.log(`Match created: ${matchId}`);
+        console.log(`[NEAR ARENA] Match created on ${NEAR_ARENA_CONTRACT_ID}: ${matchId}`);
         this.server.emit('active_matches_updated', Array.from(this.activeMatches.values()));
-        return { matchId };
+        return { matchId, contractId: NEAR_ARENA_CONTRACT_ID };
     }
     handleHostSyncFrame(client, frameData) {
         let matchId = null;
@@ -93,63 +114,67 @@ let GameGateway = class GameGateway {
                 .emit('spectator_fire_event', eventData);
             if (eventData.type === 'match_event' &&
                 eventData.data?.event === 'gameOver') {
-                console.log(`[ORACLE] Match ${matchId} concluded. Triggering Anchor SettleMatch...`);
-                this.processMatchSettlement(matchId, eventData.data.detail.winnerPubKey);
+                console.log(`[NEAR REFEREE] Match ${matchId} concluded. Triggering settle_match on ${NEAR_ARENA_CONTRACT_ID}...`);
+                this.processNearMatchSettlement(matchId, eventData.data.detail?.winnerPubKey || 'fighter-1.shin-arena.testnet');
             }
         }
     }
-    handlePlaceEncryptedBet(client, betData) {
-        const { matchId, encryptedPrediction, amount, spectatorPubKey } = betData;
+    handlePlaceSpectatorBet(client, betData) {
+        const { matchId, backedFighterId, amountNear, spectatorAccountId } = betData;
         if (this.activeMatches.has(matchId)) {
             const match = this.activeMatches.get(matchId);
-            match.encryptedWagers.push({
-                spectatorPubKey,
-                encryptedPrediction,
-                amount,
+            match.spectatorBets.push({
+                spectatorAccountId,
+                backedFighterId,
+                amountNear,
+                timestamp: Date.now(),
             });
             this.activeMatches.set(matchId, match);
-            console.log(`[ARCIUM] Encrypted wager placed for Match ${matchId} by ${spectatorPubKey}. Pool size: ${match.encryptedWagers.length}`);
+            console.log(`[NEAR SPECTATOR POOL] Bet of ${amountNear} NEAR placed on ${backedFighterId} in Match ${matchId} by ${spectatorAccountId}`);
+            this.server.to(`match_${matchId}`).emit('spectator_pool_updated', {
+                matchId,
+                totalBets: match.spectatorBets.length,
+                spectatorBets: match.spectatorBets,
+            });
             return { success: true };
         }
         return { success: false, message: 'Match not found' };
     }
-    async processMatchSettlement(matchId, winnerPubKeyStr) {
+    async processNearMatchSettlement(matchId, winnerAccountId) {
         const match = this.activeMatches.get(matchId);
         if (!match)
             return;
-        console.log(`[ORACLE] Winner for ${matchId} is ${winnerPubKeyStr}. Broadcasting end...`);
-        this.activeMatches.delete(matchId);
-        this.server.emit('active_matches_updated', Array.from(this.activeMatches.values()));
-        this.server.to(`match_${matchId}`).emit('match_ended');
-        if (!matchId.startsWith('local_') && winnerPubKeyStr) {
-            try {
-                const secretKeyString = process.env.ORACLE_PRIVATE_KEY || '[246,145,15,58,162,11,105,108,124,196,16,61,6,27,105,73,158,187,49,158,35,46,155,59,45,216,13,87,175,20,58,137,236,152,7,41,228,87,3,251,130,227,144,21,173,191,15,142,65,71,151,213,44,83,78,143,156,92,49,86,183,184,88,140]';
-                const secretKey = Uint8Array.from(JSON.parse(secretKeyString));
-                const oracleKeypair = web3_js_1.Keypair.fromSecretKey(secretKey);
-                const connection = new web3_js_1.Connection("https://api.devnet.solana.com", "confirmed");
-                const provider = new anchor_1.AnchorProvider(connection, new anchor_1.Wallet(oracleKeypair), { preflightCommitment: "confirmed" });
-                const matchPubkey = new web3_js_1.PublicKey(matchId);
-                const winnerPubkey = new web3_js_1.PublicKey(winnerPubKeyStr);
-                const idl = await anchor_1.Program.fetchIdl(PROGRAM_ID, provider);
-                if (!idl)
-                    throw new Error("IDL not found on chain");
-                const program = new anchor_1.Program(idl, provider);
-                const matchAccountData = await program.account["match"].fetch(matchPubkey);
-                const numericMatchId = matchAccountData.matchId;
-                console.log(`[ORACLE] On-Chain resolution for Match ID numeric: ${numericMatchId.toString()}`);
-                const tx = await program.methods.resolveMatch(numericMatchId, winnerPubkey)
-                    .accounts({
-                    oracle: oracleKeypair.publicKey,
-                    winnerAccount: winnerPubkey
-                })
-                    .signers([oracleKeypair])
-                    .rpc();
-                console.log(`[ORACLE] Payout distributed to Winner successfully! Signature: ${tx}`);
-            }
-            catch (err) {
-                console.error("[ORACLE] Failed to settle match on-chain:", err);
+        let receiptHash = (0, crypto_1.createHash)('sha256')
+            .update(`${matchId}:${winnerAccountId}:${Date.now()}`)
+            .digest('hex')
+            .slice(0, 44);
+        let explorerUrl = '';
+        let onChain = false;
+        const winnerTokenId = match?.p1?.accountId === winnerAccountId
+            ? match?.p1?.tokenId
+            : match?.p2?.tokenId;
+        if (winnerTokenId) {
+            const relay = await this.nearRelayer.callMethod('settle_match', {
+                match_id: matchId,
+                winner_token_id: winnerTokenId,
+            });
+            if (relay.ok && relay.txHash) {
+                receiptHash = relay.txHash;
+                explorerUrl = relay.explorerUrl;
+                onChain = true;
             }
         }
+        console.log(`[NEAR REFEREE] Settling Match ${matchId} on ${NEAR_ARENA_CONTRACT_ID} (${NEAR_RPC_URL}) -> Winner: ${winnerAccountId} | Receipt: ${receiptHash} | OnChain: ${onChain}`);
+        this.activeMatches.delete(matchId);
+        this.server.emit('active_matches_updated', Array.from(this.activeMatches.values()));
+        this.server.to(`match_${matchId}`).emit('match_ended', {
+            matchId,
+            winnerAccountId,
+            contractId: NEAR_ARENA_CONTRACT_ID,
+            receiptHash,
+            explorerUrl,
+            onChain,
+        });
     }
     handleGetActiveMatches(client) {
         client.emit('active_matches_updated', Array.from(this.activeMatches.values()));
@@ -178,10 +203,15 @@ let GameGateway = class GameGateway {
     }
     handleJoinMatchmaking(client, userData) {
         const wager = userData.wager;
-        const bucketKey = wager ? `wager_${wager.token}_${wager.amount}` : 'free';
-        console.log(`Client ${client.id} joining queue for [${bucketKey}]`);
+        const roomCode = userData.roomCode ? String(userData.roomCode).trim().toUpperCase() : null;
+        const bucketKey = roomCode
+            ? `room_${roomCode}`
+            : wager
+                ? `wager_${wager.token}_${wager.amount}`
+                : 'free';
+        console.log(`Client ${client.id} joining NEAR queue for [${bucketKey}]`);
         for (const [key, queue] of this.matchmakingBuckets.entries()) {
-            this.matchmakingBuckets.set(key, queue.filter(p => p.socket.id !== client.id));
+            this.matchmakingBuckets.set(key, queue.filter((p) => p.socket.id !== client.id));
         }
         if (!this.matchmakingBuckets.has(bucketKey)) {
             this.matchmakingBuckets.set(bucketKey, []);
@@ -196,15 +226,16 @@ let GameGateway = class GameGateway {
                 hostName: opponent.data?.username || 'Player 1',
                 p1Type: opponent.data?.charType || 'shinobi',
                 p2Type: userData?.charType || 'samurai',
-                mode: wager ? 'Wager Fight' : 'Free Fight',
+                mode: roomCode ? `Room #${roomCode}` : wager ? 'NEAR Wager Fight' : 'Free Fight',
                 wager: wager,
                 viewers: 0,
-                encryptedWagers: [],
+                spectatorBets: [],
             });
             this.server.emit('active_matches_updated', Array.from(this.activeMatches.values()));
             opponent.socket.emit('match_found', {
                 role: 'P1',
                 matchId: matchId,
+                roomCode,
                 opponentId: client.id,
                 opponentName: userData?.username || 'Player 2',
                 opponentChar: userData?.charType || 'samurai',
@@ -213,6 +244,7 @@ let GameGateway = class GameGateway {
             client.emit('match_found', {
                 role: 'P2',
                 matchId: matchId,
+                roomCode,
                 opponentId: opponent.socket.id,
                 opponentName: opponent.data?.username || 'Player 1',
                 opponentChar: opponent.data?.charType || 'shinobi',
@@ -224,6 +256,154 @@ let GameGateway = class GameGateway {
         else {
             currentBucket.push({ socket: client, data: userData });
         }
+    }
+    handleLobbyRegisterPresence(client, userData) {
+        if (!userData?.accountId)
+            return;
+        this.lobbyUsers.set(userData.accountId, {
+            accountId: userData.accountId,
+            username: userData.username || 'Warrior',
+            charId: userData.charId || 'fighter',
+            socketId: client.id,
+            isOnline: true,
+            lastSeenLabel: 'Active now',
+            elo: userData.elo || 1200,
+            wins: userData.wins || 0,
+            losses: userData.losses || 0,
+        });
+        const queued = this.offlineMessageQueue.get(userData.accountId) || [];
+        if (queued.length > 0) {
+            queued.forEach((msg) => {
+                const deliveredMsg = {
+                    ...msg,
+                    deliveryStatus: 'READ_ON_WAKE',
+                };
+                client.emit('lobby_receive_dm', deliveredMsg);
+                const sender = this.lobbyUsers.get(msg.senderAccountId);
+                if (sender?.socketId) {
+                    this.server.to(sender.socketId).emit('lobby_dm_status_updated', {
+                        id: msg.id,
+                        deliveryStatus: 'READ_ON_WAKE',
+                    });
+                }
+            });
+            this.offlineMessageQueue.delete(userData.accountId);
+        }
+        this.server.emit('lobby_presence_updated', Array.from(this.lobbyUsers.values()));
+    }
+    handleLobbySendDm(client, msg) {
+        if (!msg?.recipientAccountId) {
+            this.server.emit('lobby_chat_broadcast', {
+                ...msg,
+                socketId: client.id,
+                timestamp: msg.timestamp || Date.now(),
+            });
+            return { deliveryStatus: 'DELIVERED_LIVE' };
+        }
+        const recipient = this.lobbyUsers.get(msg.recipientAccountId);
+        if (recipient?.isOnline && recipient.socketId) {
+            const liveMsg = {
+                ...msg,
+                deliveryStatus: 'DELIVERED_LIVE',
+            };
+            this.server.to(recipient.socketId).emit('lobby_receive_dm', liveMsg);
+            return { deliveryStatus: 'DELIVERED_LIVE' };
+        }
+        else {
+            const queuedMsg = {
+                ...msg,
+                deliveryStatus: 'QUEUED_OFFLINE',
+            };
+            const existing = this.offlineMessageQueue.get(msg.recipientAccountId) || [];
+            existing.push(queuedMsg);
+            this.offlineMessageQueue.set(msg.recipientAccountId, existing);
+            return { deliveryStatus: 'QUEUED_OFFLINE' };
+        }
+    }
+    handleLobbySendFightProposal(client, msg) {
+        const offer = msg?.challengeOffer;
+        if (!offer?.proposalId || !offer?.targetId)
+            return;
+        this.chatFightProposals.set(offer.proposalId, {
+            ...offer,
+            challengerSocketId: client.id,
+        });
+        const recipient = this.lobbyUsers.get(offer.targetId);
+        if (recipient?.isOnline && recipient.socketId) {
+            this.server.to(recipient.socketId).emit('lobby_receive_dm', msg);
+        }
+    }
+    handleLobbyRespondFightProposal(client, data) {
+        const offer = this.chatFightProposals.get(data.proposalId);
+        if (!offer)
+            return;
+        offer.status = data.status;
+        if (data.status === 'COUNTERED') {
+            offer.counterWagerNear = data.wagerNear;
+        }
+        else {
+            offer.wagerNear = data.wagerNear;
+        }
+        this.chatFightProposals.set(data.proposalId, offer);
+        const challenger = this.lobbyUsers.get(offer.challengerId);
+        const target = this.lobbyUsers.get(offer.targetId);
+        if (data.status === 'ACCEPTED') {
+            const matchId = 'duel_' + Math.random().toString(36).substring(2, 9);
+            this.activeMatches.set(matchId, {
+                hostId: challenger?.socketId || client.id,
+                matchId,
+                hostName: offer.challengerName,
+                p1Type: offer.challengerCharId || 'fighter',
+                p2Type: offer.targetCharId || 'shinobi',
+                mode: offer.wagerNear > 0 ? `${offer.wagerNear} NEAR Chat Duel` : 'Free Chat Duel',
+                wager: offer.wagerNear > 0 ? { token: 'NEAR', amount: offer.wagerNear } : null,
+                viewers: 0,
+                spectatorBets: [],
+            });
+            const matchPayload = {
+                matchId,
+                proposalId: offer.proposalId,
+                wagerNear: offer.wagerNear,
+                p1Name: offer.challengerName,
+                p1Char: offer.challengerCharId || 'fighter',
+                p2Name: offer.targetName,
+                p2Char: offer.targetCharId || 'shinobi',
+            };
+            if (challenger?.socketId) {
+                this.server.to(challenger.socketId).emit('lobby_fight_matched', {
+                    ...matchPayload,
+                    isHost: true,
+                });
+            }
+            if (target?.socketId) {
+                this.server.to(target.socketId).emit('lobby_fight_matched', {
+                    ...matchPayload,
+                    isHost: false,
+                });
+            }
+        }
+        else {
+            if (challenger?.socketId) {
+                this.server.to(challenger.socketId).emit('lobby_fight_proposal_updated', offer);
+            }
+            if (target?.socketId) {
+                this.server.to(target.socketId).emit('lobby_fight_proposal_updated', offer);
+            }
+        }
+    }
+    handleLobbyChatMessage(client, msgData) {
+        this.server.emit('lobby_chat_broadcast', {
+            ...msgData,
+            socketId: client.id,
+            timestamp: Date.now(),
+        });
+    }
+    handleDirectChallengeRequest(client, challengeData) {
+        this.server.emit('direct_challenge_received', {
+            ...challengeData,
+            challengerSocketId: client.id,
+            timestamp: Date.now(),
+        });
     }
     handleCancelMatchmaking(client) {
         for (const [key, queue] of this.matchmakingBuckets.entries()) {
@@ -248,7 +428,7 @@ let GameGateway = class GameGateway {
             }
         }
     }
-    handleJoinGame(client, data) {
+    handleJoinGame(client) {
         const player = this.gameService.addPlayer(client.id);
         client.emit('currentPlayers', this.gameService.getAllPlayers());
         client.broadcast.emit('newPlayer', player);
@@ -352,13 +532,13 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], GameGateway.prototype, "handleHostFireEvent", null);
 __decorate([
-    (0, websockets_1.SubscribeMessage)('place_encrypted_bet'),
+    (0, websockets_1.SubscribeMessage)('place_spectator_bet'),
     __param(0, (0, websockets_1.ConnectedSocket)()),
     __param(1, (0, websockets_1.MessageBody)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
     __metadata("design:returntype", void 0)
-], GameGateway.prototype, "handlePlaceEncryptedBet", null);
+], GameGateway.prototype, "handlePlaceSpectatorBet", null);
 __decorate([
     (0, websockets_1.SubscribeMessage)('get_active_matches'),
     __param(0, (0, websockets_1.ConnectedSocket)()),
@@ -391,6 +571,54 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], GameGateway.prototype, "handleJoinMatchmaking", null);
 __decorate([
+    (0, websockets_1.SubscribeMessage)('lobby_register_presence'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], GameGateway.prototype, "handleLobbyRegisterPresence", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('lobby_send_dm'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], GameGateway.prototype, "handleLobbySendDm", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('lobby_send_fight_proposal'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], GameGateway.prototype, "handleLobbySendFightProposal", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('lobby_respond_fight_proposal'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], GameGateway.prototype, "handleLobbyRespondFightProposal", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('lobby_chat_message'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], GameGateway.prototype, "handleLobbyChatMessage", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('direct_challenge_request'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", void 0)
+], GameGateway.prototype, "handleDirectChallengeRequest", null);
+__decorate([
     (0, websockets_1.SubscribeMessage)('cancel_matchmaking'),
     __param(0, (0, websockets_1.ConnectedSocket)()),
     __metadata("design:type", Function),
@@ -415,9 +643,8 @@ __decorate([
 ], GameGateway.prototype, "handleP2Input", null);
 __decorate([
     (0, websockets_1.SubscribeMessage)('join_game'),
-    __param(1, (0, websockets_1.MessageBody)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:paramtypes", [socket_io_1.Socket]),
     __metadata("design:returntype", void 0)
 ], GameGateway.prototype, "handleJoinGame", null);
 __decorate([
@@ -439,6 +666,7 @@ exports.GameGateway = GameGateway = __decorate([
             origin: '*',
         },
     }),
-    __metadata("design:paramtypes", [game_service_1.GameService])
+    __metadata("design:paramtypes", [game_service_1.GameService,
+        near_relayer_service_1.NearRelayerService])
 ], GameGateway);
 //# sourceMappingURL=game.gateway.js.map

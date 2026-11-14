@@ -1,0 +1,11 @@
+/Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-token/target/debug/deps/digest_io-fef88b27ad9fe194.d: /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/lib.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/io_wrapper.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/reader.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/writer.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/../README.md
+
+/Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-token/target/debug/deps/libdigest_io-fef88b27ad9fe194.rlib: /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/lib.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/io_wrapper.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/reader.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/writer.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/../README.md
+
+/Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-token/target/debug/deps/libdigest_io-fef88b27ad9fe194.rmeta: /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/lib.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/io_wrapper.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/reader.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/writer.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/../README.md
+
+/Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/lib.rs:
+/Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/io_wrapper.rs:
+/Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/reader.rs:
+/Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/writer.rs:
+/Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-io-0.1.0/src/../README.md:

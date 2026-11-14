@@ -1,0 +1,8 @@
+/Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-token/target/release/deps/strum-535b68b040282202.d: /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/strum-0.26.3/src/lib.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/strum-0.26.3/src/additional_attributes.rs
+
+/Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-token/target/release/deps/libstrum-535b68b040282202.rlib: /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/strum-0.26.3/src/lib.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/strum-0.26.3/src/additional_attributes.rs
+
+/Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-token/target/release/deps/libstrum-535b68b040282202.rmeta: /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/strum-0.26.3/src/lib.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/strum-0.26.3/src/additional_attributes.rs
+
+/Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/strum-0.26.3/src/lib.rs:
+/Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/strum-0.26.3/src/additional_attributes.rs:

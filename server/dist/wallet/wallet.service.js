@@ -46,38 +46,77 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WalletService = void 0;
 const common_1 = require("@nestjs/common");
 const crypto_1 = require("crypto");
-const web3_js_1 = require("@solana/web3.js");
 const bs58_1 = __importDefault(require("bs58"));
 const dotenv = __importStar(require("dotenv"));
-const spl_token_1 = require("@solana/spl-token");
+const near_api_js_1 = require("near-api-js");
 dotenv.config();
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
+const YOCTO_NEAR = 1e24;
+const DEFAULT_NEAR_RPC = process.env.NEAR_RPC_URL || 'https://test.rpc.fastnear.com';
 let WalletService = WalletService_1 = class WalletService {
     logger = new common_1.Logger(WalletService_1.name);
     generateKey(password) {
         return (0, crypto_1.createHash)('sha256').update(password).digest();
     }
-    createSVMWallet = () => {
-        const keypair = web3_js_1.Keypair.generate();
-        const privateKey = keypair.secretKey;
-        const publicKey = keypair.publicKey;
+    createNEARWallet = (username) => {
+        const keyPair = near_api_js_1.KeyPair.fromRandom('ed25519');
+        const pubKeyBytes = Buffer.from(keyPair.getPublicKey().data);
+        const implicitAccountId = pubKeyBytes.toString('hex');
+        const cleanHandle = username
+            ? username.toLowerCase().replace(/[^a-z0-9_-]/g, '')
+            : '';
+        const namedAccountId = cleanHandle
+            ? `${cleanHandle}.shin-arena.testnet`
+            : implicitAccountId;
         return {
-            address: publicKey.toBase58(),
-            privateKey: bs58_1.default.encode(privateKey),
+            address: namedAccountId,
+            implicitAccountId,
+            publicKey: keyPair.getPublicKey().toString(),
+            privateKey: keyPair.toString(),
+        };
+    };
+    createSVMWallet = () => {
+        const nearWallet = this.createNEARWallet();
+        return {
+            address: nearWallet.implicitAccountId,
+            privateKey: nearWallet.privateKey.replace('ed25519:', ''),
         };
     };
     getSVMAddressFromPrivateKey = (privateKey) => {
         try {
-            const privateKeyBytes = bs58_1.default.decode(privateKey);
-            const wallet = web3_js_1.Keypair.fromSecretKey(privateKeyBytes);
+            const normalized = privateKey.replace(/^ed25519:/, '');
+            const secretKeyBytes = Buffer.from(bs58_1.default.decode(normalized));
+            let pubBytes;
+            let fullSecretBytes;
+            if (secretKeyBytes.length === 64) {
+                pubBytes = secretKeyBytes.subarray(32, 64);
+                fullSecretBytes = secretKeyBytes;
+            }
+            else if (secretKeyBytes.length === 32) {
+                const keyObj = (0, crypto_1.createPrivateKey)({
+                    key: {
+                        kty: 'OKP',
+                        crv: 'Ed25519',
+                        d: secretKeyBytes.toString('base64url'),
+                    },
+                    format: 'jwk',
+                });
+                const pubJwk = (0, crypto_1.createPublicKey)(keyObj).export({ format: 'jwk' });
+                pubBytes = Buffer.from(pubJwk.x, 'base64url');
+                fullSecretBytes = Buffer.concat([secretKeyBytes, pubBytes]);
+            }
+            else {
+                throw new Error(`Expected 32 or 64 byte Ed25519 secret key, got ${secretKeyBytes.length}`);
+            }
+            const implicitHex = pubBytes.toString('hex');
             return {
-                address: wallet.publicKey.toBase58(),
-                privateKey: bs58_1.default.encode(wallet.secretKey),
+                address: implicitHex,
+                privateKey: bs58_1.default.encode(fullSecretBytes),
             };
         }
         catch (error) {
-            throw new Error(`Invalid private key format: ${error.message}`);
+            throw new Error(`Invalid NEAR Ed25519 key format: ${error.message}`);
         }
     };
     encryptSVMWallet = (password, privateKey) => {
@@ -106,133 +145,77 @@ let WalletService = WalletService_1 = class WalletService {
             throw new Error(`Failed to decrypt wallet: ${error.message}`);
         }
     };
-    getSolBalance = async (address, rpcURL) => {
+    getNearBalance = async (accountId, rpcURL = DEFAULT_NEAR_RPC) => {
         try {
-            const connection = new web3_js_1.Connection(rpcURL, 'confirmed');
-            const publicKey = new web3_js_1.PublicKey(address);
-            const balance = await connection.getBalance(publicKey);
-            return { balance: balance / web3_js_1.LAMPORTS_PER_SOL };
+            const provider = new near_api_js_1.providers.JsonRpcProvider({ url: rpcURL });
+            const accountView = await provider.query({
+                request_type: 'view_account',
+                finality: 'final',
+                account_id: accountId,
+            });
+            if (accountView?.amount) {
+                const formatted = near_api_js_1.utils.format.formatNearAmount(accountView.amount, 4);
+                return { balance: Number(formatted.replace(/,/g, '')) };
+            }
+            return { balance: 0 };
         }
         catch (error) {
-            this.logger.error(`Failed to get SOL balance for ${address}:`, error.message);
+            this.logger.warn(`NEAR RPC balance lookup fallback for ${accountId}: ${error.message}`);
             return { balance: 0 };
         }
     };
-    getSPLTokenBalance = async (address, tokenAddress, rpcURL, decimal) => {
+    getNEP141TokenBalance = async (accountId, tokenContractId, decimals = 6, rpcURL = DEFAULT_NEAR_RPC) => {
         try {
-            const connection = new web3_js_1.Connection(rpcURL, 'confirmed');
-            const publicKey = new web3_js_1.PublicKey(address);
-            const tokenMint = new web3_js_1.PublicKey(tokenAddress);
-            const associatedTokenAddress = await (0, spl_token_1.getAssociatedTokenAddress)(tokenMint, publicKey, true);
-            const accountInfo = await connection.getAccountInfo(associatedTokenAddress);
-            if (!accountInfo)
-                return { balance: 0 };
-            const tokenAccount = await (0, spl_token_1.getAccount)(connection, associatedTokenAddress);
-            return { balance: Number(tokenAccount.amount) / 10 ** decimal };
-        }
-        catch (error) {
-            this.logger.error(`Error fetching SPL token balance:`, error.message);
+            const argsBase64 = Buffer.from(JSON.stringify({ account_id: accountId })).toString('base64');
+            const response = await fetch(rpcURL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: 'shin-nep141-balance',
+                    method: 'query',
+                    params: {
+                        request_type: 'call_function',
+                        finality: 'final',
+                        account_id: tokenContractId,
+                        method_name: 'ft_balance_of',
+                        args_base64: argsBase64,
+                    },
+                }),
+            });
+            const json = await response.json();
+            if (json?.result?.result) {
+                const raw = Buffer.from(json.result.result).toString('utf8').replace(/"/g, '');
+                return { balance: Number(raw) / 10 ** decimals };
+            }
             return { balance: 0 };
         }
+        catch (error) {
+            this.logger.warn(`NEP-141 balance lookup fallback: ${error.message}`);
+            return { balance: 0 };
+        }
+    };
+    getSolBalance = async (address, rpcURL) => {
+        return this.getNearBalance(address, rpcURL || DEFAULT_NEAR_RPC);
     };
     getUSDCBalance = async (address, rpcURL) => {
-        try {
-            if (!process.env.USDC_MINT_ADDRESS) {
-                throw new Error('USDC_MINT_ADDRESS is not set in environment variables');
-            }
-            const connection = new web3_js_1.Connection(rpcURL, 'confirmed');
-            const publicKey = new web3_js_1.PublicKey(address);
-            const tokenMint = new web3_js_1.PublicKey(process.env.USDC_MINT_ADDRESS);
-            const associatedTokenAddress = await (0, spl_token_1.getAssociatedTokenAddress)(tokenMint, publicKey, true);
-            const accountInfo = await connection.getAccountInfo(associatedTokenAddress);
-            if (!accountInfo)
-                return { balance: 0 };
-            const tokenAccount = await (0, spl_token_1.getAccount)(connection, associatedTokenAddress);
-            const balance = Number(tokenAccount.amount) / 10 ** 6;
-            return { balance };
-        }
-        catch (error) {
-            this.logger.error(`ERROR fetching USDC balance for ${address}:`, error.message);
-            return { balance: 0 };
-        }
+        const contract = process.env.NEAR_USDC_CONTRACT || 'usdc.fakes.testnet';
+        return this.getNEP141TokenBalance(address, contract, 6, rpcURL || DEFAULT_NEAR_RPC);
     };
     getUSDTBalance = async (address, rpcURL) => {
-        try {
-            if (!process.env.USDT_MINT_ADDRESS) {
-                throw new Error('USDT_MINT_ADDRESS is not set in environment variables');
-            }
-            const connection = new web3_js_1.Connection(rpcURL, 'confirmed');
-            const publicKey = new web3_js_1.PublicKey(address);
-            const tokenMint = new web3_js_1.PublicKey(process.env.USDT_MINT_ADDRESS);
-            const associatedTokenAddress = await (0, spl_token_1.getAssociatedTokenAddress)(tokenMint, publicKey, true);
-            const accountInfo = await connection.getAccountInfo(associatedTokenAddress);
-            if (!accountInfo)
-                return { balance: 0 };
-            const tokenAccount = await (0, spl_token_1.getAccount)(connection, associatedTokenAddress);
-            const balance = Number(tokenAccount.amount) / 10 ** 6;
-            return { balance };
-        }
-        catch (error) {
-            this.logger.error(`ERROR fetching USDT balance for ${address}:`, error.message);
-            return { balance: 0 };
-        }
+        const contract = process.env.NEAR_USDT_CONTRACT || 'usdt.fakes.testnet';
+        return this.getNEP141TokenBalance(address, contract, 6, rpcURL || DEFAULT_NEAR_RPC);
     };
     getWalletBalance = async (walletAddress, rpcURL) => {
-        const solBalance = await this.getSolBalance(walletAddress, rpcURL);
-        const usdcBalance = await this.getUSDCBalance(walletAddress, rpcURL);
-        const usdtBalance = await this.getUSDTBalance(walletAddress, rpcURL);
-        return { solBalance, usdcBalance, usdtBalance };
-    };
-    transferSOL = async (privateKey, recipientAddress, amount, rpcURL, description) => {
-        try {
-            const connection = new web3_js_1.Connection(rpcURL, 'confirmed');
-            const senderKeypair = web3_js_1.Keypair.fromSecretKey(bs58_1.default.decode(privateKey));
-            const recipientPubkey = new web3_js_1.PublicKey(recipientAddress);
-            const transaction = new web3_js_1.Transaction().add(web3_js_1.SystemProgram.transfer({
-                fromPubkey: senderKeypair.publicKey,
-                toPubkey: recipientPubkey,
-                lamports: amount * web3_js_1.LAMPORTS_PER_SOL,
-            }));
-            const signature = await (0, web3_js_1.sendAndConfirmTransaction)(connection, transaction, [senderKeypair]);
-            return { signature, description };
-        }
-        catch (error) {
-            throw new Error(`Failed to transfer SOL: ${error.message}`);
-        }
-    };
-    transferSPLToken = async (privateKey, recipientAddress, amount, tokenAddress, rpcURL, decimal, description) => {
-        try {
-            const connection = new web3_js_1.Connection(rpcURL, 'confirmed');
-            const senderKeypair = web3_js_1.Keypair.fromSecretKey(bs58_1.default.decode(privateKey));
-            const recipientPubkey = new web3_js_1.PublicKey(recipientAddress);
-            const tokenMint = new web3_js_1.PublicKey(tokenAddress);
-            const senderATA = await (0, spl_token_1.getAssociatedTokenAddress)(tokenMint, senderKeypair.publicKey);
-            const recipientATA = await (0, spl_token_1.getOrCreateAssociatedTokenAccount)(connection, senderKeypair, tokenMint, recipientPubkey);
-            const transaction = new web3_js_1.Transaction().add((0, spl_token_1.createTransferInstruction)(senderATA, recipientATA.address, senderKeypair.publicKey, amount * 10 ** decimal, [], spl_token_1.TOKEN_PROGRAM_ID));
-            const signature = await (0, web3_js_1.sendAndConfirmTransaction)(connection, transaction, [senderKeypair]);
-            return { signature, description };
-        }
-        catch (error) {
-            throw new Error(`Failed to transfer SPL token: ${error.message}`);
-        }
-    };
-    builtTokenTranferTx = async (privateKey, recipientAddress, amount, tokenAddress, rpcURL, decimal) => {
-        try {
-            const connection = new web3_js_1.Connection(rpcURL, 'confirmed');
-            const senderKeypair = web3_js_1.Keypair.fromSecretKey(bs58_1.default.decode(privateKey));
-            const recipientPubkey = new web3_js_1.PublicKey(recipientAddress);
-            const tokenMint = new web3_js_1.PublicKey(tokenAddress);
-            const senderATA = await (0, spl_token_1.getAssociatedTokenAddress)(tokenMint, senderKeypair.publicKey);
-            const recipientATA = await (0, spl_token_1.getOrCreateAssociatedTokenAccount)(connection, senderKeypair, tokenMint, recipientPubkey);
-            const transaction = new web3_js_1.Transaction().add((0, spl_token_1.createTransferInstruction)(senderATA, recipientATA.address, senderKeypair.publicKey, amount * 10 ** decimal, [], spl_token_1.TOKEN_PROGRAM_ID));
-            const { blockhash } = await connection.getLatestBlockhash();
-            transaction.recentBlockhash = blockhash;
-            transaction.feePayer = senderKeypair.publicKey;
-            return transaction;
-        }
-        catch (error) {
-            throw new Error(`Failed to build transfer transaction: ${error.message}`);
-        }
+        const nearBalance = await this.getNearBalance(walletAddress, rpcURL || DEFAULT_NEAR_RPC);
+        const usdcBalance = await this.getUSDCBalance(walletAddress, rpcURL || DEFAULT_NEAR_RPC);
+        const usdtBalance = await this.getUSDTBalance(walletAddress, rpcURL || DEFAULT_NEAR_RPC);
+        return {
+            nearBalance,
+            solBalance: nearBalance,
+            usdcBalance,
+            usdtBalance,
+        };
     };
 };
 exports.WalletService = WalletService;

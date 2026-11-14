@@ -1,0 +1,8 @@
+/Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-arena/target/debug/deps/derive_arbitrary-33406597bd8334e7.d: /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/lib.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/container_attributes.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/field_attributes.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/variant_attributes.rs
+
+/Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-arena/target/debug/deps/libderive_arbitrary-33406597bd8334e7.dylib: /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/lib.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/container_attributes.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/field_attributes.rs /Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/variant_attributes.rs
+
+/Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/lib.rs:
+/Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/container_attributes.rs:
+/Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/field_attributes.rs:
+/Users/ekete/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/derive_arbitrary-1.5.0/src/variant_attributes.rs:

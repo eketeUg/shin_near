@@ -16,8 +16,10 @@ export declare class AuthService {
             email: string | undefined;
             sub: any;
             userName: string | undefined;
+            username: string | undefined;
             provider: "email" | "guest" | "google";
             walletAddress: string | undefined;
+            isNewUser: boolean;
         };
     }>;
     sendOtp(email: string): Promise<{
@@ -29,8 +31,10 @@ export declare class AuthService {
             email: string | undefined;
             sub: any;
             userName: string | undefined;
+            username: string | undefined;
             provider: "email" | "guest" | "google";
             walletAddress: string | undefined;
+            isNewUser: boolean;
         };
     }>;
     private generateWalletForUser;

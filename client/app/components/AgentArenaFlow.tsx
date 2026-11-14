@@ -62,6 +62,9 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
     'Click "Fast-Forward 7 Days" to simulate a full week of autonomous arena fights, loot drops, and NPC supply/demand price swings in 10 seconds.',
   );
   const [openReasoningId, setOpenReasoningId] = useState<string | null>('hanzo-dojo');
+  const [trainerFee, setTrainerFee] = useState<string>('0.5');
+  const [trainerSpecialty, setTrainerSpecialty] = useState<'ATK' | 'DEF' | 'SPD'>('ATK');
+  const [targetTrainerId, setTargetTrainerId] = useState<string>('');
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -157,11 +160,11 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       {/* =====================================================================
           TOP BAR (Game-First War Chest + Optional NEAR Judge Inspector Switch)
          ===================================================================== */}
-      <div className="sticky top-0 z-50 bg-black/90 border-b border-white/10 px-3 sm:px-6 md:px-8 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2.5 sm:py-3.5 flex flex-wrap items-center justify-between gap-2 sm:gap-4 backdrop-blur-md">
+      <div className="sticky top-0 z-50 bg-black/90 border-b border-white/10 px-3 sm:px-6 md:px-8 py-2.5 sm:py-3.5 flex flex-wrap items-center justify-between gap-2 sm:gap-4 backdrop-blur-md">
         <div className="flex items-center gap-2 sm:gap-4">
           <button
             onClick={onBack}
-            className="mobile-touch-target text-gray-400 hover:text-white font-cinzel font-bold text-[10px] sm:text-xs uppercase tracking-widest flex items-center gap-1 cursor-pointer"
+            className="text-gray-400 hover:text-white font-cinzel font-bold text-[10px] sm:text-xs uppercase tracking-widest flex items-center gap-1 cursor-pointer"
           >
             <span>←</span> <span className="hidden xs:inline">Title</span> Hall
           </button>
@@ -211,8 +214,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
 
           <button
             onClick={onHome}
-            className="mobile-touch-target text-gray-400 hover:text-shin-red font-cinzel font-bold text-xs uppercase tracking-widest px-2.5 py-1.5 border border-white/10 rounded-lg cursor-pointer flex items-center justify-center"
-            aria-label="Close Colosseum"
+            className="text-gray-400 hover:text-shin-red font-cinzel font-bold text-xs uppercase tracking-widest px-2.5 py-1.5 border border-white/10 rounded-lg cursor-pointer"
           >
             ✕
           </button>
@@ -1306,6 +1308,110 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                   </div>
                 );
               })}
+            </div>
+
+            {/* PLAYER TRAINERS GUILD (90% Trainer / 10% Dev Treasury) */}
+            <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-black to-zinc-950 p-5 space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <div>
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-emerald-400">
+                    On-Chain Player Trainers • 90% Trainer / 10% Dev Treasury
+                  </div>
+                  <h3 className="text-lg font-cinzel font-black text-white uppercase tracking-wider">
+                    🥋 Player Trainers Guild (Earn 90% Coaching Fees)
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    Register as a Sensei to train other players&apos; Fighter NFTs (+2 ATK/DEF/SPD &amp; +15 XP) and keep 90% of every training fee.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Register as Trainer */}
+                <div className="rounded-xl border border-white/10 bg-black/60 p-4 space-y-3">
+                  <div className="text-xs font-cinzel font-bold text-emerald-300 uppercase">
+                    Become a Sensei (Register On-Chain)
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={trainerSpecialty}
+                      onChange={(e) => setTrainerSpecialty(e.target.value as 'ATK' | 'DEF' | 'SPD')}
+                      className="bg-zinc-900 border border-white/15 rounded px-2.5 py-1.5 text-xs text-white"
+                    >
+                      <option value="ATK">+2 ATK Specialty</option>
+                      <option value="DEF">+2 DEF Specialty</option>
+                      <option value="SPD">+2 SPD Specialty</option>
+                    </select>
+                    <input
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      value={trainerFee}
+                      onChange={(e) => setTrainerFee(e.target.value)}
+                      className="w-24 bg-zinc-900 border border-white/15 rounded px-2.5 py-1.5 text-xs font-mono text-white"
+                      placeholder="Fee NEAR"
+                    />
+                    <button
+                      onClick={async () => {
+                        const res = await nearArenaEngine.registerPlayerTrainer(
+                          parseFloat(trainerFee) || 0.5,
+                          trainerSpecialty,
+                        );
+                        showToast(
+                          res.ok
+                            ? `Registered as ${trainerSpecialty} Trainer (${trainerFee} NEAR)!`
+                            : res.error || 'Registration failed',
+                        );
+                      }}
+                      className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-cinzel font-bold text-[10px] uppercase rounded cursor-pointer"
+                    >
+                      Register Trainer
+                    </button>
+                  </div>
+                </div>
+
+                {/* Train with a Player Trainer */}
+                <div className="rounded-xl border border-white/10 bg-black/60 p-4 space-y-3">
+                  <div className="text-xs font-cinzel font-bold text-amber-300 uppercase">
+                    Train {selectedFighter ? selectedFighter.title : 'Selected Fighter'} with a Sensei
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      value={targetTrainerId}
+                      onChange={(e) => setTargetTrainerId(e.target.value)}
+                      placeholder="trainer-account.testnet"
+                      className="flex-1 min-w-[160px] bg-zinc-900 border border-white/15 rounded px-2.5 py-1.5 text-xs font-mono text-white"
+                    />
+                    <button
+                      disabled={!selectedFighter || !targetTrainerId.trim()}
+                      onClick={async () => {
+                        if (!selectedFighter) return;
+                        const profile = await nearArenaEngine.getTrainerProfile(targetTrainerId.trim());
+                        if (!profile) {
+                          showToast('Trainer account not registered on-chain.');
+                          return;
+                        }
+                        const feeNear = Number(profile.fee_milli_near) / 1000;
+                        const res = await nearArenaEngine.trainFighterWithPlayerTrainer(
+                          selectedFighter.tokenId,
+                          targetTrainerId.trim(),
+                          feeNear,
+                        );
+                        setArenaState({ ...nearArenaEngine.getState() });
+                        showToast(
+                          res.ok
+                            ? `Trained ${selectedFighter.title} (+2 ${profile.specialty}) for ${feeNear} NEAR!`
+                            : res.error || 'Training failed',
+                        );
+                      }}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-cinzel font-bold text-[10px] uppercase rounded disabled:opacity-40 cursor-pointer"
+                    >
+                      Train Fighter
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Warrior Bazaar (Player-Owned Marketplace) */}

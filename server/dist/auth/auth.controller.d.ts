@@ -53,8 +53,10 @@ export declare class AuthController {
             email: string | undefined;
             sub: any;
             userName: string | undefined;
+            username: string | undefined;
             provider: "email" | "guest" | "google";
             walletAddress: string | undefined;
+            isNewUser: boolean;
         };
     }>;
 }

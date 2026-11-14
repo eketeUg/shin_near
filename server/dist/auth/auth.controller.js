@@ -47,7 +47,7 @@ let AuthController = class AuthController {
               }, "*");
               window.close();
             } else {
-              window.location.href = "${process.env.FRONTEND_URL || 'http://localhost:3000'}";
+              window.location.href = "${process.env.FRONTEND_URL || 'http://localhost:3002'}";
             }
           </script>
         </body>

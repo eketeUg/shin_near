@@ -1,0 +1,1 @@
+/Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-arena/target/wasm32-unknown-unknown/release/shin_arena_contract.wasm: /Users/ekete/.gemini/antigravity/scratch/shin-near/contracts/shin-arena/src/lib.rs

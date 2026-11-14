@@ -23,6 +23,7 @@ export class NearRelayerController {
   async viewMethod(
     @Query('method') method: string,
     @Query('args') argsJson?: string,
+    @Query('contractId') contractId?: string,
   ) {
     let args: Record<string, unknown> = {};
     if (argsJson) {
@@ -33,7 +34,7 @@ export class NearRelayerController {
       }
     }
     try {
-      const result = await this.nearRelayer.viewMethod(method, args);
+      const result = await this.nearRelayer.viewMethod(method, args, contractId);
       return { ok: true, result };
     } catch (err: unknown) {
       return {
@@ -52,6 +53,7 @@ export class NearRelayerController {
       args?: Record<string, unknown>;
       attachedDepositNear?: string;
       gas?: string;
+      contractId?: string;
     },
   ) {
     const token = req.cookies?.['jwt'] as string | undefined;
@@ -108,6 +110,7 @@ export class NearRelayerController {
       body.attachedDepositNear || '0',
       body.gas || '60000000000000',
       customSigner,
+      body.contractId,
     );
   }
 

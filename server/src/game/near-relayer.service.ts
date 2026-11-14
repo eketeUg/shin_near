@@ -21,6 +21,14 @@ const ALLOWED_WRITE_METHODS = new Set([
   'buy_fighter_from_market',
   'mt_transfer',
   'mt_batch_transfer',
+  'swap_near_for_shin',
+  'register_trainer',
+  'train_fighter_with_trainer',
+  'create_tournament',
+  'join_tournament',
+  'settle_tournament',
+  'nft_transfer',
+  'ft_transfer_call',
 ]);
 
 export interface NearRelayResult {
@@ -42,6 +50,8 @@ export class NearRelayerService implements OnModuleInit {
   readonly networkId = process.env.NEAR_NETWORK || 'testnet';
   readonly rpcUrl = process.env.NEAR_RPC_URL || 'https://test.rpc.fastnear.com';
   readonly contractId = process.env.NEAR_CONTRACT_ID || 'shin-arena-28d.testnet';
+  readonly shinTokenId =
+    process.env.NEAR_SHIN_TOKEN_ID || 'shin.shin-arena-28d.testnet';
   readonly relayerAccountId =
     process.env.NEAR_REFEREE_ACCOUNT_ID ||
     process.env.NEAR_CONTRACT_ID ||
@@ -103,20 +113,34 @@ export class NearRelayerService implements OnModuleInit {
       networkId: this.networkId,
       rpcUrl: this.rpcUrl,
       contractId: this.contractId,
+      shinTokenId: this.shinTokenId,
       relayerAccountId: this.relayerAccountId,
       relayerReady: Boolean(this.relayerAccount),
     };
   }
 
+  private resolveAllowedContract(targetContractId?: string): string {
+    if (
+      targetContractId &&
+      (targetContractId === this.contractId ||
+        targetContractId === this.shinTokenId)
+    ) {
+      return targetContractId;
+    }
+    return this.contractId;
+  }
+
   async viewMethod(
     methodName: string,
     args: Record<string, unknown> = {},
+    targetContractId?: string,
   ): Promise<unknown> {
+    const resolvedContract = this.resolveAllowedContract(targetContractId);
     const argsBase64 = Buffer.from(JSON.stringify(args)).toString('base64');
     const res: any = await this.provider.query({
       request_type: 'call_function',
       finality: 'final',
-      account_id: this.contractId,
+      account_id: resolvedContract,
       method_name: methodName,
       args_base64: argsBase64,
     });
@@ -137,12 +161,14 @@ export class NearRelayerService implements OnModuleInit {
     attachedDepositNear = '0',
     gas = '60000000000000',
     customSigner?: { accountId: string; privateKey: string },
+    targetContractId?: string,
   ): Promise<NearRelayResult> {
+    const resolvedContract = this.resolveAllowedContract(targetContractId);
     if (!ALLOWED_WRITE_METHODS.has(methodName)) {
       return Promise.resolve({
         ok: false,
         simulated: true,
-        contractId: this.contractId,
+        contractId: resolvedContract,
         relayerAccountId: this.relayerAccountId,
         methodName,
         txHash: '',
@@ -158,12 +184,20 @@ export class NearRelayerService implements OnModuleInit {
         attachedDepositNear,
         gas,
         customSigner,
+        resolvedContract,
       );
     }
 
     // Serialize nonces per relayer access key
     const task = this.txQueue.then(() =>
-      this.executeFunctionCall(methodName, args, attachedDepositNear, gas),
+      this.executeFunctionCall(
+        methodName,
+        args,
+        attachedDepositNear,
+        gas,
+        undefined,
+        resolvedContract,
+      ),
     );
     this.txQueue = task.catch(() => undefined);
     return task;
@@ -175,7 +209,9 @@ export class NearRelayerService implements OnModuleInit {
     attachedDepositNear: string,
     gas: string,
     customSigner?: { accountId: string; privateKey: string },
+    targetContractId?: string,
   ): Promise<NearRelayResult> {
+    const resolvedContract = targetContractId || this.contractId;
     let signer = this.relayerAccount;
     let signerId = this.relayerAccountId;
 
@@ -218,11 +254,12 @@ export class NearRelayerService implements OnModuleInit {
     }
 
     try {
-      const depositYocto = BigInt(
-        utils.format.parseNearAmount(attachedDepositNear) || '0',
-      );
+      const depositYocto =
+        attachedDepositNear === '1yocto'
+          ? 1n
+          : BigInt(utils.format.parseNearAmount(attachedDepositNear) || '0');
       const outcome: any = await signer.functionCall({
-        contractId: this.contractId,
+        contractId: resolvedContract,
         methodName,
         args,
         gas: BigInt(gas),
@@ -249,13 +286,13 @@ export class NearRelayerService implements OnModuleInit {
       }
 
       this.logger.log(
-        `[NEAR TX] ${methodName} on ${this.contractId} -> ${txHash}`,
+        `[NEAR TX] ${methodName} on ${resolvedContract} -> ${txHash}`,
       );
 
       return {
         ok: true,
         simulated: false,
-        contractId: this.contractId,
+        contractId: resolvedContract,
         relayerAccountId: this.relayerAccountId,
         methodName,
         txHash,

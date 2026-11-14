@@ -219,8 +219,28 @@ export interface PlayerWalletState {
   implicitHex: string;
   username: string;
   NEAR: number;
+  SHIN?: number;
   USDC: number;
   USDT: number;
+}
+
+export interface AmmPoolInfo {
+  shin_token_id: string;
+  dev_treasury_id: string;
+  near_reserve: string;
+  shin_reserve: string;
+  total_swap_volume_near: string;
+  swap_fee_bps: number;
+  dev_fee_bps: number;
+  lp_fee_bps: number;
+}
+
+export interface OnChainTrainerProfile {
+  trainer_id: string;
+  fee_milli_near: string | number;
+  specialty: 'ATK' | 'DEF' | 'SPD';
+  sessions_completed: number;
+  is_active: boolean;
 }
 
 export interface Nep245TokenBalance {
@@ -625,6 +645,8 @@ export interface ArenaPersistentState {
 
 class NearArenaEngine {
   private state: ArenaPersistentState;
+  public readonly shinTokenId = 'shin.shin-arena-28d.testnet';
+  public readonly arenaContractId = 'shin-arena-28d.testnet';
 
   constructor() {
     this.state = this.loadOrInitState();
@@ -1181,6 +1203,7 @@ class NearArenaEngine {
     methodName: string,
     args: Record<string, unknown>,
     attachedDepositNear: string = '0',
+    contractId?: string,
   ) {
     if (typeof window === 'undefined') return;
     try {
@@ -1199,7 +1222,7 @@ class NearArenaEngine {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ methodName, args, attachedDepositNear }),
+      body: JSON.stringify({ methodName, args, attachedDepositNear, contractId }),
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -1395,6 +1418,28 @@ class NearArenaEngine {
             accountId: targetAddr,
             NEAR: Number(formatted.replace(/,/g, '')) || 0,
           };
+        }
+
+        // Sync $SHIN NEP-141 balance (18 decimals)
+        try {
+          const shinBalRes = await fetch(
+            `${serverUrl}/api/near/view?method=ft_balance_of&contractId=${encodeURIComponent(
+              this.shinTokenId,
+            )}&args=${encodeURIComponent(JSON.stringify({ account_id: targetAddr }))}`,
+          );
+          if (shinBalRes.ok) {
+            const shinData = await shinBalRes.json();
+            if (shinData?.ok && typeof shinData?.result === 'string') {
+              const rawBig = BigInt(shinData.result || '0');
+              const whole = Number(rawBig / BigInt('1000000000000000')) / 1000;
+              this.state.playerWallet = {
+                ...this.state.playerWallet,
+                SHIN: Number(whole.toFixed(3)),
+              };
+            }
+          }
+        } catch {
+          // Ignore $SHIN balance fetch error if offline
         }
       }
 
@@ -2253,9 +2298,13 @@ class NearArenaEngine {
       this.state.fighters.find((f) => f.tokenId === loserRef.tokenId) || loserRef;
 
     const stake = match.fighterStakeNear;
+    const totalPool = stake * 2;
+    const winnerPotShare = Number((totalPool * 0.95).toFixed(2)); // 95% Winner / 5% Dev Treasury
     const totalSpectatorPool = match.spectatorPoolP1Near + match.spectatorPoolP2Near;
-    const fighterRoyalty = Number((totalSpectatorPool * 0.05).toFixed(2));
-    const netProfitToWinnerVault = Number((stake + fighterRoyalty).toFixed(2));
+    const fighterRoyalty = Number((totalSpectatorPool * 0.05).toFixed(2)); // 5% Winning Fighter Royalty
+    const netProfitToWinnerVault = Number(
+      (winnerPotShare - stake + fighterRoyalty).toFixed(2),
+    );
 
     // Update Fighter Agent Wallets
     loser.vaultBalanceNear = Math.max(0, Number((loser.vaultBalanceNear - stake).toFixed(2)));
@@ -2294,7 +2343,7 @@ class NearArenaEngine {
     // Check if the player won any Spectator Pari-Mutuel bets on this match!
     const winningSidePool =
       winnerSide === 'p1' ? match.spectatorPoolP1Near : match.spectatorPoolP2Near;
-    const distributableSpectatorPool = totalSpectatorPool * 0.95; // 95% to winning bettors, 5% to winning Fighter NFT!
+    const distributableSpectatorPool = totalSpectatorPool * 0.90; // 90% winning bettors, 5% winning Fighter NFT, 5% Dev Treasury
     let playerSpectatorPayout = 0;
 
     match.spectatorBets.forEach((bet) => {
@@ -2324,15 +2373,24 @@ class NearArenaEngine {
       });
     }
 
+    const settleLedgerId = 'tx-settle-' + Date.now();
     this.state.ledger.unshift({
-      id: 'tx-settle-' + Date.now(),
+      id: settleLedgerId,
       txHash: makeTxHash(),
       type: 'FIGHT_POOL_SETTLED',
-      summary: `${winner.title} (${winner.agentWalletId}) won ${match.fighterPoolNear.toFixed(2)} NEAR Fighter Pool + ${fighterRoyalty.toFixed(2)} NEAR Spectator Royalty vs ${loser.title}`,
-      amountNear: match.fighterPoolNear + fighterRoyalty,
+      summary: `${winner.title} (${winner.agentWalletId}) won ${winnerPotShare.toFixed(2)} NEAR (95% pot) + ${fighterRoyalty.toFixed(2)} NEAR Spectator Royalty vs ${loser.title}`,
+      amountNear: winnerPotShare + fighterRoyalty,
       actorWallet: winner.agentWalletId,
       timestamp: Date.now(),
     });
+
+    // Relay match settlement on-chain when both fighters are registered on shin-arena-28d.testnet
+    if (!winner.isNpc || !loser.isNpc) {
+      this.relayOnChain(settleLedgerId, 'settle_match', {
+        match_id: matchId,
+        winner_token_id: winner.tokenId,
+      });
+    }
 
     // Autonomous Agent-to-NPC Dojo Commerce
     const dojoCost = this.state.npcDojo.currentDynamicCostNear;
@@ -3110,6 +3168,156 @@ class NearArenaEngine {
 
     this.saveState();
     return agT;
+  }
+
+  // ===========================================================================
+  // BUILT-IN NEAR <-> $SHIN AMM SWAP & PLAYER TRAINERS (ON-CHAIN)
+  // ===========================================================================
+
+  public async relayCallAsync(
+    methodName: string,
+    args: Record<string, unknown>,
+    attachedDepositNear: string = '0',
+    contractId?: string,
+    gas: string = '80000000000000',
+  ): Promise<{ ok: boolean; txHash?: string; explorerUrl?: string; result?: unknown; error?: string }> {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(`${serverUrl}/api/near/call`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ methodName, args, attachedDepositNear, gas, contractId }),
+    });
+    const data = await res.json();
+    if (data?.ok) {
+      await this.syncOnChainState(this.state.playerWallet.accountId);
+    }
+    return data;
+  }
+
+  public async getAmmInfo(): Promise<AmmPoolInfo | null> {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(`${serverUrl}/api/near/view?method=get_amm_info`);
+    const data = await res.json();
+    return data?.ok ? (data.result as AmmPoolInfo) : null;
+  }
+
+  public async getAmmQuoteNearToShin(nearAmount: number): Promise<number> {
+    if (nearAmount <= 0) return 0;
+    const yocto = utils.format.parseNearAmount(nearAmount.toString()) || '0';
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(
+      `${serverUrl}/api/near/view?method=get_amm_quote_near_to_shin&args=${encodeURIComponent(
+        JSON.stringify({ near_in: yocto }),
+      )}`,
+    );
+    const data = await res.json();
+    if (!data?.ok || !data?.result) return 0;
+    const raw = BigInt(String(data.result));
+    return Number((raw / BigInt('1000000000000000'))) / 1000;
+  }
+
+  public async getAmmQuoteShinToNear(shinAmount: number): Promise<number> {
+    if (shinAmount <= 0) return 0;
+    const rawShin = (BigInt(Math.floor(shinAmount * 1000)) * BigInt('1000000000000000')).toString();
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(
+      `${serverUrl}/api/near/view?method=get_amm_quote_shin_to_near&args=${encodeURIComponent(
+        JSON.stringify({ shin_in: rawShin }),
+      )}`,
+    );
+    const data = await res.json();
+    if (!data?.ok || !data?.result) return 0;
+    const formatted = utils.format.formatNearAmount(String(data.result), 4);
+    return Number(formatted.replace(/,/g, '')) || 0;
+  }
+
+  public async swapNearForShin(nearAmount: number, minShinOut: number = 0) {
+    const minRaw =
+      minShinOut > 0
+        ? (BigInt(Math.floor(minShinOut * 1000)) * BigInt('1000000000000000')).toString()
+        : undefined;
+    const res = await this.relayCallAsync(
+      'swap_near_for_shin',
+      minRaw ? { min_shin_out: minRaw } : {},
+      nearAmount.toString(),
+    );
+    if (res.ok && res.txHash) {
+      this.state.ledger.unshift({
+        id: 'tx-swap-' + Date.now(),
+        txHash: res.txHash,
+        explorerUrl: res.explorerUrl,
+        onChain: true,
+        type: 'INTENTS_SWAP',
+        summary: `AMM Swap: ${nearAmount} NEAR -> $SHIN (0.5% fee: 0.3% Dev / 0.2% LP)`,
+        amountNear: nearAmount,
+        actorWallet: this.state.playerWallet.accountId,
+        timestamp: Date.now(),
+      });
+      this.saveState();
+    }
+    return res;
+  }
+
+  public async swapShinForNear(shinAmount: number) {
+    const rawShin = (BigInt(Math.floor(shinAmount * 1000)) * BigInt('1000000000000000')).toString();
+    const res = await this.relayCallAsync(
+      'ft_transfer_call',
+      {
+        receiver_id: this.arenaContractId,
+        amount: rawShin,
+        msg: 'swap_to_near',
+      },
+      '1yocto',
+      this.shinTokenId,
+      '120000000000000',
+    );
+    if (res.ok && res.txHash) {
+      this.state.ledger.unshift({
+        id: 'tx-swap-' + Date.now(),
+        txHash: res.txHash,
+        explorerUrl: res.explorerUrl,
+        onChain: true,
+        type: 'INTENTS_SWAP',
+        summary: `AMM Swap: ${shinAmount} $SHIN -> NEAR (0.5% fee: 0.3% Dev / 0.2% LP)`,
+        amountNear: 0,
+        actorWallet: this.state.playerWallet.accountId,
+        timestamp: Date.now(),
+      });
+      this.saveState();
+    }
+    return res;
+  }
+
+  public async registerPlayerTrainer(feeNear: number, specialty: 'ATK' | 'DEF' | 'SPD') {
+    const feeMilli = Math.max(100, Math.round(feeNear * 1000));
+    return this.relayCallAsync('register_trainer', {
+      fee_milli_near: feeMilli,
+      specialty,
+    });
+  }
+
+  public async getTrainerProfile(trainerId: string): Promise<OnChainTrainerProfile | null> {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(
+      `${serverUrl}/api/near/view?method=get_trainer&args=${encodeURIComponent(
+        JSON.stringify({ trainer_id: trainerId }),
+      )}`,
+    );
+    const data = await res.json();
+    return data?.ok ? (data.result as OnChainTrainerProfile | null) : null;
+  }
+
+  public async trainFighterWithPlayerTrainer(
+    tokenId: string,
+    trainerId: string,
+    feeNear: number,
+  ) {
+    return this.relayCallAsync(
+      'train_fighter_with_trainer',
+      { token_id: tokenId, trainer_id: trainerId },
+      feeNear.toString(),
+    );
   }
 }
 

@@ -88,6 +88,7 @@ let AuthService = class AuthService {
         }
         let dbUser = await this.usersService.findByEmail(req.user.email);
         let needsSave = false;
+        let isNewUser = false;
         if (!dbUser) {
             dbUser = await this.usersService.create({
                 email: req.user.email,
@@ -95,6 +96,7 @@ let AuthService = class AuthService {
                 type: user_schema_1.UserType.AUTHENTICATED,
             });
             needsSave = true;
+            isNewUser = true;
         }
         if (!dbUser.googleId) {
             dbUser.googleId = req.user.providerId;
@@ -112,8 +114,10 @@ let AuthService = class AuthService {
             email: dbUser.email,
             sub: dbUser.id || dbUser._id?.toString(),
             userName: dbUser.username,
+            username: dbUser.username,
             provider: dbUser.authProvider,
             walletAddress: dbUser.walletAddress,
+            isNewUser,
         };
         return {
             access_token: this.jwtService.sign(payload),
@@ -191,6 +195,7 @@ let AuthService = class AuthService {
         await this.otpModel.deleteOne({ _id: otpRecord._id });
         let dbUser = await this.usersService.findByEmail(email);
         let needsSave = false;
+        let isNewUser = false;
         if (!dbUser) {
             dbUser = await this.usersService.create({
                 email,
@@ -200,6 +205,7 @@ let AuthService = class AuthService {
             dbUser.authProvider = 'email';
             dbUser.emailVerified = true;
             needsSave = true;
+            isNewUser = true;
         }
         else {
             if (!dbUser.emailVerified) {
@@ -219,8 +225,10 @@ let AuthService = class AuthService {
             email: dbUser.email,
             sub: dbUser.id || dbUser._id?.toString(),
             userName: dbUser.username,
+            username: dbUser.username,
             provider: dbUser.authProvider,
             walletAddress: dbUser.walletAddress,
+            isNewUser,
         };
         return {
             access_token: this.jwtService.sign(payload),
@@ -229,7 +237,9 @@ let AuthService = class AuthService {
     }
     async generateWalletForUser(user) {
         const newSolanaWallet = await this.walletService.createSVMWallet();
-        const encryptedSolanaWalletDetails = await this.walletService.encryptSVMWallet(process.env.DEFAULT_WALLET_PIN, newSolanaWallet.privateKey);
+        const encryptedSolanaWalletDetails = await this.walletService.encryptSVMWallet(process.env.DEFAULT_WALLET_PIN ||
+            process.env.JWT_SECRET ||
+            'shin_arena_default_wallet_pin', newSolanaWallet.privateKey);
         user.walletAddress = newSolanaWallet.address;
         user.walletDetails = encryptedSolanaWalletDetails.json;
     }
@@ -245,10 +255,11 @@ let AuthService = class AuthService {
         return this.usersService.findById(userId);
     }
     async updateUsername(userId, username) {
-        if (!username || username.length < 3) {
+        const clean = (username || '').trim();
+        if (clean.length < 3) {
             throw new common_1.BadRequestException('Username must be at least 3 characters');
         }
-        return this.usersService.update(userId, { username });
+        return this.usersService.update(userId, { username: clean });
     }
 };
 exports.AuthService = AuthService;

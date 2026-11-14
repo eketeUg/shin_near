@@ -99,12 +99,8 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
             </p>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="mobile-touch-target text-gray-500 hover:text-white transition-colors cursor-pointer flex items-center justify-center rounded-lg hover:bg-white/10"
-          aria-label="Close Profile"
-        >
-          <X size={24} aria-hidden="true" />
+        <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors cursor-pointer">
+          <X size={24} />
         </button>
       </div>
 
@@ -139,10 +135,9 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
                   </span>
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="mobile-touch-target text-gray-500 hover:text-shin-gold transition-colors cursor-pointer flex items-center justify-center rounded-lg"
-                    aria-label="Edit display name"
+                    className="text-gray-500 hover:text-shin-gold transition-colors cursor-pointer"
                   >
-                    <Edit3 size={15} aria-hidden="true" />
+                    <Edit3 size={15} />
                   </button>
                 </>
               )}
@@ -161,29 +156,33 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
               <div className="flex gap-1.5 shrink-0">
                 <button
                   onClick={copyWallet}
-                  className="mobile-touch-target p-2 sm:p-1.5 hover:bg-white/10 rounded text-gray-400 hover:text-white cursor-pointer flex items-center justify-center"
+                  className="p-1.5 hover:bg-white/10 rounded text-gray-400 hover:text-white cursor-pointer"
                   title="Copy NEAR Account"
-                  aria-label="Copy NEAR Account"
                 >
-                  {copySuccess ? <Check size={14} className="text-green-500" aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                  {copySuccess ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                 </button>
                 <a
                   href={`https://testnet.nearblocks.io/address/${nearAccount}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="mobile-touch-target p-2 sm:p-1.5 hover:bg-white/10 rounded text-gray-400 hover:text-white flex items-center justify-center"
+                  className="p-1.5 hover:bg-white/10 rounded text-gray-400 hover:text-white"
                   title="View on NearBlocks Explorer"
-                  aria-label="View on NearBlocks Explorer"
                 >
-                  <ExternalLink size={14} aria-hidden="true" />
+                  <ExternalLink size={14} />
                 </a>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/10 text-center font-mono">
+            <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-white/10 text-center font-mono">
               <div>
                 <div className="text-[9px] text-gray-500">NEAR</div>
                 <div className="text-xs font-bold text-shin-gold">
                   {arenaState.playerWallet.NEAR.toFixed(2)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[9px] text-gray-500">$SHIN</div>
+                <div className="text-xs font-bold text-amber-300">
+                  {(arenaState.playerWallet.SHIN ?? 0).toFixed(1)}
                 </div>
               </div>
               <div>
@@ -295,7 +294,7 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
                   </div>
 
                   {/* Animated Fighter Stage */}
-                  <div className="relative h-40 sm:h-48 flex items-end justify-center bg-gradient-to-t from-red-950/30 via-black/40 to-transparent rounded-xl border border-white/10 mb-3 overflow-hidden">
+                  <div className="relative h-48 flex items-end justify-center bg-gradient-to-t from-red-950/30 via-black/40 to-transparent rounded-xl border border-white/10 mb-3 overflow-hidden">
                     <div className="absolute bottom-3 w-40 h-8 rounded-full bg-shin-gold/20 blur-md border border-shin-gold/40" />
                     <img
                       src={getCharGif(f.charId)}
@@ -326,22 +325,22 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
                   </div>
 
                   {/* Fights, Wins, Losses & Ranking */}
-                  <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-3 text-center">
-                    <div className="bg-white/5 border border-white/10 rounded-lg p-1.5 sm:p-2">
-                      <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase">Fights</div>
-                      <div className="text-xs sm:text-sm font-mono font-bold text-white">{totalFights}</div>
+                  <div className="grid grid-cols-4 gap-2 mb-3 text-center">
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                      <div className="text-[9px] text-gray-400 uppercase">Fights</div>
+                      <div className="text-sm font-mono font-bold text-white">{totalFights}</div>
                     </div>
-                    <div className="bg-white/5 border border-white/10 rounded-lg p-1.5 sm:p-2">
-                      <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase">Wins</div>
-                      <div className="text-xs sm:text-sm font-mono font-bold text-emerald-400">{f.wins}</div>
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                      <div className="text-[9px] text-gray-400 uppercase">Wins</div>
+                      <div className="text-sm font-mono font-bold text-emerald-400">{f.wins}</div>
                     </div>
-                    <div className="bg-white/5 border border-white/10 rounded-lg p-1.5 sm:p-2">
-                      <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase">Losses</div>
-                      <div className="text-xs sm:text-sm font-mono font-bold text-red-400">{f.losses}</div>
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                      <div className="text-[9px] text-gray-400 uppercase">Losses</div>
+                      <div className="text-sm font-mono font-bold text-red-400">{f.losses}</div>
                     </div>
-                    <div className="bg-white/5 border border-white/10 rounded-lg p-1.5 sm:p-2">
-                      <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase">Ranking</div>
-                      <div className="text-xs sm:text-sm font-mono font-bold text-shin-gold">{rankLabel}</div>
+                    <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                      <div className="text-[9px] text-gray-400 uppercase">Ranking</div>
+                      <div className="text-sm font-mono font-bold text-shin-gold">{rankLabel}</div>
                     </div>
                   </div>
 
@@ -372,7 +371,7 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
       <div className="mt-6 flex justify-center">
         <button
           onClick={onClose}
-          className="mobile-touch-target w-full sm:w-auto px-10 py-3 sm:py-2.5 bg-white/5 border border-white/15 hover:border-white text-gray-300 hover:text-white transition-all font-cinzel tracking-[0.25em] uppercase text-xs rounded-lg cursor-pointer"
+          className="px-10 py-2.5 bg-white/5 border border-white/15 hover:border-white text-gray-300 hover:text-white transition-all font-cinzel tracking-[0.25em] uppercase text-xs rounded-lg cursor-pointer"
         >
           Return to Menu
         </button>
