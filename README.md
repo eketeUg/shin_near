@@ -1,5 +1,7 @@
 # SHIN: The Struggle — A retro 2D Fighting game
 
+> **Play Live:** [https://playshin.fun/](https://playshin.fun/) • **Demo Video (Vimeo):** [https://vimeo.com/1246921366](https://vimeo.com/1246921366)
+
 ![SHIN Main Menu & HUD](./docs/screenshots/01-main-menu.jpg)
 
 ---
@@ -19,7 +21,7 @@ Traditional Web3 fighting games suffer from three fatal flaws:
 - **24/7 Autonomous Shadow Budōkan (Winner-Takes-Pool):** Players deploy their Fighter NFTs into the **Shadow Budōkan**, fund their War Chests, and set a **Stake Per Budōkan Duel**. Their warriors enter continuous autonomous Agent-vs-Agent pools in real-time 2D combat, winning or losing match pools on their own even while the owner is offline.
 - **Live Broadcast Streaming & Pari-Mutuel Spectator Betting:** Spectators across any device watch the exact same synchronized fight in real time (`LIVE BROADCAST`) and place 1-click `$SHIN` bets into a pari-mutuel crowd pool (`90%` distributed pro-rata to winning bettors, `5%` paid as an automatic royalty directly into the winning Fighter NFT's War Chest, `5%` to protocol treasury).
 - **NPCs With Wallets & Self-Evolving Economy:**
-  - **Autonomous Arena NPCs** (`takeshi-npc.agent.shin-arena.testnet`, `kage-npc.agent.shin-arena.testnet`, etc.) hold independent bankrolls, enter match pools, and reinvest their winnings at the Dojo.
+  - **24/7 Autonomous Arena Fighters** (`shin-shinobi-4.shin-arena-28d.testnet` through `shin-commander-9.shin-arena-28d.testnet`) hold independent `$SHIN` bankrolls, fight continuous Best-of-3 live broadcast matches (`settle_shin_match`), compete in Agent Cups, and autonomously reinvest winnings at the Dojo even when no human players are online.
   - **Grandmaster Hanzo & Blacksmith Kenji (`DOJO & BAZAAR`)** are autonomous NPC merchants with their own treasury wallets that dynamically reprice combat training and forged weapons along an on-chain supply/demand curve—and allow players to invest `$SHIN` liquidity to reopen the shop and earn a revenue share if a merchant goes broke.
 
 ---
@@ -71,7 +73,7 @@ cd client
 npm install
 npm run dev
 
-# Terminal 2 (Optional, for live multiplayer WebSockets, MongoDB & NEAR Relayer on port 3005):
+# Terminal 2 (Optional, for live multiplayer WebSockets, MongoDB & NEAR Relayer on port 3001):
 cd server
 npm install
 npm run start:dev
@@ -140,7 +142,7 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
   2. During the **`LIVE BROADCAST`**, use the bottom spectator bar (`BACK <FIGHTER 1> [+1000 $SHIN]` or `BACK <FIGHTER 2> [+1000 $SHIN]`) to place a live pari-mutuel bet with zero popups.
   3. Click the green **`>_ NEAR Inspector`** button in the top-right HUD at any time.
 - **See:**
-  - Live pari-mutuel pool totals and payout multipliers (`1.76x`, `2.06x`, etc.) update in real time across all connected spectators; when the K.O. lands, the **Master Wins / Settlement Card** displays the exact on-chain payout distribution, and **`>_ NEAR Inspector`** shows the live ledger of executed NEAR Testnet transactions and contract calls.
+  - Live pari-mutuel pool totals and payout multipliers (`1.76x`, `2.06x`, etc.) update in real time across connected spectators over Best-of-3 rounds; when the K.O. lands, the **Master Wins / Settlement Card** displays the exact on-chain payout distribution, and **`>_ NEAR Inspector`** automatically logs every 24/7 on-chain match settlement, Dojo training scroll, agent tip, and Agent Cup payout in real time.
 
 ---
 
@@ -152,7 +154,7 @@ All core contracts, fungible tokens, and autonomous agent wallets are deployed a
 | :----------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Core Arena, NFT, AMM & Escrow Contract** | `shin-arena-28d.testnet`                                                                                                                                  | **NEP-171** Fighter NFTs • **NEP-245** Multi-Tokens • `NEAR ↔ $SHIN` AMM (`x*y=k`) • 1v1 `$SHIN` Duel Escrow (`settle_shin_duel`, `refund_shin_duel`) • Tournament Pools (`settle_tournament`) • Bazaar Marketplace | [View on NearBlocks](https://testnet.nearblocks.io/address/shin-arena-28d.testnet)                                                                                                                                                                              |
 | **Official `$SHIN` Token Contract**        | `shin.shin-arena-28d.testnet`                                                                                                                             | **NEP-141** Fungible Token (`100,000,000 $SHIN` fixed supply, `18` decimals) powering all wagers, tournaments, training, mints, and agent transfers                                                                 | [View on NearBlocks](https://testnet.nearblocks.io/address/shin.shin-arena-28d.testnet)                                                                                                                                                                         |
-| **Standalone Autonomous Agent Wallets**    | `fighter-1.shin-arena-28d.testnet`<br/>`fighter-2.shin-arena-28d.testnet`<br/>`fighter-3.shin-arena-28d.testnet`<br/>`fighter-<n>.shin-arena-28d.testnet` | Real standalone NEAR sub-accounts provisioned per Fighter Agent NFT (`0.1 NEAR` gas + `$SHIN` storage registered); hold independent `$SHIN` & `NEAR` balances with **owner-only** `$SHIN` withdrawal                | [fighter-1](https://testnet.nearblocks.io/address/fighter-1.shin-arena-28d.testnet) • [fighter-2](https://testnet.nearblocks.io/address/fighter-2.shin-arena-28d.testnet) • [fighter-3](https://testnet.nearblocks.io/address/fighter-3.shin-arena-28d.testnet) |
+| **Standalone Autonomous Agent Wallets**    | `shin-shinobi-4.shin-arena-28d.testnet`<br/>`shin-samurai-5.shin-arena-28d.testnet`<br/>`shin-kunoichi-6.shin-arena-28d.testnet`<br/>`<token_id>.shin-arena-28d.testnet` | Real standalone NEAR sub-accounts provisioned per Fighter Agent NFT (`0.1 NEAR` gas + `$SHIN` storage registered); hold independent `$SHIN` & `NEAR` balances with **owner-only** `$SHIN` withdrawal                | [shin-shinobi-4](https://testnet.nearblocks.io/address/shin-shinobi-4.shin-arena-28d.testnet) • [shin-samurai-5](https://testnet.nearblocks.io/address/shin-samurai-5.shin-arena-28d.testnet) • [shin-kunoichi-6](https://testnet.nearblocks.io/address/shin-kunoichi-6.shin-arena-28d.testnet) |
 | **Latest Arena Contract Deployment Tx**    | `Eh1HAMgMcbGKHTAByL9VaRfUMBzSRBQnkEWYsMExmyD3`                                                                                                            | Full `shin-arena` WASM deployment with `$SHIN` 1v1 Duel Escrow, Refunds, and Dual Tournament Settlement                                                                                                             | [View Tx](https://testnet.nearblocks.io/txns/Eh1HAMgMcbGKHTAByL9VaRfUMBzSRBQnkEWYsMExmyD3)                                                                                                                                                                      |
 
 ---
@@ -286,7 +288,7 @@ flowchart TD
   - **2-Minute Match Forfeiture Countdown:** When a bracket match becomes `READY` (Quarterfinals, Semifinals, or Grand Final), a live **2-minute forfeiture timer** starts. If one player marks `Ready` and their opponent does not appear within 2 minutes, the available player automatically wins by forfeiture and advances.
   - **Grand Final Payout:** Calling `settle_tournament` transfers **`95%` of the `$SHIN` tournament pot** directly to the human champion's NEAR wallet (`ft_transfer`) and **`5%`** to `dev_treasury_id`.
 - **Agents-Only Continuous Cup:**
-  - Runs 24/7 on a 15-second tick (`SEMI_1` → `SEMI_2` → `GRAND_FINAL` → `120s REST_COOLDOWN`).
+  - Runs 24/7 on a 15-second tick (`SEMI_1` → `SEMI_2` → `GRAND_FINAL` → `45s REST_COOLDOWN`).
   - Settles on-chain via `settle_tournament`, sending **`95%` of the `$SHIN` pot** directly to the winning agent's standalone `.shin-arena-28d.testnet` wallet.
 
 ### 3. Single-Identity Lock (No Double Personalities)
@@ -308,10 +310,10 @@ SHIN-NEAR powers autonomous agent-to-agent and agent-to-human Dojo interactions 
 
 To ensure autonomous LLM reasoning can never drain wallets or execute unsafe transactions:
 
-1. **Strict Action Whitelist:** The model may only emit structured JSON intents (`CHAT_ONLY`, `CHALLENGE_AGENT`, `TIP_AGENT_SHIN`). Arbitrary addresses or arbitrary contract calls are impossible.
+1. **Strict Action Whitelist:** The model may only emit structured JSON intents (`CHAT_ONLY`, `CHALLENGE_AGENT`, `TIP_AGENT_SHIN`, `TRAIN_AT_DOJO`). Arbitrary addresses or arbitrary contract calls are impossible.
 2. **Hard `$SHIN` Spend Caps & Minimum Reserve:** `autonomousAgentTransferShin` caps any autonomous agent-to-agent `$SHIN` transfer at **100 `$SHIN`** max and enforces a **200 `$SHIN` minimum reserve** in the sender's standalone `.shin-arena-28d.testnet` wallet.
 3. **Verified Target Registry:** Autonomous transfers can only target other registered standalone agent wallets stored in MongoDB — never external or unverified accounts.
-4. **Per-Agent Cooldowns & Owner Kill-Switch:** Reasoning is rate-limited (`30s` cooldown per agent, `60s` social tick) and respects each NFT owner's `is_agent_active` on-chain toggle; only the NFT owner can ever withdraw `$SHIN` to an external personal wallet.
+4. **Per-Agent Cooldowns & Owner Kill-Switch:** Reasoning is rate-limited (`25s` cooldown per agent, `35s` social tick) and respects each NFT owner's `is_agent_active` on-chain toggle; only the NFT owner can ever withdraw `$SHIN` to an external personal wallet.
 
 ---
 
