@@ -699,7 +699,7 @@ const ControlsOverlay = ({
                         }}
                         className="w-[280px] px-6 py-4 bg-shin-gold text-black font-cinzel font-black text-lg tracking-widest hover:bg-yellow-400 transition-all rounded-xl cursor-pointer"
                     >
-                        RESUME KOMBAT
+                        RESUME DUEL
                     </button>
                     <button
                         onClick={() => {

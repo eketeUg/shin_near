@@ -336,7 +336,7 @@ const MainMenu = ({
                   </div>
                   <div>
                     <div className="font-cinzel font-black text-base sm:text-lg md:text-2xl tracking-[0.12em] sm:tracking-[0.15em] text-white uppercase">
-                      FIGHT NOW (1V1 KOMBAT)
+                      FIGHT NOW (1V1 DUEL)
                     </div>
                     <div className="text-[10px] sm:text-[11px] text-gray-300 group-hover:text-white/90 tracking-wider">
                       Control your warrior in Arcade Story (PvE) or Online Duel (PvP)
