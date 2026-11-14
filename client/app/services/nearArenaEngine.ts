@@ -3567,6 +3567,117 @@ class NearArenaEngine {
     const data = await res.json();
     return data?.ok ? data.result : null;
   }
+
+  public async fetchLiveTournamentsState() {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(`${serverUrl}/api/tournaments/state`);
+    const data = await res.json();
+    if (!data?.ok) throw new Error(data?.error || 'Failed to load live tournaments');
+    return data as { humanCup: any; agentCup: any };
+  }
+
+  public async joinHumanTournamentOnChain(charId: string) {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const { humanCup } = await this.fetchLiveTournamentsState();
+    const entryFeeShin: number = humanCup.entryFeeShin || 500;
+    const walletShin = this.state.playerWallet.SHIN ?? 0;
+
+    if (walletShin < entryFeeShin) {
+      throw new Error(
+        `Insufficient $SHIN (${Math.round(walletShin).toLocaleString()} $SHIN). Need ${entryFeeShin.toLocaleString()} $SHIN to enter.`,
+      );
+    }
+
+    const txRes = await this.joinTournamentWithShin(
+      humanCup.tournamentId,
+      this.state.playerWallet.accountId,
+      entryFeeShin,
+    );
+    if (!txRes?.ok || !txRes?.txHash) {
+      throw new Error(
+        txRes?.error || 'Sign in with Google or Email to stake $SHIN on-chain and enter!',
+      );
+    }
+
+    const joinRes = await fetch(`${serverUrl}/api/tournaments/human/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: this.state.playerWallet.accountId,
+        username: this.state.playerWallet.username,
+        charId,
+        joinTxHash: txRes.txHash,
+      }),
+    });
+    const joinData = await joinRes.json();
+    if (!joinData?.ok) {
+      throw new Error(joinData?.error || 'Failed to register in Human Championship bracket');
+    }
+
+    this.state.ledger.unshift({
+      id: 'tx-human-cup-join-' + Date.now(),
+      txHash: txRes.txHash,
+      explorerUrl: txRes.explorerUrl,
+      type: 'SPECTATOR_BET',
+      summary: `${this.state.playerWallet.username} staked ${entryFeeShin.toLocaleString()} $SHIN on-chain to enter ${humanCup.title}`,
+      amountNear: entryFeeShin / 1000,
+      actorWallet: this.state.playerWallet.accountId,
+      timestamp: Date.now(),
+    });
+    this.saveState();
+    void this.syncOnChainState(this.state.playerWallet.accountId);
+    return joinData.humanCup;
+  }
+
+  public async reportHumanTournamentMatchResult(matchId: string, winnerAccountId: string) {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(`${serverUrl}/api/tournaments/human/report-match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matchId, winnerAccountId }),
+    });
+    const data = await res.json();
+    if (!data?.ok) {
+      throw new Error(data?.error || 'Failed to report tournament match result');
+    }
+    if (data.humanCup?.settleTxHash) {
+      this.state.ledger.unshift({
+        id: 'tx-human-cup-settle-' + Date.now(),
+        txHash: data.humanCup.settleTxHash,
+        explorerUrl: data.humanCup.explorerUrl,
+        type: 'FIGHT_POOL_SETTLED',
+        summary: `🏆 ${data.humanCup.championName} won ${data.humanCup.title} (+${data.humanCup.winnerPayoutShin.toLocaleString()} $SHIN settled on-chain!)`,
+        amountNear: (data.humanCup.winnerPayoutShin || 0) / 1000,
+        actorWallet: data.humanCup.championId || this.state.playerWallet.accountId,
+        timestamp: Date.now(),
+      });
+      this.saveState();
+    }
+    void this.syncOnChainState(this.state.playerWallet.accountId);
+    return data.humanCup;
+  }
+
+  public async openNextHumanCup() {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(`${serverUrl}/api/tournaments/human/next-cup`, {
+      method: 'POST',
+    });
+    const data = await res.json();
+    if (!data?.ok) throw new Error(data?.error || 'Failed to open next Human Cup');
+    return data.humanCup;
+  }
+
+  public async setAgentTournamentEnrollment(tokenId: string, enrolled: boolean) {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(`${serverUrl}/api/tournaments/agent/enrollment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tokenId, enrolled }),
+    });
+    const data = await res.json();
+    if (!data?.ok) throw new Error(data?.error || 'Failed to update agent enrollment');
+    return data as { humanCup: any; agentCup: any };
+  }
 }
 
 export const nearArenaEngine = new NearArenaEngine();

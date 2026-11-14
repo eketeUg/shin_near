@@ -9,6 +9,8 @@ import { LobbyChatController } from './lobby-chat.controller';
 import { LobbyChatService } from './lobby-chat.service';
 import { NearRelayerController } from './near-relayer.controller';
 import { NearRelayerService } from './near-relayer.service';
+import { TournamentController } from './tournament.controller';
+import { TournamentService } from './tournament.service';
 import { LobbyMessage, LobbyMessageSchema } from './schema/lobby-message.schema';
 
 @Module({
@@ -20,8 +22,8 @@ import { LobbyMessage, LobbyMessageSchema } from './schema/lobby-message.schema'
       { name: LobbyMessage.name, schema: LobbyMessageSchema },
     ]),
   ],
-  controllers: [NearRelayerController, LobbyChatController],
-  providers: [GameGateway, GameService, NearRelayerService, LobbyChatService],
-  exports: [NearRelayerService, LobbyChatService],
+  controllers: [NearRelayerController, LobbyChatController, TournamentController],
+  providers: [GameGateway, GameService, NearRelayerService, LobbyChatService, TournamentService],
+  exports: [NearRelayerService, LobbyChatService, TournamentService],
 })
 export class GameModule {}

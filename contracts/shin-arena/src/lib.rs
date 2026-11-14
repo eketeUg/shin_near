@@ -1521,7 +1521,7 @@ impl ShinArenaContract {
         assert!(!pool.is_settled, "Tournament already settled");
         assert!(!winner_token_ids.is_empty(), "Must specify at least one winner");
 
-        // 95% Winners / 5% Dev Treasury
+        // 1. Settle native NEAR pot (if any)
         let dev_cut = pool.total_pot_milli_near.saturating_mul(5) / 100;
         let winners_pot = pool.total_pot_milli_near.saturating_sub(dev_cut);
         let per_winner = winners_pot / (winner_token_ids.len() as u128);
@@ -1540,6 +1540,49 @@ impl ShinArenaContract {
         self.dev_treasury_milli += dev_cut;
         if dev_cut > 0 && self.dev_treasury_id != env::current_account_id() {
             let _ = Promise::new(self.dev_treasury_id.clone()).transfer(NearToken::from_millinear(dev_cut));
+        }
+
+        // 2. Settle $SHIN NEP-141 pot (if any) — 95% Winners / 5% Dev Treasury
+        let pot_key = format!("tourney_shin_pot:{}", tournament_id);
+        let shin_pot = self.mt_balances.get(&pot_key).unwrap_or(0);
+        if shin_pot > 0 {
+            self.mt_balances.insert(&pot_key, &0);
+            let dev_shin_cut = shin_pot.saturating_mul(5) / 100;
+            let winners_shin_pot = shin_pot.saturating_sub(dev_shin_cut);
+            let per_winner_shin = winners_shin_pot / (winner_token_ids.len() as u128);
+
+            for winner_id in &winner_token_ids {
+                if self.fighters.get(winner_id).is_some() {
+                    // Agent NFT winner: credit its on-chain $SHIN War Chest
+                    let v_key = format!("vault_shin:{}", winner_id);
+                    let prev = self.mt_balances.get(&v_key).unwrap_or(0);
+                    self.mt_balances.insert(&v_key, &(prev + per_winner_shin));
+                    // Stats already incremented above when total_pot_milli_near >= 0
+                } else if let Ok(human_account) = winner_id.parse::<AccountId>() {
+                    // Human player winner: transfer $SHIN directly to their NEAR wallet
+                    if per_winner_shin > 0 {
+                        let _ = ext_ft::ext(self.shin_token_id.clone())
+                            .with_attached_deposit(NearToken::from_yoctonear(1))
+                            .with_static_gas(GAS_FOR_FT_TRANSFER)
+                            .ft_transfer(
+                                human_account,
+                                U128(per_winner_shin),
+                                Some(format!("SHIN Tournament {} Champion Payout", tournament_id)),
+                            );
+                    }
+                }
+            }
+
+            if dev_shin_cut > 0 && self.dev_treasury_id != env::current_account_id() {
+                let _ = ext_ft::ext(self.shin_token_id.clone())
+                    .with_attached_deposit(NearToken::from_yoctonear(1))
+                    .with_static_gas(GAS_FOR_FT_TRANSFER)
+                    .ft_transfer(
+                        self.dev_treasury_id.clone(),
+                        U128(dev_shin_cut),
+                        Some(format!("SHIN Tournament {} 5% Dev Fee", tournament_id)),
+                    );
+            }
         }
 
         pool.is_settled = true;
@@ -1914,5 +1957,57 @@ mod tests {
             contract.get_fighter_shin_vault(f1.token_id).0,
             2_910 * 1_000_000_000_000_000_000
         );
+    }
+
+    #[test]
+    fn test_shin_tournament_human_and_agent_settlement() {
+        testing_env!(get_context("alice.testnet", 1_000));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let f1 = contract.mint_fighter("hayabusa".to_string(), "Hayabusa".to_string(), 80, 70, 90);
+        let f2 = contract.mint_fighter("kunoichi".to_string(), "Kunoichi".to_string(), 75, 65, 95);
+
+        let shin_500: u128 = 500 * 1_000_000_000_000_000_000;
+
+        // 1. Agent Cup funded in $SHIN
+        contract.create_tournament("agent-cup-1".to_string(), 500, 4);
+        testing_env!(get_context("shin.shin-arena-28d.testnet", 0));
+        let _ = contract.ft_on_transfer(
+            "alice.testnet".parse().unwrap(),
+            U128(shin_500),
+            format!("join_tournament:agent-cup-1:{}", f1.token_id),
+        );
+        let _ = contract.ft_on_transfer(
+            "bob.testnet".parse().unwrap(),
+            U128(shin_500),
+            format!("join_tournament:agent-cup-1:{}", f2.token_id),
+        );
+
+        testing_env!(get_context("oracle.testnet", 0));
+        let settled_agent = contract.settle_tournament("agent-cup-1".to_string(), vec![f1.token_id.clone()]);
+        assert!(settled_agent.is_settled);
+        // 95% of 1000 $SHIN = 950 $SHIN credited to winning agent's $SHIN vault
+        assert_eq!(
+            contract.get_fighter_shin_vault(f1.token_id.clone()).0,
+            950 * 1_000_000_000_000_000_000
+        );
+
+        // 2. Human-Only Cup funded in $SHIN with human account IDs
+        contract.create_tournament("human-cup-1".to_string(), 500, 4);
+        testing_env!(get_context("shin.shin-arena-28d.testnet", 0));
+        let _ = contract.ft_on_transfer(
+            "alice.testnet".parse().unwrap(),
+            U128(shin_500),
+            "join_tournament:human-cup-1:alice.testnet".to_string(),
+        );
+        let _ = contract.ft_on_transfer(
+            "bob.testnet".parse().unwrap(),
+            U128(shin_500),
+            "join_tournament:human-cup-1:bob.testnet".to_string(),
+        );
+
+        testing_env!(get_context("oracle.testnet", 0));
+        let settled_human = contract.settle_tournament("human-cup-1".to_string(), vec!["alice.testnet".to_string()]);
+        assert!(settled_human.is_settled);
+        assert_eq!(settled_human.winner_token_ids, vec!["alice.testnet".to_string()]);
     }
 }

@@ -48,6 +48,31 @@ export default function Home() {
   const [matchmakingRoomCode, setMatchmakingRoomCode] = useState<string | null>(null);
   const [balances, setBalances] = useState({ NEAR: 25, USDC: 100, USDT: 50 });
   const [pendingPlayerFight, setPendingPlayerFight] = useState<any | null>(null);
+  const activeTournamentBoutRef = useRef<{
+    matchId: string;
+    p1AccountId: string;
+    p2AccountId: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const onGameOver = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const bout = activeTournamentBoutRef.current;
+      if (!bout || !detail) return;
+      if (detail.winnerId !== 'p1' && detail.winnerId !== 'p2') return;
+      const winnerAccountId =
+        detail.winnerId === 'p1' ? bout.p1AccountId : bout.p2AccountId;
+      activeTournamentBoutRef.current = null;
+      if (winnerAccountId) {
+        void nearArenaEngine.reportHumanTournamentMatchResult(
+          bout.matchId,
+          winnerAccountId,
+        );
+      }
+    };
+    window.addEventListener('gameOver', onGameOver);
+    return () => window.removeEventListener('gameOver', onGameOver);
+  }, []);
   const [orientationPreference, setOrientationPreference] = useState<
     'AUTO_HYBRID' | 'FORCE_LANDSCAPE' | 'FORCE_PORTRAIT'
   >('AUTO_HYBRID');
@@ -587,10 +612,15 @@ export default function Home() {
         />
       )}
 
-      {/* Dedicated Daily & Continuous Agent Tournaments Flow */}
+      {/* Dedicated Humans-Only & Continuous Agent-Only Tournaments Flow */}
       {!isLoading && showTournaments && (
         <TournamentsFlow
           onStartTournamentDuel={(duelConfig) => {
+            activeTournamentBoutRef.current = {
+              matchId: duelConfig.matchId,
+              p1AccountId: duelConfig.p1AccountId,
+              p2AccountId: duelConfig.p2AccountId,
+            };
             setShowTournaments(false);
             startPlayerFightWithLandscapeGate({
               mode: 'PVE',
@@ -600,7 +630,7 @@ export default function Home() {
               p2Name: duelConfig.p2Name,
               difficulty: 'HARD',
               rounds: 1,
-              wager: { token: 'NEAR', amount: duelConfig.wagerNear },
+              wager: { token: 'SHIN', amount: duelConfig.wagerShin },
               isTournamentBout: duelConfig.isTournamentBout,
             });
           }}

@@ -1,30 +1,112 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { nearArenaEngine } from '../services/nearArenaEngine';
 import {
   Trophy,
   Swords,
   Timer,
   Flame,
-  FastForward,
   CheckCircle2,
   Coins,
   Terminal,
+  ExternalLink,
+  Users,
+  Bot,
+  Loader2,
 } from 'lucide-react';
 import NearInspectorModal from './NearInspectorModal';
 
+interface BracketMatch {
+  id: string;
+  round: 'SEMI_1' | 'SEMI_2' | 'GRAND_FINAL';
+  label: string;
+  p1Id: string | null;
+  p1Name: string;
+  p1CharId: string;
+  p2Id: string | null;
+  p2Name: string;
+  p2CharId: string;
+  winnerId?: string;
+  winnerName?: string;
+  status: 'WAITING' | 'READY' | 'COMPLETED';
+}
+
+interface HumanCupState {
+  cupNumber: number;
+  tournamentId: string;
+  title: string;
+  entryFeeShin: number;
+  maxPlayers: number;
+  status: 'REGISTRATION' | 'IN_PROGRESS' | 'SETTLED';
+  entrants: Array<{
+    accountId: string;
+    username: string;
+    charId: string;
+    joinTxHash: string;
+    joinedAt: number;
+  }>;
+  matches: BracketMatch[];
+  createTxHash?: string;
+  settleTxHash?: string;
+  explorerUrl?: string;
+  championId?: string;
+  championName?: string;
+  totalPoolShin: number;
+  winnerPayoutShin: number;
+}
+
+interface AgentCupState {
+  cupNumber: number;
+  tournamentId: string;
+  title: string;
+  entryFeeShin: number;
+  status: 'IN_PROGRESS' | 'REST_COOLDOWN';
+  currentStage: 'SEMI_1' | 'SEMI_2' | 'GRAND_FINAL' | 'REST_COOLDOWN';
+  restSecondsRemaining: number;
+  nextRoundInSeconds: number;
+  matches: BracketMatch[];
+  createTxHash?: string;
+  settleTxHash?: string;
+  explorerUrl?: string;
+  lastChampionId?: string;
+  lastChampionName?: string;
+  lastChampionWonShin?: number;
+  totalPoolShin: number;
+  winnerPayoutShin: number;
+  enrolledAgents: Array<{
+    tokenId: string;
+    name: string;
+    charClass: string;
+    ownerId: string;
+    wins: number;
+    elo: number;
+    powerLevel: number;
+    enrolled: boolean;
+  }>;
+}
+
 interface TournamentsFlowProps {
   onStartTournamentDuel: (duelConfig: {
+    matchId: string;
+    p1AccountId: string;
+    p2AccountId: string;
     p1Char: string;
     p2Char: string;
     p2Name: string;
-    wagerNear: number;
+    wagerShin: number;
     isTournamentBout: boolean;
   }) => void;
   onBack: () => void;
   onHome: () => void;
 }
+
+const CHAR_OPTIONS = [
+  { id: 'fighter', label: 'Kensei (Balanced)' },
+  { id: 'shinobi', label: 'Hayabusa (Fast)' },
+  { id: 'kunoichi', label: 'Akatsuki (Agile)' },
+  { id: 'samurai', label: 'Takeshi (Heavy)' },
+];
 
 const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
   onStartTournamentDuel,
@@ -32,70 +114,93 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
   onHome,
 }) => {
   const [arenaState, setArenaState] = useState(() => nearArenaEngine.getState());
+  const [activeTab, setActiveTab] = useState<'HUMAN' | 'AGENT'>('HUMAN');
+  const [humanCup, setHumanCup] = useState<HumanCupState | null>(null);
+  const [agentCup, setAgentCup] = useState<AgentCupState | null>(null);
+  const [selectedChar, setSelectedChar] = useState('fighter');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [showInspectorModal, setShowInspectorModal] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3200);
+    setTimeout(() => setToast(null), 3600);
   };
+
+  const refreshLiveTournaments = useCallback(async () => {
+    try {
+      const data = await nearArenaEngine.fetchLiveTournamentsState();
+      setHumanCup(data.humanCup);
+      setAgentCup(data.agentCup);
+    } catch {
+      // Keep last known state if server is temporarily unreachable
+    }
+  }, []);
 
   useEffect(() => {
     const sync = () => setArenaState({ ...nearArenaEngine.getState() });
     window.addEventListener('nearArenaStateUpdated', sync);
 
-    // 1-second ticker for Continuous Agent Tournament 2-Minute Rest Cooldown
-    const tourneyTimer = setInterval(() => {
-      const st = nearArenaEngine.getState();
-      if (st.agentContinuousTournament?.status === 'REST_COOLDOWN') {
-        nearArenaEngine.stepContinuousAgentTournament(false);
-        setArenaState({ ...nearArenaEngine.getState() });
-      }
-    }, 1000);
+    void refreshLiveTournaments();
+    const poll = setInterval(() => {
+      void refreshLiveTournaments();
+    }, 2000);
 
     return () => {
       window.removeEventListener('nearArenaStateUpdated', sync);
-      clearInterval(tourneyTimer);
+      clearInterval(poll);
     };
-  }, []);
-
-  const humanTourney = arenaState.humanDailyTournament;
-  const agentTourney = arenaState.agentContinuousTournament;
-  const toShin = (nearAmt: number) => Math.round((nearAmt || 0) * 1000).toLocaleString();
-  const walletShin = Math.round(arenaState.playerWallet.SHIN ?? 0).toLocaleString();
+  }, [refreshLiveTournaments]);
 
   const formatCooldown = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  const walletShin = Math.round(arenaState.playerWallet.SHIN ?? 0).toLocaleString();
+  const myAccountId = arenaState.playerWallet.accountId;
+
+  const hasJoinedHumanCup = Boolean(
+    humanCup?.entrants.some((e) => e.accountId === myAccountId),
+  );
+  const myActiveHumanMatch = humanCup?.matches.find(
+    (m) =>
+      m.status === 'READY' &&
+      (m.p1Id === myAccountId || m.p2Id === myAccountId),
+  );
+  const myWaitingHumanMatch = humanCup?.matches.find(
+    (m) =>
+      m.status === 'WAITING' &&
+      (m.p1Id === myAccountId || m.p2Id === myAccountId),
+  );
+
+  const myAgents =
+    agentCup?.enrolledAgents.filter((a) => a.ownerId === myAccountId) || [];
+
   return (
-    <div className="fixed inset-0 z-40 bg-gradient-to-b from-gray-950 via-black to-black text-white overflow-y-auto w-full h-full flex flex-col select-none">
+    <div className="min-h-screen w-full bg-black text-white flex flex-col overflow-y-auto">
       {toast && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[100] bg-shin-gold text-black font-cinzel font-black text-xs px-5 py-2.5 rounded-full shadow-[0_0_25px_rgba(251,191,36,0.9)] flex items-center gap-2">
-          <CheckCircle2 size={16} />
-          <span>{toast}</span>
+          <CheckCircle2 size={15} /> {toast}
         </div>
       )}
 
-      {/* Top Header */}
-      <div className="sticky top-0 z-50 bg-black/95 border-b border-white/10 px-4 md:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 backdrop-blur-md">
-        <div className="flex items-center gap-3">
+      {/* Header */}
+      <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-md border-b border-shin-gold/30 px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button
             onClick={onBack}
-            className="text-gray-400 hover:text-white uppercase tracking-widest text-xs font-cinzel font-bold cursor-pointer"
+            className="text-gray-400 hover:text-white uppercase tracking-widest text-xs font-cinzel font-bold px-2.5 py-1.5 border border-white/10 rounded-lg cursor-pointer"
           >
             ← Back
           </button>
-          <div className="h-4 w-px bg-white/15" />
           <div>
             <h1 className="text-base sm:text-xl md:text-2xl font-cinzel font-black text-shin-gold uppercase tracking-wider flex items-center gap-2">
               <Trophy size={18} /> SHINOBI GRAND TOURNAMENTS
             </h1>
-            <p className="text-[10px] text-gray-400">
-              Daily Human Tournament Windows (Per-Fight Cut + Champion Jackpot) &amp; Continuous
-              24/7 Agent Cups (with 2m Rest Cooldown)
+            <p className="text-[10px] sm:text-xs text-gray-400 font-mono">
+              On-Chain $SHIN Brackets • Humans-Only Championship &amp; Continuous Agent-Only Cup
             </p>
           </div>
         </div>
@@ -124,289 +229,481 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
         </div>
       </div>
 
+      {/* Mode Split Tabs */}
+      <div className="max-w-5xl mx-auto w-full px-4 md:px-8 pt-6">
+        <div className="grid grid-cols-2 gap-3 bg-gray-950 p-1.5 rounded-2xl border border-white/10">
+          <button
+            onClick={() => setActiveTab('HUMAN')}
+            className={`py-3 px-4 rounded-xl font-cinzel font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              activeTab === 'HUMAN'
+                ? 'bg-shin-gold text-black shadow-[0_0_20px_rgba(251,191,36,0.4)]'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Users size={16} />
+            <span>Humans-Only Championship</span>
+            {humanCup && (
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                  activeTab === 'HUMAN'
+                    ? 'bg-black/20 text-black'
+                    : 'bg-white/10 text-shin-gold'
+                }`}
+              >
+                {humanCup.entrants.length}/{humanCup.maxPlayers}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('AGENT')}
+            className={`py-3 px-4 rounded-xl font-cinzel font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              activeTab === 'AGENT'
+                ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.45)]'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Bot size={16} />
+            <span>Agents-Only Continuous Cup</span>
+            {agentCup && (
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                  activeTab === 'AGENT'
+                    ? 'bg-black/30 text-white'
+                    : 'bg-purple-500/20 text-purple-300'
+                }`}
+              >
+                Cup #{agentCup.cupNumber}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 1. DAILY HUMAN + AGENT OPEN TOURNAMENT WINDOW */}
-          <div className="bg-gray-950 border-2 border-shin-gold/50 rounded-2xl p-5 space-y-5 shadow-[0_0_30px_rgba(251,191,36,0.15)]">
-            <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-4">
-              <div>
-                <span className="px-2.5 py-0.5 rounded bg-shin-gold/20 border border-shin-gold/50 text-shin-gold font-mono text-[10px] font-bold uppercase">
-                  👤 Daily Open Tournament Window
-                </span>
-                <h3 className="text-lg sm:text-xl font-cinzel font-black text-white mt-1.5">
-                  {humanTourney.title}
-                </h3>
-                <p className="text-xs text-gray-400 mt-1">
-                  Each bout winner immediately takes the{' '}
-                  <strong className="text-emerald-400">
-                    +{toShin(humanTourney.boutBountyNear)} $SHIN Bout Cut
-                  </strong>
-                  , and the overall Tournament Champion takes the{' '}
-                  <strong className="text-shin-gold">
-                    +{toShin(humanTourney.championJackpotNear)} $SHIN Grand Jackpot
-                  </strong>
-                  !
-                </p>
-              </div>
-              <div className="text-right shrink-0 bg-black/80 border border-shin-gold/30 rounded-xl px-3.5 py-2">
-                <div className="text-[9px] font-mono text-gray-400 uppercase">Total Pool</div>
-                <div className="text-lg font-mono font-bold text-shin-gold">
-                  {toShin(humanTourney.totalPoolNear)} $SHIN
-                </div>
-                <div className="text-[9px] font-mono text-emerald-400">
-                  Entry: {toShin(humanTourney.entryFeeNear)} $SHIN
-                </div>
-              </div>
-            </div>
-
-            {/* Bracket Matches List */}
-            <div className="space-y-3">
-              {humanTourney.matches.map((m) => (
-                <div
-                  key={m.id}
-                  className="bg-black/75 border border-white/10 rounded-xl p-3.5 flex items-center justify-between gap-2"
-                >
-                  <div>
-                    <div className="text-[10px] font-mono text-shin-gold uppercase font-bold">
-                      {m.label} • Immediate Bounty: +{toShin(m.boutBountyPaidNear)} $SHIN
-                    </div>
-                    <div className="text-xs sm:text-sm font-cinzel font-bold text-white mt-1 flex items-center gap-2">
-                      <span className={m.winnerSide === 'p1' ? 'text-emerald-400' : ''}>
-                        {m.p1IsAgent ? '🤖' : '👤'} {m.p1Name}
-                      </span>
-                      <span className="text-gray-500">VS</span>
-                      <span className={m.winnerSide === 'p2' ? 'text-emerald-400' : ''}>
-                        {m.p2IsAgent ? '🤖' : '👤'} {m.p2Name}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-white/5 border border-white/10 text-gray-300">
-                    {m.winnerSide
-                      ? `Winner: ${m.winnerSide === 'p1' ? m.p1Name : m.p2Name}`
-                      : 'Pending'}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Tournament Action Controls */}
-            <div className="pt-2 flex flex-wrap gap-3">
-              {!humanTourney.playerJoined || humanTourney.currentStage === 'COMPLETED' ? (
-                <button
-                  onClick={() => {
-                    try {
-                      const myChar =
-                        arenaState.fighters.find((f) => !f.isNpc)?.charId || 'fighter';
-                      nearArenaEngine.joinHumanDailyTournament(myChar);
-                      setArenaState({ ...nearArenaEngine.getState() });
-                      showToast(
-                        `Joined ${humanTourney.title}! Staked ${toShin(humanTourney.entryFeeNear)} $SHIN.`,
-                      );
-                    } catch (e: any) {
-                      showToast(e.message);
-                    }
-                  }}
-                  className="w-full py-3 bg-shin-gold text-black font-cinzel font-black text-xs uppercase tracking-widest rounded-xl hover:bg-yellow-400 transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Trophy size={15} /> Join Daily Tournament Window ({toShin(humanTourney.entryFeeNear)}{' '}
-                  $SHIN Entry)
-                </button>
-              ) : (
-                <div className="w-full space-y-2">
-                  <button
-                    onClick={() => {
-                      const currentBout =
-                        humanTourney.currentStage === 'SEMI_1'
-                          ? humanTourney.matches[0]
-                          : humanTourney.matches[2];
-                      onStartTournamentDuel({
-                        p1Char: humanTourney.playerCharId || 'fighter',
-                        p2Char: currentBout.p2CharId || 'kunoichi',
-                        p2Name: currentBout.p2Name,
-                        wagerNear: humanTourney.entryFeeNear,
-                        isTournamentBout: true,
-                      });
-                    }}
-                    className="w-full py-3 bg-shin-red hover:bg-red-600 text-white font-cinzel font-black text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <Swords size={15} /> Fight Your {humanTourney.currentStage.replace('_', ' ')}{' '}
-                    Match in 2D Arena Now
-                  </button>
-                  <button
-                    onClick={() => {
-                      const res = nearArenaEngine.resolveHumanTournamentBout(true);
-                      setArenaState({ ...nearArenaEngine.getState() });
-                      if (res.jackpotPaidNear > 0) {
-                        showToast(
-                          `🏆 GRAND CHAMPION! +${toShin(res.jackpotPaidNear)} $SHIN Jackpot credited to your wallet!`,
-                        );
-                      } else {
-                        showToast(
-                          `Semifinal Won! +${toShin(res.bountyPaidNear)} $SHIN Bout Cut paid. Ready for Grand Final!`,
-                        );
-                      }
-                    }}
-                    className="w-full py-2 bg-white/10 hover:bg-white/15 border border-white/20 text-shin-gold font-mono text-[11px] uppercase rounded-xl cursor-pointer"
-                  >
-                    ⚡ Quick-Simulate My Current Round Win (Demo Shortcut)
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 2. CONTINUOUS 24/7 AUTONOMOUS AGENT TOURNAMENT (WITH 2-MIN REST COOLDOWN) */}
-          <div className="bg-gray-950 border-2 border-purple-500/50 rounded-2xl p-5 space-y-5 shadow-[0_0_30px_rgba(168,85,247,0.15)]">
-            <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-4">
-              <div>
-                <span className="px-2.5 py-0.5 rounded bg-purple-500/20 border border-purple-400/50 text-purple-300 font-mono text-[10px] font-bold uppercase">
-                  🤖 Continuous 24/7 Agent Tournament • Cup #{agentTourney.tournamentNumber}
-                </span>
-                <h3 className="text-lg sm:text-xl font-cinzel font-black text-white mt-1.5">
-                  Autonomous Shadow Clan Cup #{agentTourney.tournamentNumber}
-                </h3>
-                <p className="text-xs text-gray-400 mt-1">
-                  Enrolled agents battle continuously. After each tournament concludes, all agents
-                  enter a mandatory{' '}
-                  <strong className="text-amber-300">2-Minute Rest Cooldown (120s)</strong> so
-                  owners can withdraw agents or upgrade stats before the next cup begins!
-                </p>
-              </div>
-              <div className="text-right shrink-0 bg-black/80 border border-purple-500/30 rounded-xl px-3.5 py-2">
-                <div className="text-[9px] font-mono text-gray-400 uppercase">Agent Pool</div>
-                <div className="text-lg font-mono font-bold text-purple-300">
-                  {toShin(agentTourney.totalPoolNear)} $SHIN
-                </div>
-                <div className="text-[9px] font-mono text-shin-gold">
-                  Jackpot: {toShin(agentTourney.championJackpotNear)} $SHIN
-                </div>
-              </div>
-            </div>
-
-            {/* Status Banner: Live Round vs 2-Minute Rest Cooldown */}
-            {agentTourney.status === 'REST_COOLDOWN' ? (
-              <div className="bg-amber-950/40 border-2 border-amber-400 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs font-cinzel font-black text-amber-300 uppercase flex items-center gap-1.5">
-                    <Timer size={15} /> Mandatory 2-Minute Agent Rest Window Active
-                  </div>
-                  <p className="text-[11px] text-gray-200 mt-0.5">
-                    Last Champion:{' '}
-                    <strong className="text-shin-gold">{agentTourney.lastChampionTitle}</strong> (+
-                    {toShin(agentTourney.lastChampionWonNear || 0)} $SHIN). Next tournament starts in{' '}
-                    <strong className="font-mono text-amber-300">
-                      {formatCooldown(agentTourney.restSecondsRemaining)}
-                    </strong>
-                    .
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    nearArenaEngine.stepContinuousAgentTournament(true);
-                    setArenaState({ ...nearArenaEngine.getState() });
-                    showToast('⏩ Rest Cooldown completed! Next Agent Tournament started.');
-                  }}
-                  className="px-3.5 py-2 bg-amber-400 text-black font-cinzel font-black text-[10px] uppercase rounded-lg shrink-0 flex items-center gap-1 cursor-pointer"
-                >
-                  <FastForward size={13} /> Skip 2m Rest &amp; Start Next Cup
-                </button>
+      <div className="flex-1 max-w-5xl mx-auto w-full p-4 md:p-8">
+        {activeTab === 'HUMAN' ? (
+          /* =============================================================
+             1. HUMANS-ONLY CHAMPIONSHIP (ON-CHAIN $SHIN + REAL PVP BRACKET)
+             ============================================================= */
+          <div className="bg-gray-950 border-2 border-shin-gold/50 rounded-2xl p-5 sm:p-6 space-y-5 shadow-[0_0_30px_rgba(251,191,36,0.15)]">
+            {!humanCup ? (
+              <div className="py-12 flex items-center justify-center gap-2 text-gray-400 font-mono text-xs">
+                <Loader2 size={16} className="animate-spin text-shin-gold" />
+                Loading live on-chain Human Championship...
               </div>
             ) : (
-              <div className="bg-purple-950/30 border border-purple-500/40 rounded-xl p-3.5 flex items-center justify-between">
-                <div className="text-xs font-cinzel font-bold text-purple-200 flex items-center gap-2">
-                  <Flame size={15} className="text-shin-red" />
-                  <span>{agentTourney.currentRoundLabel}</span>
-                </div>
-                <button
-                  onClick={() => {
-                    const updated = nearArenaEngine.stepContinuousAgentTournament(false);
-                    setArenaState({ ...nearArenaEngine.getState() });
-                    if (updated.status === 'REST_COOLDOWN') {
-                      showToast(
-                        `🏆 ${updated.lastChampionTitle} won Cup #${updated.tournamentNumber}! 2-Min Rest Cooldown started.`,
-                      );
-                    } else {
-                      showToast('Resolved Agent Semifinals & paid per-bout $SHIN cuts!');
-                    }
-                  }}
-                  className="px-3.5 py-1.5 bg-purple-500 hover:bg-purple-400 text-white font-cinzel font-black text-[10px] uppercase rounded-lg cursor-pointer"
-                >
-                  ⚡ Resolve Next Bracket Round
-                </button>
-              </div>
-            )}
-
-            {/* Agent Bracket Matches */}
-            <div className="space-y-2.5">
-              {agentTourney.matches.map((m) => (
-                <div
-                  key={m.id}
-                  className="bg-black/75 border border-white/10 rounded-xl p-3 flex items-center justify-between gap-2"
-                >
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-white/10 pb-4">
                   <div>
-                    <div className="text-[10px] font-mono text-purple-300 uppercase">
-                      {m.label} • Payout: +{toShin(m.boutBountyPaidNear)} $SHIN
-                    </div>
-                    <div className="text-xs font-cinzel font-bold text-white mt-0.5">
-                      🤖 {m.p1Name} <span className="text-gray-500">VS</span> 🤖 {m.p2Name}
+                    <span className="px-2.5 py-0.5 rounded bg-shin-gold/20 border border-shin-gold/50 text-shin-gold font-mono text-[10px] font-bold uppercase">
+                      👤 Humans Only • No AI Agents • On-Chain Escrow
+                    </span>
+                    <h3 className="text-lg sm:text-2xl font-cinzel font-black text-white mt-2">
+                      {humanCup.title}
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Real 4-player human bracket settled on{' '}
+                      <span className="font-mono text-emerald-400">shin-arena-28d.testnet</span>.
+                      Champion wins{' '}
+                      <strong className="text-shin-gold">95% of the $SHIN pot</strong> directly to
+                      their NEAR wallet (5% Dev Treasury).
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 mt-2 text-[10px] font-mono text-gray-400">
+                      <span>ID: {humanCup.tournamentId}</span>
+                      {humanCup.explorerUrl && (
+                        <a
+                          href={humanCup.explorerUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-emerald-400 hover:underline inline-flex items-center gap-1"
+                        >
+                          View On-Chain Tx <ExternalLink size={10} />
+                        </a>
+                      )}
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono text-shin-gold">
-                    {m.winnerSide
-                      ? `🏆 ${m.winnerSide === 'p1' ? m.p1Name : m.p2Name}`
-                      : 'In Bracket'}
-                  </span>
-                </div>
-              ))}
-            </div>
 
-            {/* Player's Own Agents Enrollment Quick-Toggle */}
-            <div className="bg-black/80 border border-white/10 rounded-xl p-3.5 space-y-2">
-              <div className="text-[10px] font-cinzel font-bold text-gray-300 uppercase tracking-wider">
-                Your Warriors&apos; Continuous Tournament Enrollment (Opt-Out Anytime):
-              </div>
-              {arenaState.fighters
-                .filter((f) => !f.isNpc)
-                .map((myF) => (
-                  <div
-                    key={myF.tokenId}
-                    className="flex items-center justify-between text-xs bg-white/5 px-3 py-2 rounded-lg"
-                  >
-                    <div>
-                      <span className="font-cinzel font-bold text-white">{myF.title}</span>
-                      <span className="text-[10px] font-mono text-shin-gold ml-2">
-                        ({toShin(myF.vaultBalanceNear)} $SHIN Pouch)
-                      </span>
+                  <div className="text-right shrink-0 bg-black/80 border border-shin-gold/30 rounded-xl px-4 py-2.5">
+                    <div className="text-[9px] font-mono text-gray-400 uppercase">
+                      Live Escrow Pot
                     </div>
+                    <div className="text-xl font-mono font-bold text-shin-gold">
+                      {humanCup.totalPoolShin.toLocaleString()} $SHIN
+                    </div>
+                    <div className="text-[10px] font-mono text-emerald-400">
+                      Entry: {humanCup.entryFeeShin.toLocaleString()} $SHIN
+                    </div>
+                  </div>
+                </div>
+
+                {/* Human Bracket Matches */}
+                <div className="space-y-3">
+                  {humanCup.matches.map((m) => {
+                    const isMyMatch =
+                      m.p1Id === myAccountId || m.p2Id === myAccountId;
+                    return (
+                      <div
+                        key={m.id}
+                        className={`bg-black/75 border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          isMyMatch
+                            ? 'border-shin-gold/60'
+                            : 'border-white/10'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-[10px] font-mono text-shin-gold uppercase font-bold">
+                            {m.label} •{' '}
+                            {m.round === 'GRAND_FINAL'
+                              ? `Champion Payout: ${humanCup.winnerPayoutShin.toLocaleString()} $SHIN`
+                              : 'Winner Advances to Grand Final'}
+                          </div>
+                          <div className="text-xs sm:text-sm font-cinzel font-bold text-white mt-1 flex items-center gap-2 flex-wrap">
+                            <span
+                              className={
+                                m.winnerId && m.winnerId === m.p1Id
+                                  ? 'text-emerald-400'
+                                  : m.p1Id
+                                  ? 'text-white'
+                                  : 'text-gray-500'
+                              }
+                            >
+                              👤 {m.p1Name}
+                            </span>
+                            <span className="text-gray-500">VS</span>
+                            <span
+                              className={
+                                m.winnerId && m.winnerId === m.p2Id
+                                  ? 'text-emerald-400'
+                                  : m.p2Id
+                                  ? 'text-white'
+                                  : 'text-gray-500'
+                              }
+                            >
+                              👤 {m.p2Name}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-white/5 border border-white/10 text-gray-300 shrink-0 self-start sm:self-center">
+                          {m.status === 'COMPLETED'
+                            ? `🏆 Winner: ${m.winnerName}`
+                            : m.status === 'READY'
+                            ? '⚔️ Ready to Fight'
+                            : '⏳ Waiting for Human'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Human Tournament Controls */}
+                <div className="pt-2 space-y-3">
+                  {humanCup.status === 'SETTLED' ? (
+                    <div className="bg-emerald-950/30 border border-emerald-500/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-cinzel font-black text-emerald-300 uppercase">
+                          🏆 Champion Crowned: {humanCup.championName}
+                        </div>
+                        <p className="text-[11px] font-mono text-gray-300 mt-0.5">
+                          {humanCup.winnerPayoutShin.toLocaleString()} $SHIN settled on-chain!
+                          {humanCup.settleTxHash && (
+                            <>
+                              {' '}
+                              Tx: <span className="text-emerald-400">{humanCup.settleTxHash.slice(0, 14)}...</span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          setIsSubmitting(true);
+                          try {
+                            const next = await nearArenaEngine.openNextHumanCup();
+                            setHumanCup(next);
+                            showToast(`Opened ${next.title}!`);
+                          } catch (e: any) {
+                            showToast(e.message);
+                          } finally {
+                            setIsSubmitting(false);
+                          }
+                        }}
+                        disabled={isSubmitting}
+                        className="px-4 py-2.5 bg-shin-gold text-black font-cinzel font-black text-xs uppercase rounded-xl cursor-pointer shrink-0"
+                      >
+                        Start Next Human Cup
+                      </button>
+                    </div>
+                  ) : !hasJoinedHumanCup ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-mono text-gray-400 uppercase">
+                          Choose Warrior:
+                        </span>
+                        {CHAR_OPTIONS.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => setSelectedChar(c.id)}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-mono border cursor-pointer ${
+                              selectedChar === c.id
+                                ? 'bg-shin-gold/20 border-shin-gold text-shin-gold font-bold'
+                                : 'bg-white/5 border-white/10 text-gray-300'
+                            }`}
+                          >
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        disabled={
+                          isSubmitting ||
+                          humanCup.entrants.length >= humanCup.maxPlayers
+                        }
+                        onClick={async () => {
+                          setIsSubmitting(true);
+                          try {
+                            const updated =
+                              await nearArenaEngine.joinHumanTournamentOnChain(
+                                selectedChar,
+                              );
+                            setHumanCup(updated);
+                            showToast(
+                              `Staked ${humanCup.entryFeeShin.toLocaleString()} $SHIN on-chain & joined ${humanCup.title}!`,
+                            );
+                          } catch (e: any) {
+                            showToast(e.message);
+                          } finally {
+                            setIsSubmitting(false);
+                          }
+                        }}
+                        className="w-full py-3.5 bg-shin-gold text-black font-cinzel font-black text-xs uppercase tracking-widest rounded-xl hover:bg-yellow-400 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isSubmitting ? (
+                          <Loader2 size={15} className="animate-spin" />
+                        ) : (
+                          <Trophy size={15} />
+                        )}
+                        {humanCup.entrants.length >= humanCup.maxPlayers
+                          ? 'Bracket Full (4/4 Humans)'
+                          : `Stake ${humanCup.entryFeeShin.toLocaleString()} $SHIN On-Chain & Join Human Cup`}
+                      </button>
+                    </div>
+                  ) : myActiveHumanMatch ? (
                     <button
                       onClick={() => {
-                        const nextState = myF.enrolledInAutoTournament === false;
-                        nearArenaEngine.updateAgentConfig(myF.tokenId, {
-                          enrolledInAutoTournament: nextState,
+                        const amP1 = myActiveHumanMatch.p1Id === myAccountId;
+                        onStartTournamentDuel({
+                          matchId: myActiveHumanMatch.id,
+                          p1AccountId: myAccountId,
+                          p2AccountId:
+                            (amP1
+                              ? myActiveHumanMatch.p2Id
+                              : myActiveHumanMatch.p1Id) || '',
+                          p1Char: amP1
+                            ? myActiveHumanMatch.p1CharId
+                            : myActiveHumanMatch.p2CharId,
+                          p2Char: amP1
+                            ? myActiveHumanMatch.p2CharId
+                            : myActiveHumanMatch.p1CharId,
+                          p2Name: amP1
+                            ? myActiveHumanMatch.p2Name
+                            : myActiveHumanMatch.p1Name,
+                          wagerShin: humanCup.entryFeeShin,
+                          isTournamentBout: true,
                         });
-                        setArenaState({ ...nearArenaEngine.getState() });
-                        showToast(
-                          nextState
-                            ? `${myF.title} enrolled in next Agent Tournament!`
-                            : `${myF.title} withdrawn from Continuous Agent Tournaments.`,
-                        );
                       }}
-                      className={`px-3 py-1 rounded font-mono text-[10px] font-bold uppercase border cursor-pointer ${
-                        myF.enrolledInAutoTournament !== false
-                          ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
-                          : 'bg-red-500/20 border-red-400 text-red-300'
-                      }`}
+                      className="w-full py-3.5 bg-shin-red hover:bg-red-600 text-white font-cinzel font-black text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
                     >
-                      {myF.enrolledInAutoTournament !== false
-                        ? '✅ Competing (Click to Withdraw)'
-                        : '⏸️ Withdrawn (Click to Enroll)'}
+                      <Swords size={15} /> Fight Your {myActiveHumanMatch.label} in 2D Arena Now
                     </button>
-                  </div>
-                ))}
-            </div>
+                  ) : myWaitingHumanMatch ? (
+                    <div className="w-full py-3 px-4 bg-white/5 border border-shin-gold/30 rounded-xl text-center text-xs font-mono text-shin-gold">
+                      ⏳ You are entered in {myWaitingHumanMatch.label}. Waiting for another human player to join on-chain!
+                    </div>
+                  ) : (
+                    <div className="w-full py-3 px-4 bg-white/5 border border-white/10 rounded-xl text-center text-xs font-mono text-gray-300">
+                      Your bracket run has concluded. Watch the remaining human matches finish!
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
-        </div>
+        ) : (
+          /* =============================================================
+             2. AGENTS-ONLY CONTINUOUS TOURNAMENT (SERVER + ON-CHAIN)
+             ============================================================= */
+          <div className="bg-gray-950 border-2 border-purple-500/50 rounded-2xl p-5 sm:p-6 space-y-5 shadow-[0_0_30px_rgba(168,85,247,0.15)]">
+            {!agentCup ? (
+              <div className="py-12 flex items-center justify-center gap-2 text-gray-400 font-mono text-xs">
+                <Loader2 size={16} className="animate-spin text-purple-400" />
+                Loading continuous on-chain Agent Cup...
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-white/10 pb-4">
+                  <div>
+                    <span className="px-2.5 py-0.5 rounded bg-purple-500/20 border border-purple-400/50 text-purple-300 font-mono text-[10px] font-bold uppercase">
+                      🤖 Agents Only • Continuous 24/7 Server &amp; On-Chain Settlement
+                    </span>
+                    <h3 className="text-lg sm:text-2xl font-cinzel font-black text-white mt-2">
+                      {agentCup.title}
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Autonomous Fighter NFTs battle continuously through Semifinals &amp; Grand
+                      Final. Champions receive{' '}
+                      <strong className="text-shin-gold">95% of the $SHIN pot</strong> directly into
+                      their on-chain War Chest, followed by a{' '}
+                      <strong className="text-amber-300">2-Minute Rest Cooldown</strong>.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 mt-2 text-[10px] font-mono text-gray-400">
+                      <span>ID: {agentCup.tournamentId}</span>
+                      {agentCup.explorerUrl && (
+                        <a
+                          href={agentCup.explorerUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-purple-300 hover:underline inline-flex items-center gap-1"
+                        >
+                          View On-Chain Tx <ExternalLink size={10} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0 bg-black/80 border border-purple-500/30 rounded-xl px-4 py-2.5">
+                    <div className="text-[9px] font-mono text-gray-400 uppercase">Agent Pool</div>
+                    <div className="text-xl font-mono font-bold text-purple-300">
+                      {agentCup.totalPoolShin.toLocaleString()} $SHIN
+                    </div>
+                    <div className="text-[10px] font-mono text-shin-gold">
+                      Champion Cut: {agentCup.winnerPayoutShin.toLocaleString()} $SHIN
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Server Status Banner */}
+                {agentCup.status === 'REST_COOLDOWN' ? (
+                  <div className="bg-amber-950/40 border-2 border-amber-400 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-cinzel font-black text-amber-300 uppercase flex items-center gap-1.5">
+                        <Timer size={15} /> Mandatory 2-Minute Agent Rest Window Active
+                      </div>
+                      <p className="text-[11px] text-gray-200 mt-0.5">
+                        Cup #{agentCup.cupNumber} Champion:{' '}
+                        <strong className="text-shin-gold">{agentCup.lastChampionName}</strong> (+
+                        {(agentCup.lastChampionWonShin || 0).toLocaleString()} $SHIN settled on-chain).
+                        Cup #{agentCup.cupNumber + 1} starts automatically in{' '}
+                        <strong className="font-mono text-amber-300">
+                          {formatCooldown(agentCup.restSecondsRemaining)}
+                        </strong>
+                        .
+                      </p>
+                    </div>
+                    {agentCup.settleTxHash && (
+                      <span className="text-[10px] font-mono text-emerald-300 bg-black/60 px-3 py-1.5 rounded-lg border border-emerald-500/30 shrink-0">
+                        Settled: {agentCup.settleTxHash.slice(0, 12)}...
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-purple-950/30 border border-purple-500/40 rounded-xl p-3.5 flex items-center justify-between">
+                    <div className="text-xs font-cinzel font-bold text-purple-200 flex items-center gap-2">
+                      <Flame size={15} className="text-shin-red" />
+                      <span>
+                        Live Stage: {agentCup.currentStage.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-purple-300 flex items-center gap-1.5">
+                      <Timer size={13} /> Next round resolves in {agentCup.nextRoundInSeconds}s
+                    </span>
+                  </div>
+                )}
+
+                {/* Agent Bracket Matches */}
+                <div className="space-y-2.5">
+                  {agentCup.matches.map((m) => (
+                    <div
+                      key={m.id}
+                      className="bg-black/75 border border-white/10 rounded-xl p-3.5 flex items-center justify-between gap-2"
+                    >
+                      <div>
+                        <div className="text-[10px] font-mono text-purple-300 uppercase">
+                          {m.label} •{' '}
+                          {m.round === 'GRAND_FINAL'
+                            ? `Winner War Chest: +${agentCup.winnerPayoutShin.toLocaleString()} $SHIN`
+                            : 'Winner Advances to Agent Final'}
+                        </div>
+                        <div className="text-xs sm:text-sm font-cinzel font-bold text-white mt-0.5">
+                          🤖 {m.p1Name} <span className="text-gray-500">VS</span> 🤖 {m.p2Name}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono text-shin-gold">
+                        {m.winnerName ? `🏆 ${m.winnerName}` : m.status === 'READY' ? '⚔️ Fighting' : 'Pending'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Player's Own Agents Enrollment Quick-Toggle */}
+                <div className="bg-black/80 border border-white/10 rounded-xl p-4 space-y-2.5">
+                  <div className="text-[10px] font-cinzel font-bold text-gray-300 uppercase tracking-wider">
+                    Your Fighter NFTs — Continuous Agent Cup Enrollment:
+                  </div>
+                  {myAgents.length === 0 ? (
+                    <div className="text-xs font-mono text-gray-400">
+                      You have no minted Fighter NFTs on this wallet yet. Mint one in Agent Arena to
+                      compete automatically in the 24/7 Agent Cups!
+                    </div>
+                  ) : (
+                    myAgents.map((agent) => (
+                      <div
+                        key={agent.tokenId}
+                        className="flex items-center justify-between text-xs bg-white/5 px-3 py-2 rounded-lg"
+                      >
+                        <div>
+                          <span className="font-cinzel font-bold text-white">{agent.name}</span>
+                          <span className="text-[10px] font-mono text-shin-gold ml-2">
+                            (Lv.{agent.powerLevel} • ELO {agent.elo} • {agent.wins}W)
+                          </span>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const nextState = !agent.enrolled;
+                            try {
+                              const data =
+                                await nearArenaEngine.setAgentTournamentEnrollment(
+                                  agent.tokenId,
+                                  nextState,
+                                );
+                              setAgentCup(data.agentCup);
+                              showToast(
+                                nextState
+                                  ? `${agent.name} enrolled in Continuous Agent Cups!`
+                                  : `${agent.name} withdrawn from upcoming Agent Cups.`,
+                              );
+                            } catch (e: any) {
+                              showToast(e.message);
+                            }
+                          }}
+                          className={`px-3 py-1 rounded font-mono text-[10px] font-bold uppercase border cursor-pointer ${
+                            agent.enrolled
+                              ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                              : 'bg-red-500/20 border-red-400 text-red-300'
+                          }`}
+                        >
+                          {agent.enrolled
+                            ? '✅ Competing (Click to Withdraw)'
+                            : '⏸️ Withdrawn (Click to Enroll)'}
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <NearInspectorModal
