@@ -18,6 +18,7 @@ import {
   Swords,
   Zap,
   ArrowLeftRight,
+  LogOut,
 } from 'lucide-react';
 import { nearArenaEngine, COMBAT_DOCTRINES } from '../services/nearArenaEngine';
 import { Roster } from './PreGameFlow';
@@ -26,10 +27,11 @@ import ShinSwapModal from './ShinSwapModal';
 interface ProfilePageProps {
   user: any;
   onClose: () => void;
+  onLogout?: () => void;
   onUpdateSuccess: (updatedUser: any) => void;
 }
 
-export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfilePageProps) {
+export default function ProfilePage({ user, onClose, onLogout, onUpdateSuccess }: ProfilePageProps) {
   const [arenaState, setArenaState] = useState(() => nearArenaEngine.getState());
   const [isEditing, setIsEditing] = useState(false);
   const [newUsername, setNewUsername] = useState(
@@ -377,13 +379,22 @@ export default function ProfilePage({ user, onClose, onUpdateSuccess }: ProfileP
         )}
       </div>
 
-      <div className="mt-6 flex justify-center">
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <button
           onClick={onClose}
           className="px-10 py-2.5 bg-white/5 border border-white/15 hover:border-white text-gray-300 hover:text-white transition-all font-cinzel tracking-[0.25em] uppercase text-xs rounded-lg cursor-pointer"
         >
           Return to Menu
         </button>
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="px-6 py-2.5 bg-red-950/50 border border-shin-red/50 hover:bg-shin-red text-red-200 hover:text-white transition-all font-cinzel tracking-[0.2em] uppercase text-xs rounded-lg flex items-center gap-2 cursor-pointer"
+          >
+            <LogOut size={14} />
+            <span>Sign Out</span>
+          </button>
+        )}
       </div>
 
       <ShinSwapModal

@@ -18,6 +18,7 @@ import {
   Volume2,
   VolumeX,
   Coins,
+  LogOut,
 } from 'lucide-react';
 import SpectateScreen from './SpectateScreen';
 import AuthModal from './AuthModal';
@@ -162,6 +163,24 @@ const MainMenu = ({
   const activeDoctrine =
     COMBAT_DOCTRINES.find((d) => d.id === activeChampion?.doctrine) || COMBAT_DOCTRINES[0];
 
+  const handleLogout = async () => {
+    playClickSound();
+    try {
+      const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+      await fetch(`${serverUrl}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {}
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('shin_near_user');
+      localStorage.removeItem('shin_username');
+    }
+    setCurrentUser(null);
+    setUsername('Guest');
+    setActiveModal(null);
+  };
+
   const handleQuickTopUp = () => {
     playClickSound();
     if (!currentUser || currentUser.isGuest) {
@@ -223,6 +242,17 @@ const MainMenu = ({
               </div>
             </div>
           </button>
+
+          {currentUser && (
+            <button
+              onClick={() => void handleLogout()}
+              className="p-2 rounded-lg bg-white/5 hover:bg-red-950/60 border border-white/15 hover:border-shin-red/60 text-gray-300 hover:text-shin-red transition-all cursor-pointer"
+              title="Sign Out"
+              aria-label="Sign Out"
+            >
+              <LogOut size={14} />
+            </button>
+          )}
 
           {/* In-Game SHIN Balance (Zero-Web3 Header) */}
           <div className="flex items-center gap-1.5 sm:gap-2 bg-black/80 border border-white/15 px-2.5 sm:px-3.5 py-1.5 rounded-lg">
@@ -741,6 +771,7 @@ const MainMenu = ({
                 <ProfilePage
                   user={currentUser}
                   onClose={() => setActiveModal(null)}
+                  onLogout={() => void handleLogout()}
                   onUpdateSuccess={(updatedUser) => {
                     setCurrentUser(updatedUser);
                     setUsername(updatedUser.username || updatedUser.userName);
