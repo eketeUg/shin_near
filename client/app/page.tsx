@@ -61,6 +61,7 @@ export default function Home() {
     matchLabel: string;
     opponentName: string;
   } | null>(null);
+  const [deployedChars, setDeployedChars] = useState<string[]>([]);
 
   useEffect(() => {
     const onGameOver = (e: Event) => {
@@ -104,9 +105,28 @@ export default function Home() {
       }
     };
 
+    const updateDeployedFromAgentCup = (agentCup: any) => {
+      if (!agentCup?.enrolledAgents) return;
+      const myAcct = nearArenaEngine.getState().playerWallet.accountId;
+      if (agentCup.status !== 'IN_PROGRESS') {
+        setDeployedChars([]);
+        return;
+      }
+      const list = agentCup.enrolledAgents
+        .filter((a: any) => a.ownerId === myAcct && a.enrolled)
+        .map((a: any) => a.charClass);
+      setDeployedChars(Array.from(new Set(list)));
+    };
+
+    void nearArenaEngine
+      .fetchLiveTournamentsState()
+      .then((d) => updateDeployedFromAgentCup(d.agentCup))
+      .catch(() => {});
+
     socket.on('tournament_started', (cup: any) => checkMyReadyMatch(cup));
     socket.on('tournament_updated', (payload: any) => {
       if (payload?.humanCup) checkMyReadyMatch(payload.humanCup);
+      if (payload?.agentCup) updateDeployedFromAgentCup(payload.agentCup);
     });
 
     return () => {
@@ -528,6 +548,7 @@ export default function Home() {
           onBack={() => setShowPreGameFlow(false)}
           onHome={handleHome}
           ownedCharacters={ownedChars}
+          deployedCharacters={deployedChars}
           playerName={username}
           balances={balances}
           onMintNew={(charId) => {

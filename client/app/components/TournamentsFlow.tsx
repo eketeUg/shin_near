@@ -230,6 +230,19 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
 
   const myAgents =
     agentCup?.enrolledAgents.filter((a) => a.ownerId === myAccountId) || [];
+  const deployedCharClasses = new Set(
+    agentCup?.status === 'IN_PROGRESS'
+      ? myAgents.filter((a) => a.enrolled).map((a) => a.charClass)
+      : [],
+  );
+  const isSelectedCharDeployed = deployedCharClasses.has(selectedChar);
+
+  useEffect(() => {
+    if (isSelectedCharDeployed) {
+      const freeChar = availableChars.find((c) => !deployedCharClasses.has(c));
+      if (freeChar) setSelectedChar(freeChar);
+    }
+  }, [isSelectedCharDeployed, availableChars, deployedCharClasses]);
 
   // Auto-launch PvP Arena for BOTH players simultaneously once both Ready Up in the Wait Room
   useEffect(() => {
@@ -550,24 +563,32 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                           <span className="text-[11px] font-mono text-gray-400 uppercase">
                             Select Owned Warrior:
                           </span>
-                          {availableChars.map((cid) => (
-                            <button
-                              key={cid}
-                              onClick={() => setSelectedChar(cid)}
-                              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono border cursor-pointer ${
-                                selectedChar === cid
-                                  ? 'bg-shin-gold/20 border-shin-gold text-shin-gold font-bold'
-                                  : 'bg-white/5 border-white/10 text-gray-300'
-                              }`}
-                            >
-                              {CHAR_LABELS[cid] || cid}
-                            </button>
-                          ))}
+                          {availableChars.map((cid) => {
+                            const locked = deployedCharClasses.has(cid);
+                            return (
+                              <button
+                                key={cid}
+                                disabled={locked}
+                                onClick={() => setSelectedChar(cid)}
+                                className={`px-3 py-1.5 rounded-lg text-[11px] font-mono border ${
+                                  locked
+                                    ? 'bg-purple-950/40 border-purple-500/40 text-purple-300/70 opacity-60 cursor-not-allowed'
+                                    : selectedChar === cid
+                                    ? 'bg-shin-gold/20 border-shin-gold text-shin-gold font-bold cursor-pointer'
+                                    : 'bg-white/5 border-white/10 text-gray-300 cursor-pointer'
+                                }`}
+                              >
+                                {CHAR_LABELS[cid] || cid}
+                                {locked ? ' (In Agent Arena)' : ''}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                       <button
                         disabled={
                           isSubmitting ||
+                          isSelectedCharDeployed ||
                           humanCup.entrants.length >= humanCup.maxPlayers
                         }
                         onClick={async () => {
@@ -596,6 +617,8 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                         )}
                         {humanCup.entrants.length >= humanCup.maxPlayers
                           ? `Bracket Full (${humanCup.maxPlayers}/${humanCup.maxPlayers} Humans)`
+                          : isSelectedCharDeployed
+                          ? 'Warrior Currently Fighting in Agent Cup (Withdraw First)'
                           : `Stake ${humanCup.entryFeeShin.toLocaleString()} $SHIN On-Chain & Join Human Cup`}
                       </button>
                     </div>

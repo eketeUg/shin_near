@@ -11,6 +11,7 @@ interface PreGameFlowProps {
   onBack: () => void;
   onHome: () => void;
   ownedCharacters: string[];
+  deployedCharacters?: string[];
   onMintNew: (charId: CharacterId) => void;
   playerName?: string;
   balances?: { NEAR: number, USDC: number, USDT: number };
@@ -31,7 +32,7 @@ export const Roster = [
 
 type Step = 'MATCH_CONFIG' | 'PVP_TYPE_SELECT' | 'WAGER_TOKEN_SELECT' | 'WAGER_AMOUNT_SELECT' | 'WAGER_CONFIRM' | 'CHAR_SELECT';
 
-const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, onSearchOpponent, onBack, onHome, ownedCharacters, onMintNew, playerName, balances = { NEAR: 25, USDC: 100, USDT: 50 } }) => {
+const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, onSearchOpponent, onBack, onHome, ownedCharacters, deployedCharacters = [], onMintNew, playerName, balances = { NEAR: 25, USDC: 100, USDT: 50 } }) => {
   const [step, setStep] = useState<Step>('MATCH_CONFIG');
   const [mode, setMode] = useState<GameMode>(initialMode);
   const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM');
@@ -449,12 +450,16 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
               const isP1 = p1Char === char.id;
               const isP2 = p2Char === char.id;
               const isSelected = isP1 || isP2;
+              const isSelectingP1 = !p1Char;
+              const isDeployedLock = isOwned && isSelectingP1 && deployedCharacters.includes(char.id);
 
               return (
                 <button
                   key={char.id}
-                  disabled={isSelected}
+                  disabled={isSelected || isDeployedLock}
+                  title={isDeployedLock ? 'This warrior is currently fighting in the Agent Arena. Withdraw it from the Agent Cup to play manually.' : undefined}
                   onClick={() => {
+                    if (isDeployedLock) return;
                     if (isOwned) {
                       handleCharacterClick(char.id as CharacterId);
                     } else {
@@ -464,9 +469,11 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
                   className={`group relative flex flex-col items-center justify-center p-2 transition-all duration-300 border-2 overflow-hidden w-full ${
                     isSelected
                       ? char.color + ' opacity-70 scale-95 cursor-default'
-                      : isOwned
-                        ? 'bg-gray-900/80 border-gray-700 hover:border-white hover:scale-105 hover:shadow-[0_-6px_20px_rgba(255,255,255,0.15)] cursor-pointer'
-                        : 'bg-black/60 border-gray-800 hover:border-shin-gold cursor-pointer opacity-70 hover:opacity-100'
+                      : isDeployedLock
+                        ? 'bg-purple-950/40 border-purple-500/50 opacity-60 cursor-not-allowed'
+                        : isOwned
+                          ? 'bg-gray-900/80 border-gray-700 hover:border-white hover:scale-105 hover:shadow-[0_-6px_20px_rgba(255,255,255,0.15)] cursor-pointer'
+                          : 'bg-black/60 border-gray-800 hover:border-shin-gold cursor-pointer opacity-70 hover:opacity-100'
                   }`}
                   style={{ minHeight: '160px' }}
                 >
@@ -481,6 +488,13 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
                   />
                   {isP1 && <div className="absolute top-1 left-1 bg-shin-red text-white text-[8px] px-1 font-bold rounded-sm z-10">P1</div>}
                   {isP2 && <div className="absolute top-1 right-1 bg-shin-gold text-black text-[8px] px-1 font-bold rounded-sm z-10">{mode === 'PVE' ? 'CPU' : 'P2'}</div>}
+                  {isDeployedLock && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/65 z-20 p-2 text-center">
+                      <span className="text-purple-300 font-mono text-[9px] uppercase font-bold tracking-wider border border-purple-400/50 bg-purple-950/80 px-2 py-1 rounded">
+                        🤖 In Agent Arena
+                      </span>
+                    </div>
+                  )}
                   {!isOwned && !isSelected && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 group-hover:bg-black/20 transition-all z-20">
                       <span className="text-shin-gold/60 group-hover:text-shin-gold font-cinzel text-[8px] tracking-widest border border-shin-gold/30 px-1">MINT</span>
