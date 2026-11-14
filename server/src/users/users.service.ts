@@ -33,6 +33,15 @@ export class UsersService {
     return this.userModel.findOne({ walletAddress }).exec();
   }
 
+  async findAllRegistered() {
+    return this.userModel
+      .find({ walletAddress: { $exists: true, $nin: [null, ''] } })
+      .select('username walletAddress rating level authProvider updatedAt')
+      .sort({ updatedAt: -1 })
+      .lean()
+      .exec();
+  }
+
   private detectProvider(dto: CreateUserDto) {
     if (dto.email) return 'email';
     return 'guest';

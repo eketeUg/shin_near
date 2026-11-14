@@ -50,9 +50,7 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
     'ALL',
   );
   // '' = Global Dojo Lounge, otherwise accountId of the selected Human or Agent DM thread
-  const [activeThreadAccountId, setActiveThreadAccountId] = useState<string>(
-    'hanzoslayer.shin-arena.testnet',
-  );
+  const [activeThreadAccountId, setActiveThreadAccountId] = useState<string>('');
   const [chatInput, setChatInput] = useState<string>('');
   const [proposedWagerNear, setProposedWagerNear] = useState<number>(1.0); // 0 = Free Match
   const [roomCodeInput, setRoomCodeInput] = useState<string>('');
@@ -77,11 +75,9 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
   useEffect(() => {
     window.addEventListener('nearArenaStateUpdated', refreshAll);
 
-    // Periodic agent banter in Global Lounge
-    const banterTimer = setInterval(() => {
-      nearArenaEngine.triggerAgentToAgentBanter();
-      refreshAll();
-    }, 22000);
+    // Sync real registered players from MongoDB & on-chain Fighter NFTs from NEAR Testnet
+    void nearArenaEngine.syncRegisteredUsersFromDb();
+    void nearArenaEngine.syncOnChainState(nearArenaEngine.getState().playerWallet.accountId);
 
     // Cross-Tab DM & Presence Sync
     try {
@@ -151,11 +147,21 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
           wagerNear: matchPayload.wagerNear || 0,
         });
       });
+
+      socket.on('lobby_fight_proposal_updated', (offer: any) => {
+        if (offer?.proposalId && offer?.status) {
+          nearArenaEngine.updateChatFightProposal(
+            offer.proposalId,
+            Number(offer.wagerNear ?? 0),
+            offer.status === 'DECLINED' ? 'DECLINED' : 'ACCEPTED',
+          );
+          refreshAll();
+        }
+      });
     } catch {}
 
     return () => {
       window.removeEventListener('nearArenaStateUpdated', refreshAll);
-      clearInterval(banterTimer);
       bcRef.current?.close();
       socketRef.current?.disconnect();
     };

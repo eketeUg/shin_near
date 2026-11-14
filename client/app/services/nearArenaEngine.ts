@@ -985,64 +985,8 @@ class NearArenaEngine {
   }
 
   private buildInitialSocialContacts(): DojoSocialContact[] {
-    return [
-      {
-        contactId: 'human-hanzo',
-        username: 'Hanzo_Slayer',
-        accountId: 'hanzoslayer.shin-arena.testnet',
-        userType: 'HUMAN',
-        charId: 'shinobi',
-        isOnline: true,
-        lastSeenLabel: 'Active now',
-        statusBio: 'Looking for 1 NEAR Shinobi mirror match or Free sparring!',
-        elo: 1260,
-        wins: 19,
-        losses: 7,
-        preferredWagerNear: 1.0,
-      },
-      {
-        contactId: 'human-kaede',
-        username: 'Kaede_Blade',
-        accountId: 'kaede.shin-arena.testnet',
-        userType: 'HUMAN',
-        charId: 'kunoichi',
-        isOnline: true,
-        lastSeenLabel: 'Active now',
-        statusBio: 'Warming up for the Blood-Moon Open Cup. DM to negotiate wager!',
-        elo: 1315,
-        wins: 24,
-        losses: 9,
-        preferredWagerNear: 2.0,
-      },
-      {
-        contactId: 'human-ryu',
-        username: 'Ryu_Ronin',
-        accountId: 'ryuronin.shin-arena.testnet',
-        userType: 'HUMAN',
-        charId: 'samurai',
-        isOnline: false,
-        lastSeenLabel: 'Last seen 18m ago',
-        statusBio: 'Away at Kenji’s Forge. Leave a DM and I’ll duel when I’m back online!',
-        elo: 1190,
-        wins: 11,
-        losses: 6,
-        preferredWagerNear: 0.5,
-      },
-      {
-        contactId: 'human-sora',
-        username: 'Sora_Monk',
-        accountId: 'soramonk.shin-arena.testnet',
-        userType: 'HUMAN',
-        charId: 'ninja_monk',
-        isOnline: false,
-        lastSeenLabel: 'Last seen 1h ago',
-        statusBio: 'Offline meditating. Message me to schedule a 2 NEAR duel.',
-        elo: 1235,
-        wins: 15,
-        losses: 8,
-        preferredWagerNear: 2.0,
-      },
-    ];
+    // Real human players are synced live from MongoDB (GET /api/users) + Socket.IO presence
+    return [];
   }
 
   private buildInitialHumanTournament(
@@ -2515,34 +2459,107 @@ class NearArenaEngine {
    */
   public getSocialDirectory(): DojoSocialContact[] {
     if (!this.state.socialContacts) {
-      this.state.socialContacts = this.buildInitialSocialContacts();
+      this.state.socialContacts = [];
     }
-    const agentContacts: DojoSocialContact[] = this.state.fighters.map((f) => {
-      const archMeta = AGENT_PERSONALITY_ARCHETYPES.find(
-        (a) => a.id === f.personality?.archetype,
-      );
-      return {
-        contactId: `agent-${f.tokenId}`,
-        username: f.title,
-        accountId: f.agentWalletId,
-        userType: 'AGENT',
-        charId: f.charId,
-        isOnline: f.isAgentActive,
-        lastSeenLabel: f.isAgentActive ? 'Autonomous 24/7 Online' : 'Resting in Barracks',
-        statusBio:
-          f.personality?.greetingLine ||
-          'Autonomous NEAR Fighter Agent ready for wagered duels.',
-        elo: f.elo,
-        wins: f.wins,
-        losses: f.losses,
-        preferredWagerNear: f.personality?.minWagerNear ?? f.wagerPerFightNear,
-        agentTokenId: f.tokenId,
-        archetypeBadge: archMeta?.badge || '⛩️ BUSHIDO',
-        ownerName: f.ownerName,
-      };
-    });
+    // Purge any legacy hardcoded demo contacts cached in localStorage
+    const legacyFakeIds = new Set(['human-hanzo', 'human-kaede', 'human-ryu', 'human-sora']);
+    const myAccountId = this.state.playerWallet.accountId;
+    const humanContacts = this.state.socialContacts.filter(
+      (c) => !legacyFakeIds.has(c.contactId) && c.accountId !== myAccountId,
+    );
 
-    return [...this.state.socialContacts, ...agentContacts];
+    // Only list real on-chain Fighter NFTs (!f.isNpc) as Agents in the Dojo Lounge
+    const agentContacts: DojoSocialContact[] = this.state.fighters
+      .filter((f) => !f.isNpc)
+      .map((f) => {
+        const archMeta = AGENT_PERSONALITY_ARCHETYPES.find(
+          (a) => a.id === f.personality?.archetype,
+        );
+        return {
+          contactId: `agent-${f.tokenId}`,
+          username: f.title,
+          accountId: f.agentWalletId,
+          userType: 'AGENT',
+          charId: f.charId,
+          isOnline: f.isAgentActive,
+          lastSeenLabel: f.isAgentActive ? 'Autonomous 24/7 Online' : 'Resting in Barracks',
+          statusBio:
+            f.personality?.greetingLine ||
+            'On-chain NEAR Fighter Agent ready for wagered duels.',
+          elo: f.elo,
+          wins: f.wins,
+          losses: f.losses,
+          preferredWagerNear: f.personality?.minWagerNear ?? f.wagerPerFightNear,
+          agentTokenId: f.tokenId,
+          archetypeBadge: archMeta?.badge || '⛩️ BUSHIDO',
+          ownerName: f.ownerName,
+        };
+      });
+
+    return [...humanContacts, ...agentContacts];
+  }
+
+  public async syncRegisteredUsersFromDb(): Promise<void> {
+    if (typeof window === 'undefined') return;
+    try {
+      const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+      const res = await fetch(`${serverUrl}/api/users`, { credentials: 'include' });
+      if (!res.ok) return;
+      const users = (await res.json()) as Array<{
+        _id?: string;
+        username?: string;
+        walletAddress?: string;
+        rating?: number;
+        level?: number;
+      }>;
+      if (!Array.isArray(users)) return;
+
+      const existingMap = new Map(
+        (this.state.socialContacts || []).map((c) => [c.accountId, c]),
+      );
+      const myAccountId = this.state.playerWallet.accountId;
+
+      const syncedHumans: DojoSocialContact[] = users
+        .filter((u) => u.walletAddress && u.walletAddress !== myAccountId)
+        .map((u) => {
+          const addr = u.walletAddress as string;
+          const prev = existingMap.get(addr);
+          return {
+            contactId: `db-${u._id || addr}`,
+            username: u.username || addr.slice(0, 10),
+            accountId: addr,
+            userType: 'HUMAN',
+            charId: prev?.charId || 'fighter',
+            isOnline: prev?.isOnline ?? false,
+            lastSeenLabel: prev?.isOnline ? 'Online via Socket.IO' : 'Registered Warrior (Offline)',
+            statusBio: `Registered SHIN Warrior • Level ${u.level || 1}`,
+            elo: prev?.elo ?? (u.rating ? u.rating * 10 : 1000),
+            wins: prev?.wins ?? 0,
+            losses: prev?.losses ?? 0,
+            preferredWagerNear: prev?.preferredWagerNear ?? 0,
+          };
+        });
+
+      // Preserve any live Socket.IO guests not yet in DB
+      for (const [addr, contact] of existingMap.entries()) {
+        if (
+          contact.userType === 'HUMAN' &&
+          !contact.contactId.startsWith('human-') &&
+          addr !== myAccountId &&
+          !syncedHumans.some((h) => h.accountId === addr)
+        ) {
+          syncedHumans.push(contact);
+        }
+      }
+
+      this.state.socialContacts = syncedHumans;
+      this.saveState();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('nearArenaStateUpdated'));
+      }
+    } catch {
+      // Ignore network errors if backend is offline
+    }
   }
 
   /**
@@ -2736,8 +2753,9 @@ class NearArenaEngine {
     const myCharId = this.state.fighters.find((f) => !f.isNpc)?.charId || 'fighter';
     const proposalId = 'prop-' + Date.now();
 
-    // Check if the recipient automatically accepts or counters the wager
-    let initialStatus: 'PENDING' | 'ACCEPTED' | 'COUNTERED' = 'ACCEPTED';
+    // Humans start PENDING until accepted over Socket.IO; Agents auto-accept or counter
+    let initialStatus: 'PENDING' | 'ACCEPTED' | 'COUNTERED' =
+      target.userType === 'HUMAN' ? 'PENDING' : 'ACCEPTED';
     let counterWagerNear: number | undefined;
 
     if (target.userType === 'AGENT' && target.preferredWagerNear > params.wagerNear && params.wagerNear > 0) {
