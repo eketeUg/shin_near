@@ -61,6 +61,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // Active in-chat fight proposals (keyed by proposalId)
   private chatFightProposals = new Map<string, any>();
+  private broadcastTickCount = 0;
+  private cachedOnChainAgents: any[] = [];
 
   constructor(
     private readonly gameService: GameService,
@@ -74,6 +76,284 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   afterInit(server: Server) {
     this.tournamentService.registerGatewayServer(server);
     this.agentBrainService.registerGatewayServer(server);
+    void this.ensureServerBroadcastMatches();
+    setInterval(() => {
+      this.tickServerBroadcasts();
+    }, 100);
+  }
+
+  private async ensureServerBroadcastMatches() {
+    try {
+      const fighters = (await this.nearRelayer
+        .viewMethod('get_all_fighters', {})
+        .catch(() => [])) as any[];
+      if (Array.isArray(fighters) && fighters.length >= 2) {
+        this.cachedOnChainAgents = fighters;
+      }
+    } catch {}
+
+    const serverMatches = Array.from(this.activeMatches.values()).filter(
+      (m) => m.isServerBroadcast,
+    );
+    const needed = Math.max(0, 2 - serverMatches.length);
+    for (let i = 0; i < needed; i++) {
+      this.spawnServerBroadcastMatch(i);
+    }
+  }
+
+  private spawnServerBroadcastMatch(slotIdx = 0) {
+    const fallbackPool = [
+      {
+        token_id: 'fighter-1',
+        name: 'Kenshin',
+        char_class: 'samurai',
+        agent_wallet_id: 'fighter-1.shin-arena-28d.testnet',
+        atk: 18,
+        def: 14,
+        elo: 1320,
+      },
+      {
+        token_id: 'fighter-2',
+        name: 'Shadow Kunoichi',
+        char_class: 'kunoichi',
+        agent_wallet_id: 'fighter-2.shin-arena-28d.testnet',
+        atk: 17,
+        def: 13,
+        elo: 1290,
+      },
+      {
+        token_id: 'fighter-3',
+        name: 'Ryuuko',
+        char_class: 'shinobi',
+        agent_wallet_id: 'fighter-3.shin-arena-28d.testnet',
+        atk: 19,
+        def: 12,
+        elo: 1345,
+      },
+      {
+        token_id: 'fighter-4',
+        name: 'Shogun Takeshi',
+        char_class: 'samurai_commander',
+        agent_wallet_id: 'takeshi-npc.shin-arena-28d.testnet',
+        atk: 20,
+        def: 16,
+        elo: 1380,
+      },
+    ];
+    const pool =
+      this.cachedOnChainAgents.length >= 2 ? this.cachedOnChainAgents : fallbackPool;
+    const f1 = pool[(slotIdx * 2 + Math.floor(Math.random() * pool.length)) % pool.length];
+    let f2 = pool[(slotIdx * 2 + 1 + Math.floor(Math.random() * pool.length)) % pool.length];
+    if (f2.token_id === f1.token_id) {
+      f2 = pool.find((x) => x.token_id !== f1.token_id) || fallbackPool[1];
+    }
+
+    const matchId = `live_bcast_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const p1Type = String(f1.char_class || 'samurai').toLowerCase();
+    const p2Type = String(f2.char_class || 'shinobi').toLowerCase();
+
+    this.activeMatches.set(matchId, {
+      hostId: 'SERVER_BROADCAST',
+      isServerBroadcast: true,
+      matchId,
+      hostName: f1.name || 'Fighter 1',
+      p1Name: f1.name || 'Fighter 1',
+      p2Name: f2.name || 'Fighter 2',
+      p1Type,
+      p2Type,
+      p1AccountId: f1.agent_wallet_id || f1.owner_id || f1.token_id,
+      p2AccountId: f2.agent_wallet_id || f2.owner_id || f2.token_id,
+      p1: {
+        tokenId: f1.token_id,
+        accountId: f1.agent_wallet_id || f1.owner_id || f1.token_id,
+        name: f1.name || 'Fighter 1',
+        charId: p1Type,
+        atk: Number(f1.atk || 16),
+        def: Number(f1.def || 12),
+        elo: Number(f1.elo || 1250),
+      },
+      p2: {
+        tokenId: f2.token_id,
+        accountId: f2.agent_wallet_id || f2.owner_id || f2.token_id,
+        name: f2.name || 'Fighter 2',
+        charId: p2Type,
+        atk: Number(f2.atk || 16),
+        def: Number(f2.def || 12),
+        elo: Number(f2.elo || 1250),
+      },
+      mode: 'LIVE AGENT ARENA BROADCAST',
+      wager: { token: 'SHIN', amount: 250 },
+      wagerShin: 250,
+      fighterPoolShin: 500,
+      viewers: 0,
+      spectatorBets: [],
+      sim: {
+        matchTimer: 99,
+        tickInSec: 0,
+        p1RelX: -180,
+        p2RelX: 180,
+        p1Hp: 100,
+        p2Hp: 100,
+        p1MaxHp: 100,
+        p2MaxHp: 100,
+        p1Anim: `${p1Type}_idle`,
+        p2Anim: `${p2Type}_idle`,
+        p1FlipX: false,
+        p2FlipX: true,
+        ending: false,
+      },
+    });
+
+    if (this.server) {
+      this.server.emit(
+        'active_matches_updated',
+        Array.from(this.activeMatches.values()),
+      );
+    }
+  }
+
+  private tickServerBroadcasts() {
+    if (!this.server) return;
+    this.broadcastTickCount++;
+
+    for (const [matchId, match] of this.activeMatches.entries()) {
+      if (!match.isServerBroadcast || !match.sim || match.sim.ending) continue;
+      const s = match.sim;
+      s.tickInSec++;
+      if (s.tickInSec >= 10) {
+        s.tickInSec = 0;
+        s.matchTimer = Math.max(0, s.matchTimer - 1);
+      }
+
+      const dist = Math.abs(s.p2RelX - s.p1RelX);
+      s.p1FlipX = s.p1RelX > s.p2RelX;
+      s.p2FlipX = s.p2RelX > s.p1RelX;
+
+      if (dist > 95) {
+        // Move toward each other
+        const step1 = 10 + Math.random() * 6;
+        const step2 = 10 + Math.random() * 6;
+        s.p1RelX += s.p1RelX < s.p2RelX ? step1 : -step1;
+        s.p2RelX += s.p2RelX < s.p1RelX ? step2 : -step2;
+        s.p1Anim = `${match.p1Type}_run`;
+        s.p2Anim = `${match.p2Type}_run`;
+      } else {
+        // Close-range combat exchange
+        const roll = Math.random();
+        if (roll < 0.28) {
+          const atkIdx = 1 + Math.floor(Math.random() * 3);
+          s.p1Anim = `${match.p1Type}_attack_${atkIdx}`;
+          const blocked = Math.random() < 0.25;
+          s.p2Anim = blocked ? `${match.p2Type}_block` : `${match.p2Type}_idle`;
+          const dmg = blocked ? 1 : Math.max(2, Math.round((match.p1?.atk || 16) * 0.22));
+          s.p2Hp = Math.max(0, s.p2Hp - dmg);
+          s.p2RelX = Math.min(340, s.p2RelX + (blocked ? 8 : 22));
+          this.server.to(`match_${matchId}`).emit('spectator_fire_event', {
+            type: 'audio',
+            data: { type: blocked ? 'block_hit' : 'hit', id: 'remote_player' },
+          });
+        } else if (roll < 0.56) {
+          const atkIdx = 1 + Math.floor(Math.random() * 3);
+          s.p2Anim = `${match.p2Type}_attack_${atkIdx}`;
+          const blocked = Math.random() < 0.25;
+          s.p1Anim = blocked ? `${match.p1Type}_block` : `${match.p1Type}_idle`;
+          const dmg = blocked ? 1 : Math.max(2, Math.round((match.p2?.atk || 16) * 0.22));
+          s.p1Hp = Math.max(0, s.p1Hp - dmg);
+          s.p1RelX = Math.max(-340, s.p1RelX - (blocked ? 8 : 22));
+          this.server.to(`match_${matchId}`).emit('spectator_fire_event', {
+            type: 'audio',
+            data: { type: blocked ? 'block_hit' : 'hit', id: 'local_player' },
+          });
+        } else if (roll < 0.72) {
+          // Dash back / reposition
+          s.p1RelX = Math.max(-300, s.p1RelX - 35);
+          s.p2RelX = Math.min(300, s.p2RelX + 35);
+          s.p1Anim = `${match.p1Type}_run`;
+          s.p2Anim = `${match.p2Type}_run`;
+        } else {
+          s.p1Anim = `${match.p1Type}_idle`;
+          s.p2Anim = `${match.p2Type}_idle`;
+        }
+      }
+
+      const framePayload = {
+        matchTimer: s.matchTimer,
+        currentRound: 1,
+        p1Wins: 0,
+        p2Wins: 0,
+        p1: {
+          x: 640 + s.p1RelX,
+          y: 385,
+          relX: s.p1RelX,
+          relY: 0,
+          flipX: s.p1FlipX,
+          anim: s.p1Hp <= 0 ? `${match.p1Type}_dead` : s.p1Anim,
+          hp: s.p1Hp,
+          maxHp: s.p1MaxHp,
+        },
+        p2: {
+          x: 640 + s.p2RelX,
+          y: 385,
+          relX: s.p2RelX,
+          relY: 0,
+          flipX: s.p2FlipX,
+          anim: s.p2Hp <= 0 ? `${match.p2Type}_dead` : s.p2Anim,
+          hp: s.p2Hp,
+          maxHp: s.p2MaxHp,
+        },
+      };
+
+      this.server.to(`match_${matchId}`).emit('spectator_sync_frame', framePayload);
+
+      if (s.p1Hp <= 0 || s.p2Hp <= 0 || s.matchTimer <= 0) {
+        s.ending = true;
+        const p1Won = s.p1Hp >= s.p2Hp;
+        const winnerSide = p1Won ? 'p1' : 'p2';
+        const winnerName = p1Won ? match.p1Name : match.p2Name;
+        const winnerAccountId = p1Won ? match.p1AccountId : match.p2AccountId;
+
+        this.server.to(`match_${matchId}`).emit('spectator_fire_event', {
+          type: 'match_event',
+          data: {
+            event: 'gameOver',
+            detail: {
+              matchId,
+              winner: winnerName,
+              winnerId: winnerSide,
+              winnerPubKey: winnerAccountId,
+              duration: `${99 - s.matchTimer}s`,
+              roundsScore: p1Won ? '1 - 0' : '0 - 1',
+              p1Stats: {
+                name: match.p1Name,
+                charType: match.p1Type,
+                damageDealt: 100 - s.p2Hp,
+                hitsLanded: Math.max(1, Math.round((100 - s.p2Hp) / 4)),
+              },
+              p2Stats: {
+                name: match.p2Name,
+                charType: match.p2Type,
+                damageDealt: 100 - s.p1Hp,
+                hitsLanded: Math.max(1, Math.round((100 - s.p1Hp) / 4)),
+              },
+            },
+          },
+        });
+
+        setTimeout(() => {
+          void this.processNearMatchSettlement(matchId, winnerAccountId);
+          setTimeout(() => {
+            void this.ensureServerBroadcastMatches();
+          }, 2500);
+        }, 1500);
+      }
+    }
+
+    if (this.broadcastTickCount % 20 === 0) {
+      this.server.emit(
+        'active_matches_updated',
+        Array.from(this.activeMatches.values()),
+      );
+    }
   }
 
   handleConnection(client: Socket) {
@@ -473,6 +753,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         hostId: opponent.socket.id,
         matchId: matchId,
         hostName: opponent.data?.username || 'Player 1',
+        p1Name: opponent.data?.username || 'Player 1',
+        p2Name: userData?.username || 'Player 2',
         p1Type: opponent.data?.charType || 'shinobi',
         p2Type: userData?.charType || 'samurai',
         p1AccountId: opponent.data?.accountId || null,

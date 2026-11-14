@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { nearArenaEngine, ActiveArenaMatch } from '../services/nearArenaEngine';
+import { io } from 'socket.io-client';
 import { Roster } from './PreGameFlow';
-import { Play } from 'lucide-react';
+import { Play, Radio, Users } from 'lucide-react';
 
 interface LiveFightsFlowProps {
   onWatchMatch: (match: any) => void;
@@ -12,18 +12,43 @@ interface LiveFightsFlowProps {
 }
 
 const LiveFightsFlow: React.FC<LiveFightsFlowProps> = ({ onWatchMatch, onBack, onHome }) => {
-  const [matches, setMatches] = useState<ActiveArenaMatch[]>(
-    () => nearArenaEngine.getState().activeMatches,
-  );
+  const [serverMatches, setServerMatches] = useState<any[]>([]);
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const sync = () => setMatches([...nearArenaEngine.getState().activeMatches]);
-    window.addEventListener('nearArenaStateUpdated', sync);
-    return () => window.removeEventListener('nearArenaStateUpdated', sync);
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const socket = io(serverUrl, { reconnectionAttempts: 5 });
+
+    socket.on('connect', () => {
+      setConnected(true);
+      socket.emit('get_active_matches');
+    });
+
+    socket.on('disconnect', () => {
+      setConnected(false);
+    });
+
+    socket.on('active_matches_updated', (list: any[]) => {
+      if (Array.isArray(list)) {
+        setServerMatches(list);
+      }
+    });
+
+    const poll = setInterval(() => {
+      if (socket.connected) {
+        socket.emit('get_active_matches');
+      }
+    }, 3000);
+
+    return () => {
+      clearInterval(poll);
+      socket.disconnect();
+    };
   }, []);
 
   const getCharGif = (charId: string) => {
-    const found = Roster.find((r) => r.id === charId);
+    const norm = String(charId || 'fighter').toLowerCase();
+    const found = Roster.find((r) => r.id.toLowerCase() === norm);
     return found ? `/assets/Shin_gifs/${found.gif}` : '/assets/Shin_gifs/Fighter_AllActions.gif';
   };
 
@@ -43,73 +68,129 @@ const LiveFightsFlow: React.FC<LiveFightsFlowProps> = ({ onWatchMatch, onBack, o
         ✕ Main Menu
       </button>
 
+      <div className="flex items-center justify-center gap-2 mb-2">
+        <span
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider border ${
+            connected
+              ? 'bg-red-950/60 border-red-500/50 text-red-300'
+              : 'bg-gray-900 border-white/10 text-gray-400'
+          }`}
+        >
+          <Radio size={12} className={connected ? 'text-red-400 animate-pulse' : 'text-gray-500'} />
+          {connected ? 'Synchronized Server Broadcast Stream' : 'Connecting to Broadcast Relay...'}
+        </span>
+      </div>
+
       <h2 className="text-3xl md:text-5xl font-cinzel text-shin-gold mb-2 uppercase tracking-[0.2em] text-center">
         LIVE ARENA BROADCASTS
       </h2>
       <p className="text-xs text-gray-400 font-cinzel uppercase tracking-widest text-center mb-8">
-        Click any ongoing fight to watch live in the 2D Arena &amp; place Pari-Mutuel Spectator Bets
+        Real-Time Multi-Viewer Streams • Everyone Watches the Exact Same Frame, HP &amp; Timer
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto w-full">
-        {matches.map((m) => (
-          <div
-            key={m.matchId}
-            onClick={() => onWatchMatch(m)}
-            className="bg-gray-950 border border-gray-800 hover:border-shin-gold rounded-2xl p-6 cursor-pointer group transition-all duration-300 shadow-xl hover:-translate-y-1 relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 bg-red-600 text-white text-[10px] uppercase font-bold px-3 py-1.5 flex items-center gap-2 rounded-bl-lg">
-              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-              LIVE • {m.viewers} WATCHING
-            </div>
+      {serverMatches.length === 0 ? (
+        <div className="max-w-lg mx-auto w-full bg-gray-950 border border-white/10 rounded-2xl p-8 text-center font-mono text-xs text-gray-400">
+          Waiting for next live arena broadcast stream...
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto w-full">
+          {serverMatches.map((m) => {
+            const p1Name = m.p1Name || m.p1?.name || m.hostName || 'Fighter 1';
+            const p2Name = m.p2Name || m.p2?.name || 'Challenger';
+            const p1Char = m.p1Type || m.p1?.charId || 'samurai';
+            const p2Char = m.p2Type || m.p2?.charId || 'shinobi';
+            const p1Hp = m.sim?.p1Hp ?? 100;
+            const p2Hp = m.sim?.p2Hp ?? 100;
+            const timer = m.sim?.matchTimer ?? 99;
+            const potShin =
+              m.fighterPoolShin ||
+              (m.wager?.token === 'SHIN' ? Number(m.wager.amount || 0) * 2 : 500);
 
-            <h3 className="text-lg font-cinzel text-white mb-1 truncate pr-24">
-              {m.p1.title} vs {m.p2.title}
-            </h3>
-            <p className="text-xs text-shin-gold font-mono mb-4">
-              Fighter Pool: {m.fighterPoolNear.toFixed(2)} NEAR • Spectator Pool:{' '}
-              {(m.spectatorPoolP1Near + m.spectatorPoolP2Near).toFixed(2)} NEAR
-            </p>
+            return (
+              <div
+                key={m.matchId}
+                onClick={() =>
+                  onWatchMatch({
+                    matchId: m.matchId,
+                    p1Type: p1Char,
+                    p2Type: p2Char,
+                    hostName: p1Name,
+                    p1Name,
+                    p2Name,
+                    isServerBroadcast: true,
+                  })
+                }
+                className="bg-gray-950 border border-gray-800 hover:border-shin-gold rounded-2xl p-6 cursor-pointer group transition-all duration-300 shadow-xl hover:-translate-y-1 relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 bg-red-600 text-white text-[10px] uppercase font-bold px-3 py-1.5 flex items-center gap-1.5 rounded-bl-lg">
+                  <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  <Users size={11} />
+                  <span>LIVE • {m.viewers || 0} WATCHING</span>
+                </div>
 
-            <div className="flex justify-between items-center bg-black/70 p-3 rounded-xl border border-gray-800 mb-4">
-              <div className="text-center w-5/12 flex flex-col items-center">
-                <img
-                  src={getCharGif(m.p1.charId)}
-                  alt={m.p1.name}
-                  className="w-16 h-16 object-contain mb-1"
-                  style={{ imageRendering: 'pixelated' }}
-                />
-                <span className="text-shin-red font-cinzel font-black text-xs uppercase truncate w-full">
-                  {m.p1.title}
-                </span>
-                <span className="text-[9px] text-gray-400 font-mono truncate w-full">
-                  {m.p1.agentWalletId}
-                </span>
-              </div>
-              <div className="text-xl font-black text-shin-gold/80 w-2/12 text-center font-cinzel">
-                VS
-              </div>
-              <div className="text-center w-5/12 flex flex-col items-center">
-                <img
-                  src={getCharGif(m.p2.charId)}
-                  alt={m.p2.name}
-                  className="w-16 h-16 object-contain scale-x-[-1] mb-1"
-                  style={{ imageRendering: 'pixelated' }}
-                />
-                <span className="text-blue-400 font-cinzel font-black text-xs uppercase truncate w-full">
-                  {m.p2.title}
-                </span>
-                <span className="text-[9px] text-gray-400 font-mono truncate w-full">
-                  {m.p2.agentWalletId}
-                </span>
-              </div>
-            </div>
+                <div className="text-[10px] font-mono text-gray-400 uppercase mb-1">
+                  {m.mode || 'LIVE BROADCAST'} • ⏱ {timer}s
+                </div>
 
-            <div className="w-full py-2.5 bg-shin-red/20 group-hover:bg-shin-red text-white font-cinzel font-bold text-xs uppercase tracking-widest rounded-lg flex items-center justify-center gap-2 transition-colors">
-              <Play size={13} fill="currentColor" /> Watch &amp; Bet Live
-            </div>
-          </div>
-        ))}
-      </div>
+                <h3 className="text-lg font-cinzel text-white mb-1 truncate pr-24">
+                  {p1Name} vs {p2Name}
+                </h3>
+                <p className="text-xs text-shin-gold font-mono mb-4">
+                  Match Pot: {potShin.toLocaleString()} $SHIN
+                </p>
+
+                <div className="flex justify-between items-center bg-black/70 p-3 rounded-xl border border-gray-800 mb-4">
+                  <div className="text-center w-5/12 flex flex-col items-center">
+                    <img
+                      src={getCharGif(p1Char)}
+                      alt={p1Name}
+                      className="w-16 h-16 object-contain mb-1"
+                      style={{ imageRendering: 'pixelated' }}
+                    />
+                    <span className="text-shin-red font-cinzel font-black text-xs uppercase truncate w-full">
+                      {p1Name}
+                    </span>
+                    <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden mt-1">
+                      <div
+                        className="h-full bg-emerald-400 transition-all duration-300"
+                        style={{ width: `${Math.max(0, Math.min(100, p1Hp))}%` }}
+                      />
+                    </div>
+                    <span className="text-[9px] text-gray-400 font-mono mt-0.5">{p1Hp}% HP</span>
+                  </div>
+                  <div className="text-xl font-black text-shin-gold/80 w-2/12 text-center font-cinzel">
+                    VS
+                  </div>
+                  <div className="text-center w-5/12 flex flex-col items-center">
+                    <img
+                      src={getCharGif(p2Char)}
+                      alt={p2Name}
+                      className="w-16 h-16 object-contain scale-x-[-1] mb-1"
+                      style={{ imageRendering: 'pixelated' }}
+                    />
+                    <span className="text-blue-400 font-cinzel font-black text-xs uppercase truncate w-full">
+                      {p2Name}
+                    </span>
+                    <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden mt-1">
+                      <div
+                        className="h-full bg-emerald-400 transition-all duration-300"
+                        style={{ width: `${Math.max(0, Math.min(100, p2Hp))}%` }}
+                      />
+                    </div>
+                    <span className="text-[9px] text-gray-400 font-mono mt-0.5">{p2Hp}% HP</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-gray-400 font-mono">
+                  <span className="text-shin-gold font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    <Play size={13} /> Join Synchronized Stream →
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

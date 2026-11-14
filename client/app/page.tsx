@@ -770,7 +770,7 @@ export default function Home() {
         <LiveFightsFlow
           onWatchMatch={(matchData: any) => {
             setShowLiveFights(false);
-            if (matchData && matchData.p1 && matchData.p2) {
+            if (matchData && matchData.p1 && matchData.p2 && !matchData.isServerBroadcast) {
               launchAgentArenaFight(matchData);
             } else {
               setSpectatingMatch(matchData);

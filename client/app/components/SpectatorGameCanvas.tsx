@@ -117,7 +117,11 @@ const SpectatorGameCanvas = ({ matchData }: { matchData: any }) => {
                     id="spectator-game-root"
                     className="w-full h-full"
                 />
-                <ControlsOverlay isSpectator={true} isInteractiveClient={matchData?.isInteractiveClient} />
+                <ControlsOverlay
+                    isSpectator={true}
+                    isInteractiveClient={matchData?.isInteractiveClient}
+                    activeMatchId={matchData?.matchId}
+                />
                 
                 {/* HUD Overlay for Spectator Data (read-only) */}
                 {!matchData?.isInteractiveClient && (

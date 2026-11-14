@@ -6,9 +6,11 @@ import { Coins, Zap, Shield, Trophy, Swords, Flame, Terminal } from 'lucide-reac
 
 const ControlsOverlay = ({
     isSpectator = false,
+    activeMatchId: initialActiveMatchId,
 }: {
     isSpectator?: boolean;
     isInteractiveClient?: boolean;
+    activeMatchId?: string;
 }) => {
     const joystickRef = useRef<HTMLDivElement>(null);
     const [joystickActive, setJoystickActive] = useState(false);
@@ -32,7 +34,7 @@ const ControlsOverlay = ({
     const [p1Name, setP1Name] = useState('Player 1');
     const [p2Name, setP2Name] = useState('Player 2');
     const [matchMode, setMatchMode] = useState<'PVP' | 'PVE' | 'AGENT_ARENA'>('PVP');
-    const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
+    const [activeMatchId, setActiveMatchId] = useState<string | null>(initialActiveMatchId || null);
     const [arenaMatch, setArenaMatch] = useState<ActiveArenaMatch | null>(null);
     const [betAmount, setBetAmount] = useState<number>(1.0);
     const [betFeedback, setBetFeedback] = useState<string | null>(null);

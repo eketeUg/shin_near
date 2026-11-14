@@ -24,7 +24,7 @@ export class SpectatorScene extends Phaser.Scene {
         super({ key: 'SpectatorScene' });
     }
 
-    init(data: { matchId: string, p1Type?: string, p2Type?: string, hostName?: string, isInteractiveClient?: boolean, opponentChar?: string, myChar?: string, opponentName?: string, myName?: string }) {
+    init(data: { matchId: string, p1Type?: string, p2Type?: string, hostName?: string, p1Name?: string, p2Name?: string, isInteractiveClient?: boolean, opponentChar?: string, myChar?: string, opponentName?: string, myName?: string }) {
         this.matchId = data.matchId;
         
         if (data.isInteractiveClient) {
@@ -34,10 +34,10 @@ export class SpectatorScene extends Phaser.Scene {
             this.p2Name = data.myName || 'YOU';
             this.isInteractiveClient = data.isInteractiveClient;
         } else {
-            this.p1CharType = data.p1Type || 'shinobi';
-            this.p2CharType = data.p2Type || 'samurai';
-            this.p1Name = data.hostName || 'Player 1';
-            this.p2Name = 'Unknown Opponent';
+            this.p1CharType = (data.p1Type || 'shinobi').toLowerCase();
+            this.p2CharType = (data.p2Type || 'samurai').toLowerCase();
+            this.p1Name = data.p1Name || data.hostName || 'Player 1';
+            this.p2Name = data.p2Name || data.opponentName || 'Challenger';
         }
     }
 
@@ -166,9 +166,14 @@ export class SpectatorScene extends Phaser.Scene {
         window.dispatchEvent(new CustomEvent('timerUpdate', { detail: { time: data.matchTimer || 0 } }));
         window.dispatchEvent(new CustomEvent('roundUpdate', { detail: { round: data.currentRound || 1, p1Wins: data.p1Wins || 0, p2Wins: data.p2Wins || 0 } }));
 
+        const centerX = this.scale.width / 2;
+        const groundY = this.scale.height - 115 - 100;
+
         // Sync Player 1
         if (data.p1) {
-            this.player.setPosition(data.p1.x, data.p1.y);
+            const p1X = typeof data.p1.relX === 'number' ? centerX + data.p1.relX : data.p1.x;
+            const p1Y = typeof data.p1.relY === 'number' ? groundY + data.p1.relY : data.p1.y;
+            this.player.setPosition(p1X, p1Y);
             this.player.setFlipX(data.p1.flipX);
             // Only play animation if changed to avoid resetting current animation
             if (this.player.anims.currentAnim?.key !== data.p1.anim && data.p1.anim) {
@@ -180,7 +185,9 @@ export class SpectatorScene extends Phaser.Scene {
 
         // Sync Player 2
         if (data.p2) {
-            this.player2.setPosition(data.p2.x, data.p2.y);
+            const p2X = typeof data.p2.relX === 'number' ? centerX + data.p2.relX : data.p2.x;
+            const p2Y = typeof data.p2.relY === 'number' ? groundY + data.p2.relY : data.p2.y;
+            this.player2.setPosition(p2X, p2Y);
             this.player2.setFlipX(data.p2.flipX);
             if (this.player2.anims.currentAnim?.key !== data.p2.anim && data.p2.anim) {
                 this.player2.anims.play(data.p2.anim, true);
