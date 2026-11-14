@@ -2486,6 +2486,7 @@ class NearArenaEngine {
     text: string;
     targetAgentTokenId?: string;
     challengeWagerNear?: number;
+    skipLocalAutoReply?: boolean;
   }): { userMsg: LobbyChatMessage; agentReply?: LobbyChatMessage } {
     if (!this.state.lobbyChat) {
       this.state.lobbyChat = [];
@@ -2519,7 +2520,7 @@ class NearArenaEngine {
       this.state.fighters[Math.floor(Math.random() * this.state.fighters.length)];
 
     let agentReply: LobbyChatMessage | undefined;
-    if (responder) {
+    if (responder && !params.skipLocalAutoReply) {
       const p = responder.personality || {
         archetype: 'HONORABLE_SAMURAI',
         greetingLine: 'My blade is ready in the Shadow Dojo.',
@@ -2726,6 +2727,7 @@ class NearArenaEngine {
   public sendDirectMessage(params: {
     recipientAccountId?: string; // omit for Global Dojo Lounge
     text: string;
+    skipLocalAutoReply?: boolean;
   }): { sentMsg: LobbyChatMessage; autoReply?: LobbyChatMessage } {
     if (!this.state.lobbyChat) {
       this.state.lobbyChat = [];
@@ -2737,7 +2739,10 @@ class NearArenaEngine {
       : undefined;
 
     if (!target) {
-      const res = this.postLobbyChatMessage({ text: params.text });
+      const res = this.postLobbyChatMessage({
+        text: params.text,
+        skipLocalAutoReply: params.skipLocalAutoReply,
+      });
       return { sentMsg: res.userMsg, autoReply: res.agentReply };
     }
 
@@ -2759,7 +2764,7 @@ class NearArenaEngine {
 
     let autoReply: LobbyChatMessage | undefined;
 
-    if (target.isOnline) {
+    if (target.isOnline && !params.skipLocalAutoReply) {
       if (target.userType === 'AGENT' && target.agentTokenId) {
         const fighter = this.state.fighters.find((f) => f.tokenId === target.agentTokenId);
         const p = fighter?.personality;

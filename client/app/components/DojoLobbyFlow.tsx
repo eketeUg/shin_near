@@ -133,6 +133,11 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
         refreshAll();
       });
 
+      socket.on('lobby_receive_public', (msg: LobbyChatMessage) => {
+        nearArenaEngine.ingestRemoteLobbyMessage(msg);
+        refreshAll();
+      });
+
       socket.on(
         'lobby_dm_status_updated',
         (data: { id: string; deliveryStatus: 'DELIVERED_LIVE' | 'QUEUED_OFFLINE' | 'READ_ON_WAKE' }) => {
@@ -214,6 +219,7 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
     const res = nearArenaEngine.sendDirectMessage({
       recipientAccountId: activeThreadAccountId || undefined,
       text: chatInput,
+      skipLocalAutoReply: Boolean(socketRef.current?.connected),
     });
     setChatInput('');
     refreshAll();

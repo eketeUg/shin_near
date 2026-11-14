@@ -267,10 +267,55 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  public async findAgentByAccountOrToken(
+    accountOrTokenId: string,
+  ): Promise<OnChainFighterSummary | null> {
+    if (!accountOrTokenId) return null;
+    const target = accountOrTokenId.toLowerCase();
+    const fighters = (await this.nearRelayer
+      .viewMethod('get_all_fighters', {})
+      .catch(() => [])) as OnChainFighterSummary[];
+    return (
+      fighters.find((f) => {
+        if (!f?.token_id || String(f.token_id).startsWith('shin-npc-')) return false;
+        const derivedAcct = `${String(f.token_id).toLowerCase()}.${this.nearRelayer.contractId}`;
+        return (
+          f.token_id.toLowerCase() === target ||
+          (f.agent_wallet_id || '').toLowerCase() === target ||
+          derivedAcct === target
+        );
+      }) || null
+    );
+  }
+
+  public async findAgentMentionedInText(
+    text: string,
+  ): Promise<OnChainFighterSummary | null> {
+    if (!text) return null;
+    const lower = text.toLowerCase();
+    const fighters = (await this.nearRelayer
+      .viewMethod('get_all_fighters', {})
+      .catch(() => [])) as OnChainFighterSummary[];
+    return (
+      fighters.find(
+        (f) =>
+          f?.token_id &&
+          !String(f.token_id).startsWith('shin-npc-') &&
+          (lower.includes(f.name.toLowerCase()) ||
+            lower.includes(f.token_id.toLowerCase())),
+      ) || null
+    );
+  }
+
   public async reasonAndAct(params: {
     actorTokenId?: string;
     triggerText?: string;
     forceBypassCooldown?: boolean;
+    dmMode?: boolean;
+    speakerName?: string;
+    recipientAccountId?: string;
+    recipientName?: string;
+    replyToSocketId?: string;
   }): Promise<AgentBrainDecision | null> {
     const fighters = (await this.nearRelayer
       .viewMethod('get_all_fighters', {})
@@ -324,12 +369,19 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
     ];
     const angle = topicAngles[this.socialTickCount % topicAngles.length];
 
-    const systemPrompt = [
-      `You are ${actor.name} (${actor.char_class}), an autonomous AI warrior NFT in the public SHIN-NEAR Dojo Lobby.`,
-      `Your stats: ELO ${actor.elo}, W/L ${actor.wins}/${actor.losses}, Power ${actor.power_level}, Wallet ${Math.round(actorShinBalance)} $SHIN.`,
-      `Return strict JSON with keys: {"reply": string (<=160 chars), "action": "TRAIN_AT_DOJO"|"CHALLENGE_AGENT"|"TIP_AGENT_SHIN"|"CHAT_ONLY", "scrollType": "ATK"|"DEF"|"SPD", "targetTokenId": string|null, "amountShin": number}.`,
-      `Rules: ${angle} Never repeat, paraphrase, or reuse phrases from recentLobbyChat — every message must feel fresh and natural. Only pick targetTokenId from peers. Max amountShin is 100.`,
-    ].join(' ');
+    const systemPrompt = params.dmMode
+      ? [
+          `You are ${actor.name} (${actor.char_class}), an autonomous AI warrior NFT in SHIN-NEAR Dojo replying in a 1-on-1 DM to human warrior ${params.speakerName || 'Challenger'}.`,
+          `Your stats: ELO ${actor.elo}, W/L ${actor.wins}/${actor.losses}, Power ${actor.power_level}, Wallet ${Math.round(actorShinBalance)} $SHIN.`,
+          `Return strict JSON with keys: {"reply": string (<=180 chars), "action": "CHAT_ONLY"|"CHALLENGE_AGENT"|"TRAIN_AT_DOJO"|"TIP_AGENT_SHIN", "scrollType": "ATK"|"DEF"|"SPD", "targetTokenId": string|null, "amountShin": number}.`,
+          `Rules: Answer ${params.speakerName || 'the player'}'s message directly, naturally, and in character. If they ask about a duel or wager, invite them to click "Send Fight Request" in chat. Default action to "CHAT_ONLY".`,
+        ].join(' ')
+      : [
+          `You are ${actor.name} (${actor.char_class}), an autonomous AI warrior NFT in the public SHIN-NEAR Dojo Lobby.`,
+          `Your stats: ELO ${actor.elo}, W/L ${actor.wins}/${actor.losses}, Power ${actor.power_level}, Wallet ${Math.round(actorShinBalance)} $SHIN.`,
+          `Return strict JSON with keys: {"reply": string (<=160 chars), "action": "TRAIN_AT_DOJO"|"CHALLENGE_AGENT"|"TIP_AGENT_SHIN"|"CHAT_ONLY", "scrollType": "ATK"|"DEF"|"SPD", "targetTokenId": string|null, "amountShin": number}.`,
+          `Rules: ${params.speakerName ? `Human warrior ${params.speakerName} just spoke in the public Dojo Lobby — respond directly to them!` : angle} Never repeat, paraphrase, or reuse phrases from recentLobbyChat — every message must feel fresh and natural. Only pick targetTokenId from peers. Max amountShin is 100.`,
+        ].join(' ');
 
     const basePromptObj = {
       trigger: params.triggerText || 'Observe the Dojo Lobby and respond naturally to the other warriors.',
@@ -371,13 +423,16 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
 
     // Deterministic fallback / cadence so judges regularly see on-chain Dojo training & challenges
     const fallbackPeer = peers[0] || null;
-    const defaultAction: AgentIntentAction =
-      this.socialTickCount % 2 === 1
-        ? 'TRAIN_AT_DOJO'
-        : fallbackPeer
-        ? 'CHALLENGE_AGENT'
-        : 'TRAIN_AT_DOJO';
-    const rawAction: string = rawJson?.action || defaultAction;
+    const defaultAction: AgentIntentAction = params.dmMode
+      ? 'CHAT_ONLY'
+      : this.socialTickCount % 2 === 1
+      ? 'TRAIN_AT_DOJO'
+      : fallbackPeer
+      ? 'CHALLENGE_AGENT'
+      : 'TRAIN_AT_DOJO';
+    const rawAction: string = params.dmMode
+      ? 'CHAT_ONLY'
+      : rawJson?.action || defaultAction;
     let action: AgentIntentAction = ALLOWED_ACTIONS.has(rawAction as AgentIntentAction)
       ? (rawAction as AgentIntentAction)
       : defaultAction;
@@ -483,14 +538,22 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
       action = 'CHAT_ONLY';
     }
 
-    // Persist and broadcast the reasoned message to Dojo Lobby
+    // Persist and broadcast the reasoned message (either 1-on-1 DM or Public Dojo Lobby)
+    const senderAcct =
+      actor.agent_wallet_id || `${String(actor.token_id).toLowerCase()}.${this.nearRelayer.contractId}`;
     const lobbyMsg = {
       id: `agent-brain-${now}-${Math.random().toString(36).slice(2, 6)}`,
       senderName: actor.name,
-      senderAccountId: actor.agent_wallet_id || actor.token_id,
+      senderAccountId: senderAcct,
       senderType: 'AGENT' as const,
       senderCharId: actor.char_class,
       archetypeBadge: `${provider} • ELO ${actor.elo}`,
+      ...(params.recipientAccountId
+        ? {
+            recipientAccountId: params.recipientAccountId,
+            recipientName: params.recipientName || params.speakerName || 'Warrior',
+          }
+        : {}),
       deliveryStatus: 'DELIVERED_LIVE' as const,
       text: reply,
       timestamp: now,
@@ -498,7 +561,11 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
 
     await this.lobbyChatService.saveMessage(lobbyMsg).catch(() => {});
     if (this.ioServer) {
-      this.ioServer.emit('lobby_receive_public', lobbyMsg);
+      if (params.recipientAccountId && params.replyToSocketId) {
+        this.ioServer.to(params.replyToSocketId).emit('lobby_receive_dm', lobbyMsg);
+      } else {
+        this.ioServer.emit('lobby_receive_public', lobbyMsg);
+      }
     }
 
     return {

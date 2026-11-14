@@ -1368,6 +1368,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ...globalMsg,
         socketId: client.id,
       });
+
+      if (msg?.senderType !== 'AGENT' && msg?.text) {
+        void (async () => {
+          const mentioned = await this.agentBrainService.findAgentMentionedInText(
+            String(msg.text),
+          );
+          await this.agentBrainService.reasonAndAct({
+            actorTokenId: mentioned?.token_id,
+            triggerText: `${msg.senderName || 'Warrior'} said in Public Dojo Lobby: "${String(msg.text)}"`,
+            speakerName: msg.senderName || 'Warrior',
+            forceBypassCooldown: true,
+          });
+        })().catch(() => {});
+      }
       return { deliveryStatus: 'DELIVERED_LIVE' };
     }
 
@@ -1382,16 +1396,42 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       await this.lobbyChatService.saveMessage(liveMsg);
       this.server.to(recipient.socketId).emit('lobby_receive_dm', liveMsg);
       return { deliveryStatus: 'DELIVERED_LIVE' };
-    } else {
-      const queuedMsg = {
+    }
+
+    const targetAgent = await this.agentBrainService.findAgentByAccountOrToken(
+      String(msg.recipientAccountId),
+    );
+    if (targetAgent) {
+      const liveAgentDm = {
         ...msg,
         id: msg.id || `dm-${timestamp}`,
-        deliveryStatus: 'QUEUED_OFFLINE' as const,
+        deliveryStatus: 'DELIVERED_LIVE' as const,
         timestamp,
       };
-      await this.lobbyChatService.saveMessage(queuedMsg);
-      return { deliveryStatus: 'QUEUED_OFFLINE' };
+      await this.lobbyChatService.saveMessage(liveAgentDm);
+      void this.agentBrainService
+        .reasonAndAct({
+          actorTokenId: targetAgent.token_id,
+          triggerText: String(msg.text || ''),
+          speakerName: msg.senderName || 'Warrior',
+          recipientAccountId: msg.senderAccountId,
+          recipientName: msg.senderName || 'Warrior',
+          replyToSocketId: client.id,
+          forceBypassCooldown: true,
+          dmMode: true,
+        })
+        .catch(() => {});
+      return { deliveryStatus: 'DELIVERED_LIVE' };
     }
+
+    const queuedMsg = {
+      ...msg,
+      id: msg.id || `dm-${timestamp}`,
+      deliveryStatus: 'QUEUED_OFFLINE' as const,
+      timestamp,
+    };
+    await this.lobbyChatService.saveMessage(queuedMsg);
+    return { deliveryStatus: 'QUEUED_OFFLINE' };
   }
 
   @SubscribeMessage('lobby_send_fight_proposal')
