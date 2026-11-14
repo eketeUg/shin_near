@@ -289,6 +289,17 @@ export class AgentWalletService implements OnModuleInit {
     };
   }
 
+  public async recordAgentLoss(tokenId?: string, eloDelta = 12): Promise<void> {
+    if (!tokenId) return;
+    await this.agentWalletModel
+      .updateOne(
+        { tokenId },
+        { $inc: { losses: 1, eloPenalty: eloDelta } },
+      )
+      .exec()
+      .catch(() => {});
+  }
+
   public async getAllAgentsDirectory() {
     const fighters = (await this.nearRelayer.viewMethod('get_all_fighters', {})) as any[] | null;
     if (!Array.isArray(fighters)) return [];
@@ -312,8 +323,8 @@ export class AgentWalletService implements OnModuleInit {
         def: f.def ?? 70,
         spd: f.spd ?? 70,
         wins: f.wins ?? 0,
-        losses: f.losses ?? 0,
-        elo: f.elo ?? 1000,
+        losses: (f.losses ?? 0) + (walletRecord?.losses ?? 0),
+        elo: Math.max(800, (f.elo ?? 1000) - (walletRecord?.eloPenalty ?? 0)),
         hasStandaloneWallet: Boolean(walletRecord),
         ...balances,
       });

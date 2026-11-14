@@ -14,6 +14,7 @@ import { NearRelayerService } from './near-relayer.service';
 import { TournamentService } from './tournament.service';
 import { UsersService } from '../users/users.service';
 import { AgentBrainService } from './agent-brain.service';
+import { AgentWalletService } from './agent-wallet.service';
 import { createHash } from 'crypto';
 
 const NEAR_ARENA_CONTRACT_ID =
@@ -72,6 +73,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly tournamentService: TournamentService,
     private readonly usersService: UsersService,
     private readonly agentBrainService: AgentBrainService,
+    private readonly agentWalletService: AgentWalletService,
   ) {}
 
   afterInit(server: Server) {
@@ -1012,6 +1014,15 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         match?.p1?.accountId === winnerAccountId
           ? match?.p1?.tokenId
           : match?.p2?.tokenId;
+      const loserTokenId =
+        match?.p1?.tokenId && match?.p2?.tokenId
+          ? match.p1.tokenId === winnerTokenId
+            ? match.p2.tokenId
+            : match.p1.tokenId
+          : undefined;
+      if (loserTokenId) {
+        void this.agentWalletService.recordAgentLoss(loserTokenId);
+      }
       const winnerName =
         match?.p1?.accountId === winnerAccountId
           ? match?.p1Name || match?.p1?.name

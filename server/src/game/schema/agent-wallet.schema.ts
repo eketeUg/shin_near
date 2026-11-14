@@ -16,6 +16,12 @@ export class AgentWallet {
 
   @Prop({ required: true })
   encryptedPrivateKey: string;
+
+  @Prop({ default: 0 })
+  losses?: number;
+
+  @Prop({ default: 0 })
+  eloPenalty?: number;
 }
 
 export const AgentWalletSchema = SchemaFactory.createForClass(AgentWallet);

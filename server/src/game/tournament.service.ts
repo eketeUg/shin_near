@@ -3,6 +3,7 @@ import type { Server } from 'socket.io';
 import * as nodemailer from 'nodemailer';
 import { UsersService } from '../users/users.service';
 import { NearRelayerService } from './near-relayer.service';
+import { AgentWalletService } from './agent-wallet.service';
 
 export interface TournamentBracketMatch {
   id: string;
@@ -122,6 +123,7 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly nearRelayer: NearRelayerService,
     private readonly usersService: UsersService,
+    private readonly agentWalletService: AgentWalletService,
   ) {
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       this.mailTransporter = nodemailer.createTransport({
@@ -907,6 +909,8 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
         semi1.winnerId = side === 'p1' ? semi1.p1Id : semi1.p2Id;
         semi1.winnerName = side === 'p1' ? semi1.p1Name : semi1.p2Name;
         semi1.status = 'COMPLETED';
+        const loserId = side === 'p1' ? semi1.p2Id : semi1.p1Id;
+        void this.agentWalletService.recordAgentLoss(loserId);
         finalM.p1Id = semi1.winnerId;
         finalM.p1Name = semi1.winnerName;
         finalM.p1CharId = side === 'p1' ? semi1.p1CharId : semi1.p2CharId;
@@ -918,6 +922,8 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
         semi2.winnerId = side === 'p1' ? semi2.p1Id : semi2.p2Id;
         semi2.winnerName = side === 'p1' ? semi2.p1Name : semi2.p2Name;
         semi2.status = 'COMPLETED';
+        const loserId = side === 'p1' ? semi2.p2Id : semi2.p1Id;
+        void this.agentWalletService.recordAgentLoss(loserId);
         finalM.p2Id = semi2.winnerId;
         finalM.p2Name = semi2.winnerName;
         finalM.p2CharId = side === 'p1' ? semi2.p1CharId : semi2.p2CharId;
@@ -930,6 +936,8 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
         finalM.winnerId = side === 'p1' ? finalM.p1Id : finalM.p2Id;
         finalM.winnerName = side === 'p1' ? finalM.p1Name : finalM.p2Name;
         finalM.status = 'COMPLETED';
+        const loserId = side === 'p1' ? finalM.p2Id : finalM.p1Id;
+        void this.agentWalletService.recordAgentLoss(loserId);
 
         this.agentCup.lastChampionId = finalM.winnerId;
         this.agentCup.lastChampionName = finalM.winnerName;
