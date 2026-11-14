@@ -80,14 +80,20 @@ export const NearInspectorModal: React.FC<NearInspectorModalProps> = ({
                 {Math.round(arenaState.playerWallet.NEAR * 1000).toLocaleString()} $SHIN •{' '}
                 {arenaState.playerWallet.NEAR.toFixed(2)} NEAR
               </div>
-              <a
-                href={`https://testnet.nearblocks.io/address/${arenaState.playerWallet.accountId}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[10px] font-mono text-blue-400 hover:underline mt-1.5"
-              >
-                NearBlocks <ExternalLink size={10} />
-              </a>
+              {arenaState.playerWallet.accountId.endsWith('.shin-arena.testnet') ? (
+                <span className="inline-block text-[10px] font-mono text-gray-500 mt-1.5">
+                  Guest / Local Session (Sign in for on-chain wallet)
+                </span>
+              ) : (
+                <a
+                  href={`https://testnet.nearblocks.io/address/${arenaState.playerWallet.accountId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[10px] font-mono text-blue-400 hover:underline mt-1.5"
+                >
+                  NearBlocks <ExternalLink size={10} />
+                </a>
+              )}
             </div>
 
             <div className="bg-black/80 border border-shin-gold/30 rounded-xl p-3.5">
@@ -122,16 +128,16 @@ export const NearInspectorModal: React.FC<NearInspectorModalProps> = ({
 
             <div className="bg-black/80 border border-white/15 rounded-xl p-3.5">
               <div className="font-mono font-bold text-purple-300 mb-1">
-                3. Autonomous Sensei Wallet
+                3. Dojo &amp; Sensei Vault
               </div>
               <div className="font-mono text-[11px] text-white truncate">
-                {arenaState.npcDojo.npcWalletId}
+                {ARENA_CONTRACT_ID} (Dojo Escrow)
               </div>
               <div className="font-mono text-[10px] text-gray-400 mt-1">
                 Treasury: {Math.round(arenaState.npcDojo.treasuryBalanceNear * 1000).toLocaleString()} $SHIN
               </div>
               <a
-                href={`https://testnet.nearblocks.io/address/${arenaState.npcDojo.npcWalletId}`}
+                href={`https://testnet.nearblocks.io/address/${ARENA_CONTRACT_ID}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-[10px] font-mono text-blue-400 hover:underline mt-1.5"
@@ -246,12 +252,12 @@ export const NearInspectorModal: React.FC<NearInspectorModalProps> = ({
                     {f.title} ({f.tokenId})
                   </span>
                   <a
-                    href={`https://testnet.nearblocks.io/address/${f.agentWalletId}`}
+                    href={`https://testnet.nearblocks.io/address/${ARENA_CONTRACT_ID}`}
                     target="_blank"
                     rel="noreferrer"
                     className="text-shin-gold hover:underline inline-flex items-center gap-1"
                   >
-                    {f.agentWalletId} <ExternalLink size={10} />
+                    Vault on {ARENA_CONTRACT_ID} <ExternalLink size={10} />
                   </a>
                   <span className="text-emerald-400">
                     Pouch: {Math.round(f.vaultBalanceNear * 1000).toLocaleString()} $SHIN
