@@ -49,6 +49,7 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
   private ioServer: Server | null = null;
   private tickInterval: NodeJS.Timeout | null = null;
   private lastThoughtAt = new Map<string, number>();
+  private recentReplies: string[] = [];
   private socialTickCount = 0;
 
   private readonly AGENT_COOLDOWN_MS = 25_000;
@@ -140,7 +141,7 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
             { role: 'user', content: userPrompt },
           ],
           max_tokens: 220,
-          temperature: 0.7,
+          temperature: 0.9,
         });
         const content = res.choices?.[0]?.message?.content || '{}';
         return { provider: 'NEAR_AI', rawJson: this.parseJsonSafe(content) };
@@ -161,7 +162,7 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
           ],
           response_format: { type: 'json_object' },
           max_tokens: 220,
-          temperature: 0.7,
+          temperature: 0.9,
         });
         const content = res.choices?.[0]?.message?.content || '{}';
         return { provider: 'OPENAI', rawJson: JSON.parse(content) };
@@ -173,6 +174,72 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
     }
 
     return { provider: 'DETERMINISTIC_FALLBACK', rawJson: null };
+  }
+
+  private normalizeReply(text: string): string {
+    return text
+      .replace(/\[(?:Trained|Sent)[^\]]*\]/gi, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private isTooSimilarReply(candidate: string, recentTexts: string[]): boolean {
+    const norm = this.normalizeReply(candidate);
+    if (!norm) return true;
+    const wordsA = new Set(norm.split(' ').filter((w) => w.length > 2));
+
+    for (const prev of recentTexts) {
+      const prevNorm = this.normalizeReply(prev);
+      if (!prevNorm) continue;
+      if (norm === prevNorm) return true;
+      if (wordsA.size < 3) continue;
+
+      const wordsB = new Set(prevNorm.split(' ').filter((w) => w.length > 2));
+      if (wordsB.size === 0) continue;
+      let intersection = 0;
+      for (const w of wordsA) {
+        if (wordsB.has(w)) intersection += 1;
+      }
+      const union = wordsA.size + wordsB.size - intersection;
+      if (union > 0 && intersection / union >= 0.65) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private pickFreshFallbackReply(params: {
+    actor: OnChainFighterSummary;
+    peer: OnChainFighterSummary | null;
+    action: AgentIntentAction;
+    scrollType: 'ATK' | 'DEF' | 'SPD';
+    amountShin: number;
+    recentTexts: string[];
+  }): string {
+    const { actor, peer, action, scrollType, amountShin, recentTexts } = params;
+    const peerName = peer?.name || 'rivals';
+    const pool =
+      action === 'TRAIN_AT_DOJO'
+        ? [
+            `Drilling ${scrollType} forms with Hanzo — my ${actor.elo} ELO won't defend itself.`,
+            `Spending 50 $SHIN on ${scrollType} mastery today. ${peerName}, watch your guard.`,
+            `${actor.wins} wins in, and my ${scrollType} technique is still evolving.`,
+            `Another ${scrollType} scroll at the Dojo before the next Budōkan bracket locks.`,
+            `Power Lv.${actor.power_level} isn't enough — sharpening ${scrollType} for ${peerName}.`,
+          ]
+        : [
+            `${peerName} (${peer?.elo ?? 1000} ELO), let's settle this in the Blood-Moon Arena for ${amountShin} $SHIN.`,
+            `Saw ${peerName}'s last bout — clean footwork, but my counter-window is faster.`,
+            `Who wants ${amountShin} $SHIN? ${peerName}, step up or stay in the barracks.`,
+            `${actor.name} checking in at ${actor.elo} ELO. ${peerName}, ready for a real duel?`,
+            `My blade's warmed up and my vault's loaded — ${peerName}, name your round.`,
+          ];
+
+    const fresh = pool.find((line) => !this.isTooSimilarReply(line, recentTexts));
+    if (fresh) return fresh;
+    return pool[this.socialTickCount % pool.length];
   }
 
   private async tickAutonomousSocial() {
@@ -233,8 +300,12 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
       )
       .slice(0, 6);
     const recentChat = await this.lobbyChatService
-      .getHistoryForAccount(undefined, 8)
+      .getHistoryForAccount(undefined, 15)
       .catch(() => []);
+    const recentTexts = [
+      ...this.recentReplies,
+      ...recentChat.map((m) => m.text).filter(Boolean),
+    ];
 
     let actorShinBalance = 0;
     try {
@@ -244,15 +315,24 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
       }
     } catch {}
 
+    const topicAngles = [
+      'React directly to the last message in recentLobbyChat with witty fighter banter.',
+      'Compare ELO or win/loss records with a peer and call them out for a spar.',
+      'Discuss your Dojo scroll training (ATK/DEF/SPD) and how it changes your matchup.',
+      'Talk about the $SHIN prize pool, bankroll strategy, or the next Budōkan tournament.',
+      'Share a short tactical observation about timing, parries, or shadow-step footwork.',
+    ];
+    const angle = topicAngles[this.socialTickCount % topicAngles.length];
+
     const systemPrompt = [
       `You are ${actor.name} (${actor.char_class}), an autonomous AI warrior NFT in the public SHIN-NEAR Dojo Lobby.`,
       `Your stats: ELO ${actor.elo}, W/L ${actor.wins}/${actor.losses}, Power ${actor.power_level}, Wallet ${Math.round(actorShinBalance)} $SHIN.`,
       `Return strict JSON with keys: {"reply": string (<=160 chars), "action": "TRAIN_AT_DOJO"|"CHALLENGE_AGENT"|"TIP_AGENT_SHIN"|"CHAT_ONLY", "scrollType": "ATK"|"DEF"|"SPD", "targetTokenId": string|null, "amountShin": number}.`,
-      `Rules: Address or respond directly to another warrior in recentLobbyChat or peers by name so players watching the public Dojo chat see lively agent-to-agent banter. Prefer TRAIN_AT_DOJO (50 $SHIN), CHALLENGE_AGENT, TIP_AGENT_SHIN, or CHAT_ONLY. Only pick targetTokenId from peers. Max amountShin is 100.`,
+      `Rules: ${angle} Never repeat, paraphrase, or reuse phrases from recentLobbyChat — every message must feel fresh and natural. Only pick targetTokenId from peers. Max amountShin is 100.`,
     ].join(' ');
 
-    const userPrompt = JSON.stringify({
-      trigger: params.triggerText || 'Observe the Dojo Lobby and decide your next social or arena move.',
+    const basePromptObj = {
+      trigger: params.triggerText || 'Observe the Dojo Lobby and respond naturally to the other warriors.',
       peers: peers.map((p) => ({
         tokenId: p.token_id,
         name: p.name,
@@ -260,13 +340,33 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
         wins: p.wins,
         losses: p.losses,
       })),
-      recentLobbyChat: recentChat.slice(-5).map((m) => ({
+      recentLobbyChat: recentChat.slice(-10).map((m) => ({
         sender: m.senderName,
         text: m.text,
       })),
-    });
+    };
 
-    const { provider, rawJson } = await this.callWithFallback(systemPrompt, userPrompt);
+    let { provider, rawJson } = await this.callWithFallback(
+      systemPrompt,
+      JSON.stringify(basePromptObj),
+    );
+    if (
+      rawJson?.reply &&
+      this.isTooSimilarReply(String(rawJson.reply), recentTexts) &&
+      provider !== 'DETERMINISTIC_FALLBACK'
+    ) {
+      const retry = await this.callWithFallback(
+        systemPrompt,
+        JSON.stringify({
+          ...basePromptObj,
+          avoidRepeating: `Your draft "${String(rawJson.reply)}" was too similar to recent chat. Say something completely different.`,
+        }),
+      );
+      if (retry.rawJson?.reply) {
+        provider = retry.provider;
+        rawJson = retry.rawJson;
+      }
+    }
     this.socialTickCount += 1;
 
     // Deterministic fallback / cadence so judges regularly see on-chain Dojo training & challenges
@@ -302,14 +402,23 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
       this.MAX_AUTONOMOUS_SHIN,
       Math.max(20, Math.floor(Number(rawJson?.amountShin || 50))),
     );
-    let reply = String(
-      rawJson?.reply ||
-        (action === 'TRAIN_AT_DOJO'
-          ? `Training ${scrollType} mastery with Grandmaster Hanzo at the Dojo to sharpen my spirit for the next Budōkan Cup!`
-          : fallbackPeer
-          ? `${fallbackPeer.name}, step into the Dojo — ${amountShin} $SHIN says my blade is faster!`
-          : 'Sharpening my blade in the Blood-Moon Dojo.'),
-    ).slice(0, 180);
+    const candidateReply = rawJson?.reply ? String(rawJson.reply).slice(0, 180) : '';
+    let reply =
+      candidateReply && !this.isTooSimilarReply(candidateReply, recentTexts)
+        ? candidateReply
+        : this.pickFreshFallbackReply({
+            actor,
+            peer:
+              peers.find((p) => p.token_id === targetTokenId) || fallbackPeer,
+            action,
+            scrollType,
+            amountShin,
+            recentTexts,
+          });
+    this.recentReplies.push(reply);
+    if (this.recentReplies.length > 25) {
+      this.recentReplies = this.recentReplies.slice(-25);
+    }
 
     let executedTxHash: string | undefined;
     let guardrailNote: string | undefined;
