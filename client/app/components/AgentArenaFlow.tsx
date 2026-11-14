@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
 import {
   nearArenaEngine,
   ActiveArenaMatch,
@@ -26,11 +27,12 @@ import {
   CheckCircle2,
   Swords,
   Terminal,
+  Radio,
 } from 'lucide-react';
 
 interface AgentArenaFlowProps {
   initialTab?: 'LIVE_ARENA' | 'MY_AGENTS' | 'DOJO_MARKET' | 'LEDGER';
-  onWatchAgentFight: (match: ActiveArenaMatch) => void;
+  onWatchAgentFight: (match: any) => void;
   onMintNewFighter: (charId: CharacterId) => void;
   onBack: () => void;
   onHome: () => void;
@@ -66,6 +68,8 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
   const [targetTrainerId, setTargetTrainerId] = useState<string>('');
   const [onChainCupId, setOnChainCupId] = useState<string>('shin-cup-1');
   const [onChainEntryNear, setOnChainEntryNear] = useState<string>('0.5');
+  const [serverMatches, setServerMatches] = useState<any[]>([]);
+  const [socketConnected, setSocketConnected] = useState<boolean>(false);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -77,10 +81,37 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
   };
 
   useEffect(() => {
+    void nearArenaEngine.syncOnChainState();
     const sync = () => setArenaState({ ...nearArenaEngine.getState() });
     window.addEventListener('nearArenaStateUpdated', sync);
 
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const socket = io(serverUrl, { reconnectionAttempts: 5 });
+
+    socket.on('connect', () => {
+      setSocketConnected(true);
+      socket.emit('get_active_matches');
+    });
+
+    socket.on('disconnect', () => {
+      setSocketConnected(false);
+    });
+
+    socket.on('active_matches_updated', (list: any[]) => {
+      if (Array.isArray(list)) {
+        setServerMatches(list);
+      }
+    });
+
+    const poll = setInterval(() => {
+      if (socket.connected) {
+        socket.emit('get_active_matches');
+      }
+    }, 3000);
+
     return () => {
+      clearInterval(poll);
+      socket.disconnect();
       window.removeEventListener('nearArenaStateUpdated', sync);
     };
   }, []);
@@ -90,7 +121,8 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
     ownedFighters.find((f) => f.tokenId === selectedFighterId) || ownedFighters[0];
 
   const getCharGif = (charId: string) => {
-    const found = Roster.find((r) => r.id === charId);
+    const norm = String(charId || 'fighter').toLowerCase();
+    const found = Roster.find((r) => r.id.toLowerCase() === norm);
     return found ? `/assets/Shin_gifs/${found.gif}` : '/assets/Shin_gifs/Fighter_AllActions.gif';
   };
 
@@ -100,18 +132,28 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
     showToast('+15,000 $SHIN added to your SHIN Pouch!');
   };
 
-  const handlePlaceLobbyBet = (matchId: string, side: 'p1' | 'p2', fighterName: string) => {
+  const handlePlaceLobbyBet = (
+    matchId: string,
+    side: 'p1' | 'p2',
+    fighterName: string,
+    explicitTokenId?: string,
+  ) => {
     const amt = betAmounts[matchId] || 1.0;
     const shinAmt = Math.round(amt * 1000);
     try {
-      nearArenaEngine.placeSpectatorBet(matchId, side, amt);
-      const match = arenaState.activeMatches.find((m) => m.matchId === matchId);
-      const targetTokenId = side === 'p1' ? match?.p1.tokenId : match?.p2.tokenId;
-      if (targetTokenId) {
-        void nearArenaEngine.placeSpectatorBetShin(matchId, targetTokenId, shinAmt);
+      const localMatch = arenaState.activeMatches.find((m) => m.matchId === matchId);
+      if (localMatch) {
+        nearArenaEngine.placeSpectatorBet(matchId, side, amt);
       }
+      const targetTokenId =
+        explicitTokenId ||
+        (side === 'p1' ? localMatch?.p1.tokenId : localMatch?.p2.tokenId) ||
+        `${matchId}-${side}`;
+      void nearArenaEngine.placeSpectatorBetShin(matchId, targetTokenId, shinAmt);
       setArenaState({ ...nearArenaEngine.getState() });
-      showToast(`🔥 Backed ${fighterName} with ${shinAmt.toLocaleString()} $SHIN! Click ENTER PIT to watch live!`);
+      showToast(
+        `🔥 Backed ${fighterName} with ${shinAmt.toLocaleString()} $SHIN! Click WATCH LIVE to enter the pit!`,
+      );
     } catch (e: any) {
       showToast(e.message || 'Backing failed');
     }
@@ -274,8 +316,21 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
             {/* Atmospheric Colosseum Intro Banner */}
             <div className="bg-gradient-to-r from-red-950/50 via-black to-amber-950/40 border border-shin-gold/30 rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="space-y-1">
-                <div className="text-xs font-cinzel font-black text-shin-gold uppercase tracking-widest flex items-center gap-2">
+                <div className="text-xs font-cinzel font-black text-shin-gold uppercase tracking-widest flex flex-wrap items-center gap-2">
                   <Sparkles size={15} /> Non-Stop Shadow Battles • Winner Takes The Fight Pot
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono border ${
+                      socketConnected
+                        ? 'bg-red-950/60 border-red-500/50 text-red-300'
+                        : 'bg-gray-900 border-white/10 text-gray-400'
+                    }`}
+                  >
+                    <Radio
+                      size={10}
+                      className={socketConnected ? 'text-red-400 animate-pulse' : 'text-gray-500'}
+                    />
+                    {socketConnected ? 'LIVE SERVER STREAM' : 'CONNECTING...'}
+                  </span>
                 </div>
                 <p className="text-xs md:text-sm text-gray-300 max-w-3xl">
                   Warriors in the Budōkan stake their own{' '}
@@ -302,160 +357,331 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
             </div>
 
             {/* Arcade VS Fight Posters Grid (2 per row on mobile, 3 on desktop) */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6">
-              {arenaState.activeMatches.map((match) => {
-                const totalSpec = match.spectatorPoolP1Near + match.spectatorPoolP2Near;
-                const p1Odds =
-                  match.spectatorPoolP1Near > 0
-                    ? ((totalSpec * 0.95) / match.spectatorPoolP1Near).toFixed(2)
-                    : '1.90';
-                const p2Odds =
-                  match.spectatorPoolP2Near > 0
-                    ? ((totalSpec * 0.95) / match.spectatorPoolP2Near).toFixed(2)
-                    : '1.90';
-                const currentBetAmt = betAmounts[match.matchId] ?? 1.0;
+            {serverMatches.length === 0 && arenaState.activeMatches.length === 0 ? (
+              <div className="bg-gray-950/80 border border-white/10 rounded-2xl p-8 text-center font-mono text-xs text-gray-400">
+                Waiting for next live arena broadcast stream, or click &ldquo;Send Shinobi Into Pit Now&rdquo; above to launch your warrior.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6">
+                {serverMatches.map((sm) => {
+                  const matchId = sm.id;
+                  const p1Char = String(sm.p1Char || 'samurai').toLowerCase();
+                  const p2Char = String(sm.p2Char || 'shinobi').toLowerCase();
+                  const p1Name = sm.p1Name || 'Red Corner';
+                  const p2Name = sm.p2Name || 'Blue Corner';
+                  const potShin = Number(sm.potShin || 2000);
+                  const currentBetAmt = betAmounts[matchId] ?? 1.0;
 
-                return (
-                  <div
-                    key={match.matchId}
-                    className="bg-gradient-to-b from-gray-900/95 via-black to-black border-2 border-white/15 hover:border-shin-gold rounded-xl sm:rounded-2xl p-2.5 sm:p-5 flex flex-col justify-between transition-all shadow-[0_0_30px_rgba(0,0,0,0.8)] relative overflow-hidden group"
-                  >
-                    {/* Top Match Header */}
-                    <div className="flex flex-wrap items-center justify-between gap-1 mb-2 sm:mb-3">
-                      <span className="text-[8px] sm:text-[10px] font-cinzel text-gray-300 bg-white/5 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded border border-white/10">
-                        👁 {match.viewers}
-                      </span>
-                      <span className="bg-shin-red/20 text-shin-red border border-shin-red/50 text-[8px] sm:text-[10px] font-cinzel font-black px-1.5 sm:px-3 py-0.5 rounded-full flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-shin-red animate-ping shrink-0" />
-                        <span className="truncate">
-                          {Math.round(match.fighterPoolNear * 1000).toLocaleString()} $SHIN
-                        </span>
-                      </span>
-                    </div>
-
-                    {/* Visual VS Stage */}
-                    <div className="grid grid-cols-11 items-center bg-gradient-to-r from-amber-950/30 via-black to-red-950/30 border border-white/10 rounded-lg sm:rounded-xl p-1.5 sm:p-3 mb-2 sm:mb-4 relative">
-                      {/* Fighter 1 */}
-                      <div className="col-span-5 flex flex-col items-center text-center min-w-0">
-                        <div className="relative w-12 h-12 sm:w-24 sm:h-24 flex items-end justify-center overflow-hidden">
-                          <img
-                            src={getCharGif(match.p1.charId)}
-                            alt={match.p1.name}
-                            className="w-12 h-12 sm:w-24 sm:h-24 object-contain scale-125 origin-bottom"
-                            style={{ imageRendering: 'pixelated' }}
-                          />
-                        </div>
-                        <div className="font-cinzel font-black text-[9px] sm:text-xs text-white mt-1 truncate w-full">
-                          {match.p1.title}
-                        </div>
-                        <div className="text-[8px] sm:text-[10px] text-shin-gold font-mono font-bold truncate w-full">
-                          Lv.{match.p1.powerLevel} • {match.p1.wins}W/{match.p1.losses}L
-                        </div>
-                      </div>
-
-                      {/* VS Emblem */}
-                      <div className="col-span-1 flex flex-col items-center justify-center">
-                        <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-full bg-shin-red/20 border border-shin-red flex items-center justify-center font-cinzel font-black text-[8px] sm:text-xs text-shin-red shadow-[0_0_15px_rgba(255,42,42,0.6)]">
-                          VS
-                        </div>
-                      </div>
-
-                      {/* Fighter 2 */}
-                      <div className="col-span-5 flex flex-col items-center text-center min-w-0">
-                        <div className="relative w-12 h-12 sm:w-24 sm:h-24 flex items-end justify-center overflow-hidden">
-                          <img
-                            src={getCharGif(match.p2.charId)}
-                            alt={match.p2.name}
-                            className="w-12 h-12 sm:w-24 sm:h-24 object-contain scale-x-[-1.25] scale-y-125 origin-bottom"
-                            style={{ imageRendering: 'pixelated' }}
-                          />
-                        </div>
-                        <div className="font-cinzel font-black text-[9px] sm:text-xs text-white mt-1 truncate w-full">
-                          {match.p2.title}
-                        </div>
-                        <div className="text-[8px] sm:text-[10px] text-red-400 font-mono font-bold truncate w-full">
-                          Lv.{match.p2.powerLevel} • {match.p2.wins}W/{match.p2.losses}L
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Pots Overview */}
-                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mb-2 sm:mb-3 text-center">
-                      <div className="bg-shin-gold/10 border border-shin-gold/30 rounded-lg p-1.5 sm:p-2">
-                        <div className="text-[7px] sm:text-[9px] text-gray-400 uppercase truncate">
-                          Winner Pot
-                        </div>
-                        <div className="text-[10px] sm:text-sm font-mono font-bold text-shin-gold truncate">
-                          {Math.round(match.fighterPoolNear * 1000).toLocaleString()} $SHIN
-                        </div>
-                      </div>
-                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-1.5 sm:p-2">
-                        <div className="text-[7px] sm:text-[9px] text-gray-400 uppercase truncate">
-                          Crowd Pot
-                        </div>
-                        <div className="text-[10px] sm:text-sm font-mono font-bold text-emerald-400 truncate">
-                          {Math.round(totalSpec * 1000).toLocaleString()} $SHIN
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Quick Crowd Backing Bar */}
-                    <div className="space-y-1.5 sm:space-y-2 mb-2.5 sm:mb-4 bg-white/5 p-2 sm:p-3 rounded-lg sm:rounded-xl border border-white/10">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[8px] sm:text-[10px] text-gray-300 font-cinzel uppercase tracking-wider">
-                        <span className="truncate">Back ($SHIN)</span>
-                        <div className="grid grid-cols-4 sm:flex gap-1">
-                          {[0.5, 1, 2, 5].map((val) => (
-                            <button
-                              key={val}
-                              onClick={() =>
-                                setBetAmounts((prev) => ({ ...prev, [match.matchId]: val }))
-                              }
-                              className={`px-1 sm:px-2 py-0.5 rounded font-mono text-[8px] sm:text-[10px] border cursor-pointer truncate ${
-                                currentBetAmt === val
-                                  ? 'bg-shin-gold text-black border-shin-gold font-bold'
-                                  : 'bg-black/60 text-gray-400 border-white/10'
-                              }`}
-                            >
-                              {val === 0.5 ? '500' : `${val}k`}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-1 sm:gap-2">
-                        <button
-                          onClick={() =>
-                            handlePlaceLobbyBet(match.matchId, 'p1', match.p1.title)
-                          }
-                          className="py-1.5 sm:py-2 px-1.5 sm:px-2.5 bg-amber-950/70 hover:bg-amber-800 border border-shin-gold/50 rounded-lg text-[9px] sm:text-xs font-cinzel font-bold text-shin-gold flex items-center justify-between gap-1 cursor-pointer min-w-0"
-                        >
-                          <span className="truncate">{match.p1.name}</span>
-                          <span className="font-mono text-white shrink-0">{p1Odds}x</span>
-                        </button>
-                        <button
-                          onClick={() =>
-                            handlePlaceLobbyBet(match.matchId, 'p2', match.p2.title)
-                          }
-                          className="py-1.5 sm:py-2 px-1.5 sm:px-2.5 bg-red-950/70 hover:bg-red-800 border border-shin-red/50 rounded-lg text-[9px] sm:text-xs font-cinzel font-bold text-red-300 flex items-center justify-between gap-1 cursor-pointer min-w-0"
-                        >
-                          <span className="truncate">{match.p2.name}</span>
-                          <span className="font-mono text-white shrink-0">{p2Odds}x</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Enter Live 2D Fight Button */}
-                    <button
-                      onClick={() => onWatchAgentFight(match)}
-                      className="w-full py-2 sm:py-3.5 bg-gradient-to-r from-shin-red to-red-700 hover:from-red-500 hover:to-red-600 text-white font-cinzel font-black text-[9px] sm:text-xs tracking-[0.12em] sm:tracking-[0.2em] uppercase rounded-lg sm:rounded-xl shadow-[0_0_20px_rgba(255,42,42,0.4)] transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer"
+                  return (
+                    <div
+                      key={matchId}
+                      className="bg-gradient-to-b from-gray-900/95 via-black to-black border-2 border-white/15 hover:border-shin-gold rounded-xl sm:rounded-2xl p-2.5 sm:p-5 flex flex-col justify-between transition-all shadow-[0_0_30px_rgba(0,0,0,0.8)] relative overflow-hidden group"
                     >
-                      <Swords size={13} className="shrink-0" />
-                      <span className="truncate">WATCH LIVE</span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                      {/* Top Match Header */}
+                      <div className="flex flex-wrap items-center justify-between gap-1 mb-2 sm:mb-3">
+                        <span className="text-[8px] sm:text-[10px] font-cinzel text-gray-300 bg-white/5 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded border border-white/10">
+                          👁 {sm.spectatorCount || 1} • ⏱ {sm.timer ?? 99}s
+                        </span>
+                        <span className="bg-shin-red/20 text-shin-red border border-shin-red/50 text-[8px] sm:text-[10px] font-cinzel font-black px-1.5 sm:px-3 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-shin-red animate-ping shrink-0" />
+                          <span className="truncate">{potShin.toLocaleString()} $SHIN</span>
+                        </span>
+                      </div>
+
+                      {/* Visual VS Stage */}
+                      <div className="grid grid-cols-11 items-center bg-gradient-to-r from-amber-950/30 via-black to-red-950/30 border border-white/10 rounded-lg sm:rounded-xl p-1.5 sm:p-3 mb-2 sm:mb-4 relative">
+                        {/* Fighter 1 */}
+                        <div className="col-span-5 flex flex-col items-center text-center min-w-0">
+                          <div className="relative w-12 h-12 sm:w-24 sm:h-24 flex items-end justify-center overflow-hidden">
+                            <img
+                              src={getCharGif(p1Char)}
+                              alt={p1Name}
+                              className="w-12 h-12 sm:w-24 sm:h-24 object-contain scale-125 origin-bottom"
+                              style={{ imageRendering: 'pixelated' }}
+                            />
+                          </div>
+                          <div className="font-cinzel font-black text-[9px] sm:text-xs text-white mt-1 truncate w-full">
+                            {p1Name}
+                          </div>
+                          <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden mt-1">
+                            <div
+                              className="h-full bg-emerald-400 transition-all duration-300"
+                              style={{ width: `${Math.max(0, Math.min(100, sm.p1Hp ?? 100))}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* VS Emblem */}
+                        <div className="col-span-1 flex flex-col items-center justify-center">
+                          <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-full bg-shin-red/20 border border-shin-red flex items-center justify-center font-cinzel font-black text-[8px] sm:text-xs text-shin-red shadow-[0_0_15px_rgba(255,42,42,0.6)]">
+                            VS
+                          </div>
+                        </div>
+
+                        {/* Fighter 2 */}
+                        <div className="col-span-5 flex flex-col items-center text-center min-w-0">
+                          <div className="relative w-12 h-12 sm:w-24 sm:h-24 flex items-end justify-center overflow-hidden">
+                            <img
+                              src={getCharGif(p2Char)}
+                              alt={p2Name}
+                              className="w-12 h-12 sm:w-24 sm:h-24 object-contain scale-x-[-1.25] scale-y-125 origin-bottom"
+                              style={{ imageRendering: 'pixelated' }}
+                            />
+                          </div>
+                          <div className="font-cinzel font-black text-[9px] sm:text-xs text-white mt-1 truncate w-full">
+                            {p2Name}
+                          </div>
+                          <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden mt-1">
+                            <div
+                              className="h-full bg-red-400 transition-all duration-300"
+                              style={{ width: `${Math.max(0, Math.min(100, sm.p2Hp ?? 100))}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pots Overview */}
+                      <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mb-2 sm:mb-3 text-center">
+                        <div className="bg-shin-gold/10 border border-shin-gold/30 rounded-lg p-1.5 sm:p-2">
+                          <div className="text-[7px] sm:text-[9px] text-gray-400 uppercase truncate">
+                            Winner Pot
+                          </div>
+                          <div className="text-[10px] sm:text-sm font-mono font-bold text-shin-gold truncate">
+                            {potShin.toLocaleString()} $SHIN
+                          </div>
+                        </div>
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-1.5 sm:p-2">
+                          <div className="text-[7px] sm:text-[9px] text-gray-400 uppercase truncate">
+                            Broadcast Mode
+                          </div>
+                          <div className="text-[10px] sm:text-sm font-mono font-bold text-emerald-400 truncate">
+                            {sm.mode === 'AGENT_BROADCAST' ? 'AI COLOSSEUM' : '1v1 DUEL'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Crowd Backing Bar */}
+                      <div className="space-y-1.5 sm:space-y-2 mb-2.5 sm:mb-4 bg-white/5 p-2 sm:p-3 rounded-lg sm:rounded-xl border border-white/10">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[8px] sm:text-[10px] text-gray-300 font-cinzel uppercase tracking-wider">
+                          <span className="truncate">Back ($SHIN)</span>
+                          <div className="grid grid-cols-4 sm:flex gap-1">
+                            {[0.5, 1, 2, 5].map((val) => (
+                              <button
+                                key={val}
+                                onClick={() =>
+                                  setBetAmounts((prev) => ({ ...prev, [matchId]: val }))
+                                }
+                                className={`px-1 sm:px-2 py-0.5 rounded font-mono text-[8px] sm:text-[10px] border cursor-pointer truncate ${
+                                  currentBetAmt === val
+                                    ? 'bg-shin-gold text-black border-shin-gold font-bold'
+                                    : 'bg-black/60 text-gray-400 border-white/10'
+                                }`}
+                              >
+                                {val === 0.5 ? '500' : `${val}k`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1 sm:gap-2">
+                          <button
+                            onClick={() =>
+                              handlePlaceLobbyBet(matchId, 'p1', p1Name, `${matchId}-p1`)
+                            }
+                            className="py-1.5 sm:py-2 px-1.5 sm:px-2.5 bg-amber-950/70 hover:bg-amber-800 border border-shin-gold/50 rounded-lg text-[9px] sm:text-xs font-cinzel font-bold text-shin-gold flex items-center justify-between gap-1 cursor-pointer min-w-0"
+                          >
+                            <span className="truncate">{p1Name}</span>
+                            <span className="font-mono text-white shrink-0">1.90x</span>
+                          </button>
+                          <button
+                            onClick={() =>
+                              handlePlaceLobbyBet(matchId, 'p2', p2Name, `${matchId}-p2`)
+                            }
+                            className="py-1.5 sm:py-2 px-1.5 sm:px-2.5 bg-red-950/70 hover:bg-red-800 border border-shin-red/50 rounded-lg text-[9px] sm:text-xs font-cinzel font-bold text-red-300 flex items-center justify-between gap-1 cursor-pointer min-w-0"
+                          >
+                            <span className="truncate">{p2Name}</span>
+                            <span className="font-mono text-white shrink-0">1.90x</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Enter Live 2D Fight Button */}
+                      <button
+                        onClick={() =>
+                          onWatchAgentFight({
+                            matchId: sm.id,
+                            id: sm.id,
+                            p1Character: p1Char,
+                            p2Character: p2Char,
+                            p1Name,
+                            p2Name,
+                            potShin,
+                            isServerBroadcast: true,
+                          })
+                        }
+                        className="w-full py-2 sm:py-3.5 bg-gradient-to-r from-shin-red to-red-700 hover:from-red-500 hover:to-red-600 text-white font-cinzel font-black text-[9px] sm:text-xs tracking-[0.12em] sm:tracking-[0.2em] uppercase rounded-lg sm:rounded-xl shadow-[0_0_20px_rgba(255,42,42,0.4)] transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer"
+                      >
+                        <Swords size={13} className="shrink-0" />
+                        <span className="truncate">WATCH LIVE</span>
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {arenaState.activeMatches.map((match) => {
+                  const totalSpec = match.spectatorPoolP1Near + match.spectatorPoolP2Near;
+                  const p1Odds =
+                    match.spectatorPoolP1Near > 0
+                      ? ((totalSpec * 0.95) / match.spectatorPoolP1Near).toFixed(2)
+                      : '1.90';
+                  const p2Odds =
+                    match.spectatorPoolP2Near > 0
+                      ? ((totalSpec * 0.95) / match.spectatorPoolP2Near).toFixed(2)
+                      : '1.90';
+                  const currentBetAmt = betAmounts[match.matchId] ?? 1.0;
+
+                  return (
+                    <div
+                      key={match.matchId}
+                      className="bg-gradient-to-b from-gray-900/95 via-black to-black border-2 border-white/15 hover:border-shin-gold rounded-xl sm:rounded-2xl p-2.5 sm:p-5 flex flex-col justify-between transition-all shadow-[0_0_30px_rgba(0,0,0,0.8)] relative overflow-hidden group"
+                    >
+                      {/* Top Match Header */}
+                      <div className="flex flex-wrap items-center justify-between gap-1 mb-2 sm:mb-3">
+                        <span className="text-[8px] sm:text-[10px] font-cinzel text-gray-300 bg-white/5 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded border border-white/10">
+                          👁 {match.viewers}
+                        </span>
+                        <span className="bg-shin-red/20 text-shin-red border border-shin-red/50 text-[8px] sm:text-[10px] font-cinzel font-black px-1.5 sm:px-3 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-shin-red animate-ping shrink-0" />
+                          <span className="truncate">
+                            {Math.round(match.fighterPoolNear * 1000).toLocaleString()} $SHIN
+                          </span>
+                        </span>
+                      </div>
+
+                      {/* Visual VS Stage */}
+                      <div className="grid grid-cols-11 items-center bg-gradient-to-r from-amber-950/30 via-black to-red-950/30 border border-white/10 rounded-lg sm:rounded-xl p-1.5 sm:p-3 mb-2 sm:mb-4 relative">
+                        {/* Fighter 1 */}
+                        <div className="col-span-5 flex flex-col items-center text-center min-w-0">
+                          <div className="relative w-12 h-12 sm:w-24 sm:h-24 flex items-end justify-center overflow-hidden">
+                            <img
+                              src={getCharGif(match.p1.charId)}
+                              alt={match.p1.name}
+                              className="w-12 h-12 sm:w-24 sm:h-24 object-contain scale-125 origin-bottom"
+                              style={{ imageRendering: 'pixelated' }}
+                            />
+                          </div>
+                          <div className="font-cinzel font-black text-[9px] sm:text-xs text-white mt-1 truncate w-full">
+                            {match.p1.title}
+                          </div>
+                          <div className="text-[8px] sm:text-[10px] text-shin-gold font-mono font-bold truncate w-full">
+                            Lv.{match.p1.powerLevel} • {match.p1.wins}W/{match.p1.losses}L
+                          </div>
+                        </div>
+
+                        {/* VS Emblem */}
+                        <div className="col-span-1 flex flex-col items-center justify-center">
+                          <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-full bg-shin-red/20 border border-shin-red flex items-center justify-center font-cinzel font-black text-[8px] sm:text-xs text-shin-red shadow-[0_0_15px_rgba(255,42,42,0.6)]">
+                            VS
+                          </div>
+                        </div>
+
+                        {/* Fighter 2 */}
+                        <div className="col-span-5 flex flex-col items-center text-center min-w-0">
+                          <div className="relative w-12 h-12 sm:w-24 sm:h-24 flex items-end justify-center overflow-hidden">
+                            <img
+                              src={getCharGif(match.p2.charId)}
+                              alt={match.p2.name}
+                              className="w-12 h-12 sm:w-24 sm:h-24 object-contain scale-x-[-1.25] scale-y-125 origin-bottom"
+                              style={{ imageRendering: 'pixelated' }}
+                            />
+                          </div>
+                          <div className="font-cinzel font-black text-[9px] sm:text-xs text-white mt-1 truncate w-full">
+                            {match.p2.title}
+                          </div>
+                          <div className="text-[8px] sm:text-[10px] text-red-400 font-mono font-bold truncate w-full">
+                            Lv.{match.p2.powerLevel} • {match.p2.wins}W/{match.p2.losses}L
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pots Overview */}
+                      <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mb-2 sm:mb-3 text-center">
+                        <div className="bg-shin-gold/10 border border-shin-gold/30 rounded-lg p-1.5 sm:p-2">
+                          <div className="text-[7px] sm:text-[9px] text-gray-400 uppercase truncate">
+                            Winner Pot
+                          </div>
+                          <div className="text-[10px] sm:text-sm font-mono font-bold text-shin-gold truncate">
+                            {Math.round(match.fighterPoolNear * 1000).toLocaleString()} $SHIN
+                          </div>
+                        </div>
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-1.5 sm:p-2">
+                          <div className="text-[7px] sm:text-[9px] text-gray-400 uppercase truncate">
+                            Crowd Pot
+                          </div>
+                          <div className="text-[10px] sm:text-sm font-mono font-bold text-emerald-400 truncate">
+                            {Math.round(totalSpec * 1000).toLocaleString()} $SHIN
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Crowd Backing Bar */}
+                      <div className="space-y-1.5 sm:space-y-2 mb-2.5 sm:mb-4 bg-white/5 p-2 sm:p-3 rounded-lg sm:rounded-xl border border-white/10">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[8px] sm:text-[10px] text-gray-300 font-cinzel uppercase tracking-wider">
+                          <span className="truncate">Back ($SHIN)</span>
+                          <div className="grid grid-cols-4 sm:flex gap-1">
+                            {[0.5, 1, 2, 5].map((val) => (
+                              <button
+                                key={val}
+                                onClick={() =>
+                                  setBetAmounts((prev) => ({ ...prev, [match.matchId]: val }))
+                                }
+                                className={`px-1 sm:px-2 py-0.5 rounded font-mono text-[8px] sm:text-[10px] border cursor-pointer truncate ${
+                                  currentBetAmt === val
+                                    ? 'bg-shin-gold text-black border-shin-gold font-bold'
+                                    : 'bg-black/60 text-gray-400 border-white/10'
+                                }`}
+                              >
+                                {val === 0.5 ? '500' : `${val}k`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1 sm:gap-2">
+                          <button
+                            onClick={() =>
+                              handlePlaceLobbyBet(match.matchId, 'p1', match.p1.title)
+                            }
+                            className="py-1.5 sm:py-2 px-1.5 sm:px-2.5 bg-amber-950/70 hover:bg-amber-800 border border-shin-gold/50 rounded-lg text-[9px] sm:text-xs font-cinzel font-bold text-shin-gold flex items-center justify-between gap-1 cursor-pointer min-w-0"
+                          >
+                            <span className="truncate">{match.p1.name}</span>
+                            <span className="font-mono text-white shrink-0">{p1Odds}x</span>
+                          </button>
+                          <button
+                            onClick={() =>
+                              handlePlaceLobbyBet(match.matchId, 'p2', match.p2.title)
+                            }
+                            className="py-1.5 sm:py-2 px-1.5 sm:px-2.5 bg-red-950/70 hover:bg-red-800 border border-shin-red/50 rounded-lg text-[9px] sm:text-xs font-cinzel font-bold text-red-300 flex items-center justify-between gap-1 cursor-pointer min-w-0"
+                          >
+                            <span className="truncate">{match.p2.name}</span>
+                            <span className="font-mono text-white shrink-0">{p2Odds}x</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Enter Live 2D Fight Button */}
+                      <button
+                        onClick={() => onWatchAgentFight(match)}
+                        className="w-full py-2 sm:py-3.5 bg-gradient-to-r from-shin-red to-red-700 hover:from-red-500 hover:to-red-600 text-white font-cinzel font-black text-[9px] sm:text-xs tracking-[0.12em] sm:tracking-[0.2em] uppercase rounded-lg sm:rounded-xl shadow-[0_0_20px_rgba(255,42,42,0.4)] transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer"
+                      >
+                        <Swords size={13} className="shrink-0" />
+                        <span className="truncate">WATCH LIVE</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

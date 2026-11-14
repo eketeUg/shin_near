@@ -492,10 +492,18 @@ export default function Home() {
         )}
 
       {/* Shadow Colosseum & Champion Barracks */}
-      {!isLoading && showAgentArena && !isGameStarted && (
+      {!isLoading && showAgentArena && !isGameStarted && !isSpectating && (
         <AgentArenaFlow
           initialTab={agentArenaInitialTab}
-          onWatchAgentFight={(match) => launchAgentArenaFight(match)}
+          onWatchAgentFight={(match: any) => {
+            if (match?.isServerBroadcast) {
+              setShowAgentArena(false);
+              setSpectatingMatch(match);
+              setIsSpectating(true);
+            } else {
+              launchAgentArenaFight(match);
+            }
+          }}
           onMintNewFighter={(charId) => {
             setInitialMintChar(charId);
             setShowAgentArena(false);
