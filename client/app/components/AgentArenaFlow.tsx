@@ -61,7 +61,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
   const [isFastForwarding, setIsFastForwarding] = useState<boolean>(false);
   const [simStep, setSimStep] = useState<number>(0);
   const [simHeadline, setSimHeadline] = useState<string>(
-    'Click "Fast-Forward 7 Days" to simulate a full week of autonomous arena fights, loot drops, and NPC supply/demand price swings in 10 seconds.',
+    'Fast-forward 7 days of autonomous duels, loot drops, and merchant price swings.',
   );
   const [openReasoningId, setOpenReasoningId] = useState<string | null>('hanzo-dojo');
   const [trainerFee, setTrainerFee] = useState<string>('0.5');
@@ -986,19 +986,14 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
               <div className="space-y-1.5 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                    NEP-245 Multi-Token Economy • Supply &amp; Demand Pricing
+                    Dynamic Dojo Economy • Supply &amp; Demand
                   </span>
                   <span className="text-[10px] font-mono text-gray-400">
-                    Total Simulated Days: <strong className="text-white">{arenaState.simulatedDaysElapsed || 0}</strong>
+                    Day <strong className="text-white">{arenaState.simulatedDaysElapsed || 0}</strong>
                   </span>
-                  {showNearUnderHood && (
-                    <span className="text-[10px] font-mono text-shin-gold">
-                      Config: client/app/config/npcMerchantConfig.ts
-                    </span>
-                  )}
                 </div>
                 <h2 className="text-lg md:text-xl font-cinzel font-black text-white">
-                  ⏩ Fast-Forward Economy Simulator (1 Week of Autonomous Trading)
+                  ⏩ 7-Day Dojo Economy Sim
                 </h2>
                 <p className="text-xs text-gray-300 font-sans">{simHeadline}</p>
                 {isFastForwarding && (
@@ -1059,7 +1054,9 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4 mb-4">
                         <div className="flex items-center gap-3.5">
                           <img
-                            src={merchant.avatarGif}
+                            src={merchant.avatarGif
+                              .replace('Shinobi_idle.gif', 'Shinobi_AllActions.gif')
+                              .replace('Samurai_idle.gif', 'Samurai_AllActions.gif')}
                             alt={merchant.name}
                             className="w-16 h-16 object-contain bg-black/80 rounded-xl p-1.5 border border-white/15"
                             style={{ imageRendering: 'pixelated' }}
@@ -1073,9 +1070,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                     : 'bg-red-500/25 text-red-300 border-red-500/50 animate-pulse'
                                 }`}
                               >
-                                {merchant.isShopOpen
-                                  ? '🟢 SHOP OPEN'
-                                  : '🔴 SHOP CLOSED (INSOLVENT / BROKE)'}
+                                {merchant.isShopOpen ? '🟢 SHOP OPEN' : '🔴 SHOP CLOSED'}
                               </span>
                               <button
                                 onClick={() =>
@@ -1086,7 +1081,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                 title={merchant.activeReasoning}
                                 className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 cursor-pointer"
                               >
-                                🧠 {isReasoningOpen ? 'Hide' : 'Show'} NPC Reasoning
+                                💭 {isReasoningOpen ? 'Hide' : 'Show'} Note
                               </button>
                             </div>
                             <h3 className="text-lg md:text-xl font-cinzel font-black text-white mt-1">
@@ -1125,7 +1120,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                       {isReasoningOpen && (
                         <div className="mb-4 bg-purple-950/35 border border-purple-500/40 rounded-xl p-3 text-xs font-mono text-purple-100">
                           <div className="text-[10px] font-bold text-purple-300 uppercase mb-1 flex items-center justify-between">
-                            <span>🧠 Active NPC Agent Pricing &amp; Inventory Reasoning</span>
+                            <span>💭 Merchant Status</span>
                             <span>Trades: {merchant.totalTradesCount}</span>
                           </div>
                           <p className="leading-relaxed text-[11px]">{merchant.activeReasoning}</p>
@@ -1137,12 +1132,12 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         <div className="mb-4 bg-red-950/60 border border-red-500/60 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                           <div className="text-xs text-red-200">
                             <strong className="text-white block font-cinzel uppercase">
-                              ⚠️ Shop Closed — Merchant Went Broke!
+                              ⚠️ Shop Closed!
                             </strong>
-                            Heavy material sell-offs drained {merchant.name}&apos;s pouch below{' '}
-                            {Math.round(merchant.insolvencyThresholdNear * 1000).toLocaleString()} $SHIN. Invest $SHIN to reopen the shop
-                            and earn {Math.round(merchant.investorDividendRate * 100)}% of future
-                            spreads!
+                            Low $SHIN reserves (below{' '}
+                            {Math.round(merchant.insolvencyThresholdNear * 1000).toLocaleString()} $SHIN).
+                            Fund 5,000 $SHIN to reopen and earn{' '}
+                            {Math.round(merchant.investorDividendRate * 100)}% of future trades!
                           </div>
                           <button
                             onClick={() => {
@@ -1325,11 +1320,11 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                     {/* Footer: Invest in Merchant Liquidity */}
                     <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-[11px]">
                       <span className="text-gray-400">
-                        LP Backers earn{' '}
+                        Patrons earn{' '}
                         <strong className="text-shin-gold">
                           {Math.round(merchant.investorDividendRate * 100)}%
                         </strong>{' '}
-                        of every scroll &amp; steel trade at this shop.
+                        of every trade at this shop.
                       </span>
                       <button
                         onClick={() => {
@@ -1358,13 +1353,13 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                 <div>
                   <div className="text-[10px] font-mono uppercase tracking-widest text-emerald-400">
-                    On-Chain Player Trainers • 90% Trainer / 10% Dev Treasury
+                    Sensei Guild • Earn 90% of Training Fees
                   </div>
                   <h3 className="text-lg font-cinzel font-black text-white uppercase tracking-wider">
-                    🥋 Player Trainers Guild (Earn 90% Coaching Fees)
+                    🥋 Sensei Guild
                   </h3>
                   <p className="text-xs text-gray-400">
-                    Register as a Sensei to train other players&apos; Fighter NFTs (+2 ATK/DEF/SPD &amp; +15 XP) and keep 90% of every training fee.
+                    Become a Sensei to train other warriors (+2 ATK/DEF/SPD &amp; +15 XP) and keep 90% of every fee.
                   </p>
                 </div>
               </div>
@@ -1373,7 +1368,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                 {/* Register as Trainer */}
                 <div className="rounded-xl border border-white/10 bg-black/60 p-4 space-y-3">
                   <div className="text-xs font-cinzel font-bold text-emerald-300 uppercase">
-                    Become a Sensei (Register On-Chain)
+                    Become a Sensei
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <select
@@ -1461,13 +1456,13 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
             <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-950/30 via-black to-zinc-950 p-5 space-y-4">
               <div>
                 <div className="text-[10px] font-mono uppercase tracking-widest text-amber-400">
-                  On-Chain Tournaments • 95% Winners / 5% Dev Treasury
+                  Budōkan Cups • 95% Winner Pot
                 </div>
                 <h3 className="text-lg font-cinzel font-black text-white uppercase tracking-wider">
-                  🏆 Player-Funded Tournaments
+                  🏆 Budōkan Tournaments
                 </h3>
                 <p className="text-xs text-gray-400">
-                  Create or join a Budōkan tournament pool. All entry fees go into the prize pot (95% to winners, 5% Dojo Treasury).
+                  Create or join a winner-takes-all tournament pot.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1536,8 +1531,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                     ⚔ Warrior Bazaar (Recruit Veteran Shinobi)
                   </h3>
                   <p className="text-xs text-gray-400">
-                    Every Shinobi carries their own SHIN Pouch. Recruiting a veteran transfers both
-                    the Warrior and all $SHIN inside their pouch!
+                    Recruit veteran warriors along with their entire SHIN Pouch.
                   </p>
                 </div>
 
