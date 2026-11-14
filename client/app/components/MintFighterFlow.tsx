@@ -152,7 +152,7 @@ const MintFighterFlow: React.FC<MintFighterFlowProps> = ({
               </h3>
               <p className="text-xs text-gray-400">
                 Every awakened Champion receives their own personal War Chest to fight in 1v1 duels
-                or the 24/7 Shadow Colosseum.
+                or the 24/7 Shadow Budōkan.
               </p>
             </div>
             <div className="text-right font-mono text-xs shrink-0">
@@ -231,7 +231,7 @@ const MintFighterFlow: React.FC<MintFighterFlowProps> = ({
 
             <div className="bg-white/5 border border-white/10 p-3 rounded-xl">
               <div className="text-[10px] font-cinzel font-bold text-emerald-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                <Swords size={12} /> Stake Per Colosseum Fight
+                <Swords size={12} /> Stake Per Budōkan Duel
               </div>
               <div className="flex gap-1.5">
                 {[0.5, 1, 2, 5].map((amt) => (

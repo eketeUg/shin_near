@@ -738,7 +738,7 @@ const ControlsOverlay = ({
                         <div className="w-full max-w-2xl bg-gradient-to-r from-amber-950/40 via-black to-emerald-950/30 border-2 border-shin-gold/50 rounded-2xl p-5 mb-5">
                             <div className="flex items-center justify-between border-b border-white/10 pb-2.5 mb-3">
                                 <span className="text-xs font-cinzel font-black text-shin-gold uppercase tracking-widest flex items-center gap-2">
-                                    <Coins size={16} /> Spoils of the Colosseum
+                                    <Coins size={16} /> Spoils of the Shōbu
                                 </span>
                                 <button
                                     onClick={() => setShowTechDetails(!showTechDetails)}
@@ -848,9 +848,9 @@ const ControlsOverlay = ({
                             }}
                         >
                             {matchMode === 'AGENT_ARENA'
-                                ? '⚔ NEXT COLOSSEUM FIGHT'
+                                ? '⚔ NEXT BUDŌKAN DUEL'
                                 : isSpectator
-                                  ? 'RETURN TO COLOSSEUM'
+                                  ? 'RETURN TO BUDŌKAN'
                                   : '⚔ REMATCH'}
                         </button>
 

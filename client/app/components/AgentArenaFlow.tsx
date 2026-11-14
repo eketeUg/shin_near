@@ -174,7 +174,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
           <div>
             <h1 className="text-sm sm:text-lg md:text-2xl font-cinzel font-black tracking-[0.12em] sm:tracking-[0.2em] text-white uppercase flex items-center gap-1.5 sm:gap-2.5">
               <Flame size={16} className="text-shin-red shrink-0" />
-              <span>SHADOW COLOSSEUM</span>
+              <span>SHADOW BUDŌKAN</span>
             </h1>
           </div>
         </div>
@@ -229,7 +229,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       <div className="px-3 sm:px-6 md:px-8 pt-3 sm:pt-5 pb-2 max-w-7xl mx-auto w-full flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 w-full lg:w-auto">
           {[
-            { id: 'LIVE_ARENA', label: '🔥 Colosseum Pit', icon: Flame },
+            { id: 'LIVE_ARENA', label: '🔥 Shōbu Pit', icon: Flame },
             {
               id: 'MY_AGENTS',
               label: `⚔ Barracks (${ownedFighters.length})`,
@@ -286,7 +286,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                   <Sparkles size={15} /> Non-Stop Shadow Battles • Winner Takes The Fight Pot
                 </div>
                 <p className="text-xs md:text-sm text-gray-300 max-w-3xl">
-                  Champions in the Colosseum stake their own{' '}
+                  Champions in the Budōkan stake their own{' '}
                   <span className="text-shin-gold font-semibold">War Chest</span> into each match
                   pot and fight autonomously using their learned Fighting Style. Back either corner
                   before or during the fight to win a share of the{' '}
@@ -606,7 +606,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                       setArenaState({ ...nearArenaEngine.getState() });
                       showToast(
                         !selectedFighter.isAgentActive
-                          ? `${selectedFighter.title} entered the 24/7 Shadow Colosseum!`
+                          ? `${selectedFighter.title} entered the 24/7 Shadow Budōkan!`
                           : `${selectedFighter.title} rested in Barracks.`,
                       );
                     }}
@@ -617,8 +617,8 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                     }`}
                   >
                     {selectedFighter.isAgentActive
-                      ? '🟢 FIGHTING IN COLOSSEUM'
-                      : '⚪ SEND TO COLOSSEUM'}
+                      ? '🟢 FIGHTING IN BUDŌKAN'
+                      : '⚪ SEND TO BUDŌKAN'}
                   </button>
                 </div>
 
@@ -635,7 +635,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                     </div>
                     <p className="text-[11px] text-gray-400">
                       Load coins into this warrior&apos;s personal War Chest so they can keep entering
-                      winner-takes-all Colosseum pools.
+                      winner-takes-all Budōkan pools.
                     </p>
                     <div className="flex gap-1.5">
                       {[2, 5, 10].map((quickAmt) => (
@@ -711,7 +711,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         Fight Stake Per Match (Pool Entry)
                       </div>
                       <div className="text-[11px] text-gray-400">
-                        Amount your Champion puts on the line in each Colosseum fight (Winner takes
+                        Amount your Champion puts on the line in each Budōkan duel (Winner takes
                         both stakes).
                       </div>
                     </div>

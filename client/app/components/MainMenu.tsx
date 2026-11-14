@@ -270,7 +270,7 @@ const MainMenu = ({
             className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/70 border border-red-500/40 text-xs font-cinzel text-red-300 cursor-pointer transition-all"
           >
             <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-            <span>{arenaState.activeMatches.length} Live Colosseum Fights</span>
+            <span>{arenaState.activeMatches.length} Live Budōkan Duels</span>
           </button>
 
           {/* Dedicated Judge / Under-The-Hood Inspector Button */}
@@ -365,7 +365,7 @@ const MainMenu = ({
                   </div>
                   <div>
                     <div className="font-cinzel font-black text-sm sm:text-base md:text-xl tracking-[0.12em] sm:tracking-[0.15em] text-white uppercase flex flex-wrap items-center gap-1.5 sm:gap-2">
-                      <span>SHADOW COLOSSEUM</span>
+                      <span>SHADOW BUDŌKAN</span>
                       <span className="text-[8px] sm:text-[9px] bg-shin-gold text-black font-mono font-bold px-2 py-0.5 rounded">
                         WINNER TAKES POOL
                       </span>
@@ -862,31 +862,48 @@ const MainMenu = ({
               {activeModal === 'about' && (
                 <div>
                   <h2 className="text-2xl font-cinzel font-black text-shin-gold mb-4 border-b border-white/10 pb-2 uppercase">
-                    The Lore of SHIN
+                    Chronicles of SHIN: The Struggle
                   </h2>
                   <div className="space-y-4 text-gray-300 text-sm leading-relaxed">
-                    <p className="bg-white/5 p-4 rounded-xl border border-white/10">
-                      <strong className="text-white">SHIN: The Struggle</strong> is a fast-paced 2D
-                      Shinobi &amp; Samurai arcade fighting game. Every Champion you awaken possesses
-                      both a lethal martial style and their own independent{' '}
-                      <strong className="text-shin-gold">War Chest</strong>.
-                    </p>
+                    <div className="bg-gradient-to-br from-red-950/30 via-black/70 to-amber-950/20 p-4 rounded-xl border border-shin-red/30 space-y-2">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-shin-red">
+                        The Blood-Moon Era • Kurogane Shogunate
+                      </div>
+                      <p>
+                        In the twilight of the <strong className="text-white">Kurogane Shogunate</strong>,
+                        when the Blood Moon rose over the fractured provinces, open war was forbidden
+                        by the <strong className="text-shin-gold">Edict of Steel</strong>. Instead,
+                        shadow-walking <strong className="text-white">Shinobi</strong>, sworn{' '}
+                        <strong className="text-white">Samurai</strong> retainers, masterless{' '}
+                        <strong className="text-white">Ronin</strong>, and{' '}
+                        <strong className="text-white">Sōhei</strong> warrior-monks gather beneath the
+                        crimson lanterns of the <strong className="text-shin-gold">Shadow Budōkan</strong>{' '}
+                        — settling clan rivalries through single combat and{' '}
+                        <strong className="text-amber-300">$SHIN Spirit Steel</strong>.
+                      </p>
+                    </div>
                     <div className="grid grid-cols-1 gap-2.5 text-xs">
                       <div className="bg-black/60 p-3 rounded-lg border border-white/10">
-                        <strong className="text-shin-red uppercase">1. Fight Yourself or Send Your Shadow:</strong>{' '}
-                        Take direct control in 1v1 combat, or assign a Fighting Style and Stake Limit
-                        so your Champion fights autonomously in the 24/7 Shadow Colosseum.
+                        <strong className="text-shin-red uppercase">1. Way of the Shadow (Kage-Bunshin):</strong>{' '}
+                        Take direct command of your blade in 1v1 duels, or seal a{' '}
+                        <strong className="text-shin-gold">War Chest</strong> and Fighting Doctrine
+                        into your Warrior Seal so your autonomous Shadow fights 24/7 in the{' '}
+                        <strong className="text-white">Shadow Budōkan</strong>.
                       </div>
                       <div className="bg-black/60 p-3 rounded-lg border border-white/10">
-                        <strong className="text-shin-gold uppercase">2. Live Crowd Backing:</strong>{' '}
-                        Spectators watching live fights can toss coins into the Red or Blue corner pot.
-                        Winning backers split 95% of the pot, and 5% goes straight into the winning
-                        Warrior&apos;s War Chest!
+                        <strong className="text-shin-gold uppercase">2. Shōbu Spoils &amp; Crowd Backing:</strong>{' '}
+                        Duelists battle for <strong className="text-white">95%</strong> of the fight pot
+                        (5% to the Shogunate Treasury). Spectators backing the Red or Blue corner split{' '}
+                        <strong className="text-white">90%</strong> of the crowd pot, while{' '}
+                        <strong className="text-emerald-400">5%</strong> goes straight to the winning
+                        Warrior&apos;s War Chest and <strong className="text-white">5%</strong> to the Treasury.
                       </div>
                       <div className="bg-black/60 p-3 rounded-lg border border-white/10">
-                        <strong className="text-emerald-400 uppercase">3. Grandmaster Hanzo&apos;s Shadow Dojo:</strong>{' '}
-                        Master Hanzo is an autonomous NPC sensei whose training fee rises and falls
-                        naturally with arena demand.
+                        <strong className="text-emerald-400 uppercase">3. Hanzo&apos;s Dojo, Kenji&apos;s Forge &amp; Sensei Guild:</strong>{' '}
+                        Grandmaster Hanzo guards forbidden Shinobi Scrolls while Blacksmith Kenji
+                        tempers Tamahagane Shadow Steel — their prices shifting with war demand.
+                        Veteran players can also register as Sensei to train fellow warriors for{' '}
+                        <strong className="text-white">90%</strong> of coaching fees.
                       </div>
                     </div>
                   </div>
