@@ -330,8 +330,8 @@ export class NearRelayerService implements OnModuleInit {
   }
 
   /**
-   * Sends a small real Testnet NEAR drip to a newly onboarded user's implicit account
-   * (only if their current on-chain balance is below 0.1 NEAR).
+   * Sends a starter Testnet NEAR drip (if below 0.1 NEAR) AND 250 $SHIN tokens
+   * to an onboarded user's account.
    */
   async dripTestnetNear(
     receiverId: string,
@@ -351,7 +351,6 @@ export class NearRelayerService implements OnModuleInit {
     }
 
     try {
-      // Check current balance first to prevent repeated drips
       let currentNear = 0;
       try {
         const acct: any = await this.provider.query({
@@ -366,34 +365,57 @@ export class NearRelayerService implements OnModuleInit {
         currentNear = 0; // Account not yet initialized on-chain (0 NEAR)
       }
 
-      if (currentNear >= 0.1) {
-        return {
-          ok: false,
-          simulated: false,
-          contractId: this.contractId,
-          relayerAccountId: this.relayerAccountId,
-          methodName: 'sendMoney',
-          txHash: '',
-          explorerUrl: '',
-          error: `Account already funded (${currentNear.toFixed(4)} NEAR)`,
-        };
+      let lastTxHash = '';
+
+      if (currentNear < 0.1) {
+        const yocto = BigInt(utils.format.parseNearAmount(amountNear) || '0');
+        const outcome: any = await this.relayerAccount.sendMoney(receiverId, yocto);
+        lastTxHash =
+          outcome?.transaction?.hash || outcome?.transaction_outcome?.id || '';
+        this.logger.log(`[NEAR DRIP] Sent ${amountNear} NEAR to ${receiverId} -> ${lastTxHash}`);
       }
 
-      const yocto = BigInt(utils.format.parseNearAmount(amountNear) || '0');
-      const outcome: any = await this.relayerAccount.sendMoney(receiverId, yocto);
+      // Register NEP-141 storage and transfer 250 $SHIN (18 decimals)
+      try {
+        await this.relayerAccount.functionCall({
+          contractId: this.shinTokenId,
+          methodName: 'storage_deposit',
+          args: { account_id: receiverId, registration_only: true },
+          gas: BigInt('30000000000000'),
+          attachedDeposit: BigInt(utils.format.parseNearAmount('0.00125') || '1250000000000000000000'),
+        });
+      } catch {
+        // Ignore if already registered
+      }
+
+      const shinAmountRaw = (BigInt(250) * BigInt('1000000000000000000')).toString();
+      const ftOutcome: any = await this.relayerAccount.functionCall({
+        contractId: this.shinTokenId,
+        methodName: 'ft_transfer',
+        args: {
+          receiver_id: receiverId,
+          amount: shinAmountRaw,
+          memo: 'SHIN Dojo Faucet Refill (+250 SHIN)',
+        },
+        gas: BigInt('30000000000000'),
+        attachedDeposit: 1n,
+      });
+
       const txHash: string =
-        outcome?.transaction?.hash || outcome?.transaction_outcome?.id || '';
+        ftOutcome?.transaction?.hash ||
+        ftOutcome?.transaction_outcome?.id ||
+        lastTxHash;
       const explorerUrl = txHash
         ? `https://testnet.nearblocks.io/txns/${txHash}`
         : '';
 
-      this.logger.log(`[NEAR DRIP] Sent ${amountNear} NEAR to ${receiverId} -> ${txHash}`);
+      this.logger.log(`[SHIN DRIP] Sent 250 SHIN to ${receiverId} -> ${txHash}`);
       return {
         ok: true,
         simulated: false,
-        contractId: this.contractId,
+        contractId: this.shinTokenId,
         relayerAccountId: this.relayerAccountId,
-        methodName: 'sendMoney',
+        methodName: 'ft_transfer',
         txHash,
         explorerUrl,
       };

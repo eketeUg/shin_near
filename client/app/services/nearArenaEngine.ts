@@ -1381,28 +1381,28 @@ class NearArenaEngine {
             NEAR: Number(formatted.replace(/,/g, '')) || 0,
           };
         }
+      }
 
-        // Sync $SHIN NEP-141 balance (18 decimals)
-        try {
-          const shinBalRes = await fetch(
-            `${serverUrl}/api/near/view?method=ft_balance_of&contractId=${encodeURIComponent(
-              this.shinTokenId,
-            )}&args=${encodeURIComponent(JSON.stringify({ account_id: targetAddr }))}`,
-          );
-          if (shinBalRes.ok) {
-            const shinData = await shinBalRes.json();
-            if (shinData?.ok && typeof shinData?.result === 'string') {
-              const rawBig = BigInt(shinData.result || '0');
-              const whole = Number(rawBig / BigInt('1000000000000000')) / 1000;
-              this.state.playerWallet = {
-                ...this.state.playerWallet,
-                SHIN: Number(whole.toFixed(3)),
-              };
-            }
+      // Always sync $SHIN NEP-141 balance (18 decimals) from on-chain
+      try {
+        const shinBalRes = await fetch(
+          `${serverUrl}/api/near/view?method=ft_balance_of&contractId=${encodeURIComponent(
+            this.shinTokenId,
+          )}&args=${encodeURIComponent(JSON.stringify({ account_id: targetAddr }))}`,
+        );
+        if (shinBalRes.ok) {
+          const shinData = await shinBalRes.json();
+          if (shinData?.ok && typeof shinData?.result === 'string') {
+            const rawBig = BigInt(shinData.result || '0');
+            const whole = Number(rawBig / BigInt('1000000000000000')) / 1000;
+            this.state.playerWallet = {
+              ...this.state.playerWallet,
+              SHIN: Number(whole.toFixed(3)),
+            };
           }
-        } catch {
-          // Ignore $SHIN balance fetch error if offline
         }
+      } catch {
+        // Ignore $SHIN balance fetch error if offline
       }
 
       const costRes = await fetch(
