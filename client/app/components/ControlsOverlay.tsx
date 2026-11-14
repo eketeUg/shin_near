@@ -711,7 +711,11 @@ const ControlsOverlay = ({
                             window.dispatchEvent(
                                 new CustomEvent('togglePause', { detail: { isPaused: false } }),
                             );
-                            window.dispatchEvent(new CustomEvent('exitMatch'));
+                            if (isSpectator) {
+                                window.dispatchEvent(new CustomEvent('leaveSpectator'));
+                            } else {
+                                window.dispatchEvent(new CustomEvent('exitMatch'));
+                            }
                         }}
                         className="w-[280px] px-6 py-4 bg-red-950/60 border-2 border-shin-red text-shin-red font-cinzel font-bold text-lg tracking-widest hover:bg-shin-red hover:text-white transition-all rounded-xl cursor-pointer"
                     >
@@ -861,7 +865,11 @@ const ControlsOverlay = ({
                         <button
                             className="flex-1 py-3.5 bg-white/5 border border-white/20 text-white font-cinzel font-bold text-xs tracking-widest uppercase rounded-xl transition-all hover:border-white cursor-pointer"
                             onClick={() => {
-                                window.dispatchEvent(new CustomEvent('exitMatch'));
+                                if (isSpectator) {
+                                    window.dispatchEvent(new CustomEvent('leaveSpectator'));
+                                } else {
+                                    window.dispatchEvent(new CustomEvent('exitMatch'));
+                                }
                             }}
                         >
                             RETURN TO HALL

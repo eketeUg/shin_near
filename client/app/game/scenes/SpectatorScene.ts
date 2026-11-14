@@ -139,22 +139,74 @@ export class SpectatorScene extends Phaser.Scene {
                 this.syncState(frameData);
             });
 
+            let hasEnded = false;
+            let autoLeaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+            const scheduleStreamAutoClose = () => {
+                if (autoLeaveTimer) clearTimeout(autoLeaveTimer);
+                autoLeaveTimer = setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('leaveSpectator'));
+                }, 4500);
+            };
+
             this.socket.on('spectator_fire_event', (payload: any) => {
                 if (payload.type === 'audio') {
                     this.playAudioEvent(payload.data);
                 } else if (payload.type === 'match_event') {
+                    if (payload.data?.event === 'gameOver') {
+                        hasEnded = true;
+                        scheduleStreamAutoClose();
+                    }
                     // Forward match events (roundEnded, gameOver) to ControlsOverlay
                     window.dispatchEvent(new CustomEvent(payload.data.event, { detail: payload.data.detail }));
                 }
             });
 
-            this.socket.on('match_ended', () => {
-                console.log('Host disconnected. Match ended.');
-                // Optionally emit a game over event drawn to be 'Disconnected'
+            this.socket.on('match_ended', (endData?: any) => {
+                console.log('Match stream ended.', endData);
+                if (!hasEnded) {
+                    hasEnded = true;
+                    const p1Hp = this.player?.hp ?? 100;
+                    const p2Hp = this.player2?.hp ?? 100;
+                    const p1Won = p1Hp >= p2Hp;
+                    window.dispatchEvent(
+                        new CustomEvent('gameOver', {
+                            detail: {
+                                matchId: this.matchId,
+                                winner: p1Won ? this.p1Name : this.p2Name,
+                                winnerId: p1Won ? 'p1' : 'p2',
+                                winnerPubKey: endData?.winnerAccountId,
+                                duration: 'Stream Concluded',
+                                roundsScore: p1Won ? '1 - 0' : '0 - 1',
+                                p1Stats: {
+                                    name: this.p1Name,
+                                    charType: this.p1CharType,
+                                    damageDealt: Math.max(0, 100 - p2Hp),
+                                    hitsLanded: Math.max(1, Math.round((100 - p2Hp) / 5)),
+                                    specialsLanded: 0,
+                                    blocks: 0,
+                                },
+                                p2Stats: {
+                                    name: this.p2Name,
+                                    charType: this.p2CharType,
+                                    damageDealt: Math.max(0, 100 - p1Hp),
+                                    hitsLanded: Math.max(1, Math.round((100 - p1Hp) / 5)),
+                                    specialsLanded: 0,
+                                    blocks: 0,
+                                },
+                            },
+                        }),
+                    );
+                }
+                scheduleStreamAutoClose();
             });
 
             // Cleanup UI listener on destroy
             this.events.on(Phaser.Scenes.Events.DESTROY, () => {
+                if (autoLeaveTimer) clearTimeout(autoLeaveTimer);
+                try {
+                    this.sound.stopAll();
+                } catch {}
                 if (this.socket) {
                     this.socket.emit('leave_spectator', this.matchId);
                     this.socket.disconnect();

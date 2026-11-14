@@ -317,11 +317,17 @@ export default function Home() {
     const handleLeaveSpectator = () => {
       setIsSpectating(false);
       setSpectatingMatch(null);
-      setShowAgentArena(true);
+      if (returnToAgentArenaAfterFight) {
+        setShowAgentArena(true);
+      } else {
+        setShowLiveFights(true);
+      }
     };
 
     const handleExitMatch = () => {
       setIsGameStarted(false);
+      setIsSpectating(false);
+      setSpectatingMatch(null);
       if (returnToAgentArenaAfterFight) {
         setShowAgentArena(true);
       }

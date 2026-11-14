@@ -573,12 +573,57 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { success: false, message: 'Match not found' };
   }
 
+  @SubscribeMessage('end_match')
+  handleEndMatch(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { matchId?: string },
+  ) {
+    let targetId = payload?.matchId || null;
+    if (!targetId) {
+      for (const [mid, m] of this.activeMatches.entries()) {
+        if (m.hostId === client.id) {
+          targetId = mid;
+          break;
+        }
+      }
+    }
+    if (targetId && this.activeMatches.has(targetId)) {
+      const pendingTimer = this.disconnectTimers.get(targetId);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        this.disconnectTimers.delete(targetId);
+      }
+      this.activeMatches.delete(targetId);
+      this.server.emit(
+        'active_matches_updated',
+        Array.from(this.activeMatches.values()),
+      );
+      this.server.to(`match_${targetId}`).emit('match_ended', {
+        matchId: targetId,
+        reason: 'HOST_ENDED',
+      });
+    }
+  }
+
   private async processNearMatchSettlement(
     matchId: string,
     winnerAccountId: string,
   ) {
     const match = this.activeMatches.get(matchId);
     if (!match) return;
+
+    const pendingTimer = this.disconnectTimers.get(matchId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      this.disconnectTimers.delete(matchId);
+    }
+
+    // Immediately remove from active live broadcasts and notify spectators that the stream ended
+    this.activeMatches.delete(matchId);
+    this.server.emit(
+      'active_matches_updated',
+      Array.from(this.activeMatches.values()),
+    );
 
     let receiptHash = createHash('sha256')
       .update(`${matchId}:${winnerAccountId}:${Date.now()}`)
@@ -653,11 +698,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       `[NEAR REFEREE] Settling Match ${matchId} on ${NEAR_ARENA_CONTRACT_ID} (${NEAR_RPC_URL}) -> Winner: ${winnerAccountId} | Receipt: ${receiptHash} | OnChain: ${onChain}`,
     );
 
-    this.activeMatches.delete(matchId);
-    this.server.emit(
-      'active_matches_updated',
-      Array.from(this.activeMatches.values()),
-    );
     this.server.to(`match_${matchId}`).emit('match_ended', {
       matchId,
       winnerAccountId,

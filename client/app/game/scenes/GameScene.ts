@@ -56,12 +56,21 @@ export class GameScene extends Phaser.Scene {
     private p2LastHitTime: number = 0;
     private lastFrameBroadcastTime: number = 0;
     private lastP2InputSentStr: string = '';
+    private isMatchFinished: boolean = false;
 
     constructor() {
         super({ key: 'GameScene' });
     }
 
     init(data: { mode?: 'PVP' | 'PVE' | 'AGENT_ARENA', p1?: string, p2?: string, p1Name?: string, p2Name?: string, p1Doctrine?: string, p2Doctrine?: string, difficulty?: 'EASY' | 'HARD', rounds?: number, isOnlineHost?: boolean, matchId?: string, p1PubKey?: string, p2PubKey?: string }) {
+        if (this.socket) {
+            if (this.isOnlineHost && this.matchId) {
+                this.socket.emit('end_match', { matchId: this.matchId });
+            }
+            this.socket.disconnect();
+            this.socket = null;
+        }
+        this.isMatchFinished = false;
         if (data.mode) this.gameMode = data.mode;
         if (data.p1) this.p1CharType = data.p1;
         if (data.p2) this.p2CharType = data.p2;
@@ -310,7 +319,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     private emitHostSyncFrameIfNeeded() {
-        if (!this.isOnlineHost || !this.socket?.connected || !this.matchId || !this.player || !this.player2) return;
+        if (this.isMatchFinished || !this.isOnlineHost || !this.socket?.connected || !this.matchId || !this.player || !this.player2) return;
         const now = this.time.now;
         if (now - this.lastFrameBroadcastTime < 65) return;
         this.lastFrameBroadcastTime = now;
@@ -386,6 +395,7 @@ export class GameScene extends Phaser.Scene {
         window.dispatchEvent(new CustomEvent('roundEnded', { detail: { winner, p1Wins: this.p1Wins, p2Wins: this.p2Wins, matchOver } }));
 
         if (matchOver) {
+            this.isMatchFinished = true;
             try { this.sound.play('victory'); } catch (e) {}
 
             setTimeout(() => {
@@ -419,12 +429,14 @@ export class GameScene extends Phaser.Scene {
 
                 if (this.isOnlineHost && this.socket && this.matchId) {
                     this.socket.emit('host_fire_event', {
+                        matchId: this.matchId,
                         type: 'match_event',
                         data: {
                             event: 'gameOver',
                             detail: results
                         }
                     });
+                    this.socket.emit('end_match', { matchId: this.matchId });
                 }
             }, 1400);
         } else {
@@ -775,22 +787,43 @@ export class GameScene extends Phaser.Scene {
         window.removeEventListener('playerAction', this.handlePlayerAction as any);
         window.removeEventListener('playerAudio', this.handlePlayerAudio as any);
         window.removeEventListener('togglePause', this.handleTogglePause as any);
+        window.removeEventListener('exitMatch', this.handleExitScene as any);
 
         window.addEventListener('joystickInput', this.handleJoystickInput as any);
         window.addEventListener('playerAction', this.handlePlayerAction as any);
         window.addEventListener('playerAudio', this.handlePlayerAudio as any);
         window.addEventListener('togglePause', this.handleTogglePause as any);
+        window.addEventListener('exitMatch', this.handleExitScene as any);
 
         this.events.on(Phaser.Scenes.Events.DESTROY, () => {
             window.removeEventListener('joystickInput', this.handleJoystickInput as any);
             window.removeEventListener('playerAction', this.handlePlayerAction as any);
             window.removeEventListener('playerAudio', this.handlePlayerAudio as any);
             window.removeEventListener('togglePause', this.handleTogglePause as any);
+            window.removeEventListener('exitMatch', this.handleExitScene as any);
             if (this.socket) {
+                if (this.isOnlineHost && this.matchId) {
+                    this.socket.emit('end_match', { matchId: this.matchId });
+                }
                 this.socket.disconnect();
+                this.socket = null;
             }
         });
     }
+
+    private handleExitScene = () => {
+        this.isMatchFinished = true;
+        try {
+            this.sound.stopAll();
+        } catch {}
+        if (this.socket) {
+            if (this.isOnlineHost && this.matchId) {
+                this.socket.emit('end_match', { matchId: this.matchId });
+            }
+            this.socket.disconnect();
+            this.socket = null;
+        }
+    };
 
     private handleTogglePause = (e: CustomEvent<{ isPaused: boolean }>) => {
         if (e.detail.isPaused) {
