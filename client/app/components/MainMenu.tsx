@@ -22,6 +22,7 @@ import {
 import SpectateScreen from './SpectateScreen';
 import AuthModal from './AuthModal';
 import ProfilePage from './ProfilePage';
+import NearInspectorModal from './NearInspectorModal';
 import { nearArenaEngine, COMBAT_DOCTRINES } from '../services/nearArenaEngine';
 import { Roster, CharacterId } from './PreGameFlow';
 
@@ -677,7 +678,13 @@ const MainMenu = ({
       {/* =====================================================================
           MODALS (Game Mode, Controls, About, Judge Inspector, Auth, Profile)
          ===================================================================== */}
-      {activeModal && (
+      <NearInspectorModal
+        isOpen={activeModal === 'judge'}
+        onClose={() => setActiveModal(null)}
+        onOpenFullLedger={() => onOpenColosseum?.('LEDGER')}
+      />
+
+      {activeModal && activeModal !== 'judge' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
           {activeModal === 'auth' ? (
             <div className="animate-in zoom-in-95 duration-200 flex justify-center w-full">
@@ -713,7 +720,7 @@ const MainMenu = ({
           ) : (
             <div
               className={`${
-                activeModal === 'profile' || activeModal === 'judge' ? 'max-w-3xl' : 'max-w-md'
+                activeModal === 'profile' ? 'max-w-3xl' : 'max-w-md'
               } bg-gray-950 border-2 border-shin-red rounded-2xl p-4 sm:p-6 md:p-8 w-full relative animate-in zoom-in-95 duration-200 shadow-[0_0_35px_rgba(255,42,42,0.3)] max-h-[90%] overflow-y-auto`}
             >
               {activeModal !== 'profile' && (
@@ -893,139 +900,6 @@ const MainMenu = ({
                         Veteran players can also register as Sensei to train fellow warriors for{' '}
                         <strong className="text-white">90%</strong> of coaching fees.
                       </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* JUDGE INSPECTOR MODAL (NEAR Architecture Under-The-Hood) */}
-              {activeModal === 'judge' && (
-                <div className="space-y-5">
-                  <div className="border-b border-white/15 pb-3">
-                    <div className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">
-                      NEAR Hackathon Technical Verification View
-                    </div>
-                    <h2 className="text-xl md:text-2xl font-cinzel font-black text-white uppercase mt-1">
-                      Under The Hood: How NEAR Powers SHIN Invisibly
-                    </h2>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Players experience pure arcade fighting with zero wallet popups. Underneath,
-                      every warrior, NPC, fight pool, and dojo upgrade runs on NEAR accounts.
-                    </p>
-                  </div>
-
-                  {/* 4 Pillars Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                    <div className="bg-black/80 border border-emerald-500/30 rounded-xl p-3.5">
-                      <div className="font-mono font-bold text-emerald-400 mb-1">
-                        1. Zero-Popup Session Account
-                      </div>
-                      <div className="font-mono text-[11px] text-white break-all">
-                        Account: {arenaState.playerWallet.accountId}
-                      </div>
-                      <div className="font-mono text-[10px] text-gray-400 mt-1">
-                        Implicit Key: ed25519:{arenaState.playerWallet.implicitHex.slice(0, 16)}… (250 TGas Relayer)
-                      </div>
-                    </div>
-
-                    <div className="bg-black/80 border border-shin-gold/30 rounded-xl p-3.5">
-                      <div className="font-mono font-bold text-shin-gold mb-1">
-                        2. Autonomous NPC Sensei Wallet
-                      </div>
-                      <div className="font-mono text-[11px] text-white">
-                        {arenaState.npcDojo.npcWalletId}
-                      </div>
-                      <div className="font-mono text-[10px] text-gray-400 mt-1">
-                        Treasury: {arenaState.npcDojo.treasuryBalanceNear.toFixed(2)} NEAR • Dynamic
-                        Fee: {arenaState.npcDojo.currentDynamicCostNear.toFixed(2)} NEAR
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Owned Fighter NFTs & Sub-Account Wallets */}
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                    <div className="text-xs font-mono font-bold text-white uppercase mb-2">
-                      3. Dynamic NEP-171 Fighter NFTs with Sub-Account Wallets ({ownedChampions.length})
-                    </div>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {ownedChampions.map((f) => (
-                        <div
-                          key={f.tokenId}
-                          className="flex flex-wrap items-center justify-between bg-black/70 px-3 py-2 rounded border border-white/10 text-[11px] font-mono"
-                        >
-                          <span className="text-white font-bold">
-                            {f.title} ({f.tokenId})
-                          </span>
-                          <span className="text-shin-gold">{f.agentWalletId}</span>
-                          <span className="text-emerald-400">
-                            Vault: {f.vaultBalanceNear.toFixed(2)} NEAR (Stake: {f.wagerPerFightNear}N)
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* NEP-245 Multi-Token Batch Inventory */}
-                  <div className="bg-white/5 border border-purple-500/30 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono font-bold text-purple-300 uppercase">
-                        4. NEP-245 Multi-Token Batch Inventory (`mt_batch_balance_of`)
-                      </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                        STANDARD: NEP-245 v1.0.0
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto">
-                      {nearArenaEngine.getNep245MultiTokenInventory().map((item, idx) => (
-                        <div
-                          key={`${item.tokenId}-${idx}`}
-                          className="flex items-center justify-between bg-black/75 px-3 py-1.5 rounded border border-white/10 text-[10px] font-mono"
-                        >
-                          <div className="truncate pr-2">
-                            <span className="text-purple-300 font-bold">{item.tokenId}</span>
-                            <div className="text-[9px] text-gray-400 truncate">
-                              Holder: {item.holderAccountId}
-                            </div>
-                          </div>
-                          <span className="text-shin-gold font-bold shrink-0">{item.balance}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Recent Contract Receipts */}
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono font-bold text-white uppercase">
-                        5. Live Contract Receipts (shin-arena.testnet)
-                      </span>
-                      <button
-                        onClick={() => {
-                          setActiveModal(null);
-                          onOpenColosseum?.('LEDGER');
-                        }}
-                        className="text-[11px] font-mono text-shin-gold hover:underline cursor-pointer"
-                      >
-                        Open Full Ledger →
-                      </button>
-                    </div>
-                    <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                      {arenaState.ledger.slice(0, 5).map((tx) => (
-                        <div
-                          key={tx.id}
-                          className="flex items-center justify-between text-[11px] font-mono bg-black/70 px-3 py-1.5 rounded"
-                        >
-                          <span className="text-gray-300 truncate max-w-md">{tx.summary}</span>
-                          <a
-                            href={`https://testnet.nearblocks.io/txns/${tx.txHash}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-400 hover:underline flex items-center gap-1 shrink-0 ml-2"
-                          >
-                            {tx.txHash.slice(0, 10)}… <ExternalLink size={10} />
-                          </a>
-                        </div>
-                      ))}
                     </div>
                   </div>
                 </div>

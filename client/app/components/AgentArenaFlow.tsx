@@ -9,6 +9,7 @@ import {
   AgentPersonalityArchetype,
 } from '../services/nearArenaEngine';
 import { Roster, CharacterId } from './PreGameFlow';
+import NearInspectorModal from './NearInspectorModal';
 import {
   Coins,
   Shield,
@@ -48,6 +49,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
     initialTab,
   );
   const [showNearUnderHood, setShowNearUnderHood] = useState<boolean>(false);
+  const [showInspectorModal, setShowInspectorModal] = useState<boolean>(false);
   const [selectedFighterId, setSelectedFighterId] = useState<string>(
     () => nearArenaEngine.getState().fighters.find((f) => !f.isNpc)?.tokenId || '',
   );
@@ -187,18 +189,14 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
 
         {/* Right: War Chest + NEAR Judge View Switch */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Toggle NEAR Under-the-Hood details for Judges */}
+          {/* Open Under-the-Hood NEAR Inspector */}
           <button
-            onClick={() => setShowNearUnderHood(!showNearUnderHood)}
-            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer ${
-              showNearUnderHood
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-                : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
-            }`}
-            title="Toggle NEAR Sub-Account & Contract Inspector"
+            onClick={() => setShowInspectorModal(true)}
+            className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer bg-white/5 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/15 hover:border-emerald-400"
+            title="Inspect live on-chain transactions & contract activity"
           >
             <Terminal size={12} />
-            <span>{showNearUnderHood ? 'NEAR: ON' : 'NEAR View'}</span>
+            <span>NEAR Inspector</span>
           </button>
 
           {/* Player War Chest */}
@@ -1705,6 +1703,12 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
           </div>
         )}
       </div>
+
+      <NearInspectorModal
+        isOpen={showInspectorModal}
+        onClose={() => setShowInspectorModal(false)}
+        onOpenFullLedger={() => setActiveTab('LEDGER')}
+      />
     </div>
   );
 };
