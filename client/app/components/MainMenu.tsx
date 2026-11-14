@@ -288,7 +288,7 @@ const MainMenu = ({
       {/* =====================================================================
           MAIN SPLIT-STAGE ARCADE HUB (Left: Arcade Blades | Right: Champion)
          ===================================================================== */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 md:px-10 py-4 sm:py-6 pb-10 [@media(max-height:540px)]:py-1.5 [@media(max-height:540px)]:pb-1.5 [@media(max-height:540px)]:px-4 grid grid-cols-1 sm:grid-cols-12 [@media(max-height:540px)]:grid-cols-12 items-center gap-6 sm:gap-8 [@media(max-height:540px)]:gap-4 z-20">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 md:px-10 py-4 sm:py-6 pb-10 [@media(max-height:540px)]:py-1.5 [@media(max-height:540px)]:pb-1.5 [@media(max-height:540px)]:px-4 grid grid-cols-1 sm:grid-cols-12 [@media(max-height:540px)]:grid-cols-12 items-center sm:items-stretch [@media(max-height:540px)]:items-stretch gap-6 sm:gap-8 [@media(max-height:540px)]:gap-4 z-20">
         {/* LEFT COLUMN (7 cols): Title & Angled Arcade Action Blades */}
         <div className="sm:col-span-7 [@media(max-height:540px)]:col-span-7 flex flex-col items-start justify-center space-y-4 sm:space-y-6 [@media(max-height:540px)]:space-y-1.5 w-full">
           {/* Dramatic Title Block */}
@@ -482,8 +482,8 @@ const MainMenu = ({
 
         {/* RIGHT COLUMN (5 cols): Living Champion Showcase Pedestal */}
         {activeChampion ? (
-          <div className="sm:col-span-5 [@media(max-height:540px)]:col-span-5 flex flex-col items-center">
-            <div className="w-full max-w-md bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-shin-gold/40 rounded-2xl p-5 [@media(max-height:540px)]:p-3 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden">
+          <div className="sm:col-span-5 [@media(max-height:540px)]:col-span-5 flex flex-col items-center h-full">
+            <div className="w-full max-w-md flex-1 flex flex-col justify-between bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-shin-gold/40 rounded-2xl p-5 [@media(max-height:540px)]:p-3 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden">
               {/* Top Champion Header */}
               <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4 [@media(max-height:540px)]:pb-1.5 [@media(max-height:540px)]:mb-2">
                 <div>
@@ -505,7 +505,7 @@ const MainMenu = ({
               </div>
 
               {/* Animated Fighter Stage */}
-              <div className="relative h-56 [@media(max-height:540px)]:h-24 flex items-end justify-center bg-gradient-to-t from-red-950/30 via-black/40 to-transparent rounded-xl border border-white/10 mb-4 [@media(max-height:540px)]:mb-2 overflow-hidden">
+              <div className="relative flex-1 min-h-[160px] [@media(max-height:540px)]:min-h-[84px] flex items-end justify-center bg-gradient-to-t from-red-950/30 via-black/40 to-transparent rounded-xl border border-white/10 mb-4 [@media(max-height:540px)]:mb-2 overflow-hidden">
                 {/* Glowing Dojo Aura Ring */}
                 <div className="absolute bottom-3 w-48 h-10 rounded-full bg-shin-gold/20 blur-md border border-shin-gold/40" />
 
@@ -611,8 +611,8 @@ const MainMenu = ({
             </div>
           </div>
         ) : (
-          <div className="sm:col-span-5 [@media(max-height:540px)]:col-span-5 flex flex-col items-center">
-            <div className="w-full max-w-md bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-white/15 rounded-2xl p-6 [@media(max-height:540px)]:p-3 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden text-center">
+          <div className="sm:col-span-5 [@media(max-height:540px)]:col-span-5 flex flex-col items-center h-full">
+            <div className="w-full max-w-md flex-1 flex flex-col justify-between bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-white/15 rounded-2xl p-6 [@media(max-height:540px)]:p-3 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden text-center">
               <div className="text-[10px] [@media(max-height:540px)]:text-[8px] font-cinzel text-shin-gold uppercase tracking-widest flex items-center justify-center gap-1.5 mb-1 [@media(max-height:540px)]:mb-0.5">
                 <Trophy size={12} /> Active Warrior
               </div>
@@ -623,7 +623,7 @@ const MainMenu = ({
                 Awaken a shinobi to unlock autonomous Shadow Duels, ELO ranks, and Dojo training.
               </p>
 
-              <div className="relative h-52 [@media(max-height:540px)]:h-24 flex items-end justify-center bg-gradient-to-t from-shin-gold/15 via-black/40 to-transparent rounded-xl border border-dashed border-shin-gold/30 mb-5 [@media(max-height:540px)]:mb-2 overflow-hidden">
+              <div className="relative flex-1 min-h-[160px] [@media(max-height:540px)]:min-h-[84px] flex items-end justify-center bg-gradient-to-t from-shin-gold/15 via-black/40 to-transparent rounded-xl border border-dashed border-shin-gold/30 mb-5 [@media(max-height:540px)]:mb-2 overflow-hidden">
                 <button
                   onClick={() => {
                     playClickSound();
