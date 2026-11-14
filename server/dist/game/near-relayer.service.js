@@ -68,6 +68,8 @@ const ALLOWED_WRITE_METHODS = new Set([
     'settle_tournament',
     'nft_transfer',
     'ft_transfer_call',
+    'withdraw_agent_shin',
+    'settle_shin_match',
 ]);
 let NearRelayerService = NearRelayerService_1 = class NearRelayerService {
     logger = new common_1.Logger(NearRelayerService_1.name);

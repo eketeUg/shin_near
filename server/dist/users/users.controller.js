@@ -20,6 +20,9 @@ let UsersController = class UsersController {
     constructor(usersService) {
         this.usersService = usersService;
     }
+    async listRegisteredUsers() {
+        return this.usersService.findAllRegistered();
+    }
     async getUser(walletAddress) {
         const user = await this.usersService.findByWallet(walletAddress);
         if (!user) {
@@ -30,6 +33,12 @@ let UsersController = class UsersController {
 };
 exports.UsersController = UsersController;
 __decorate([
+    (0, common_1.Get)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "listRegisteredUsers", null);
+__decorate([
     (0, common_1.Get)(':walletAddress'),
     __param(0, (0, common_1.Param)('walletAddress')),
     __metadata("design:type", Function),
@@ -37,7 +46,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "getUser", null);
 exports.UsersController = UsersController = __decorate([
-    (0, common_1.Controller)('api/users'),
+    (0, common_1.Controller)('users'),
     __metadata("design:paramtypes", [users_service_1.UsersService])
 ], UsersController);
 //# sourceMappingURL=users.controller.js.map

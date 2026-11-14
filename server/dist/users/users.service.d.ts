@@ -66,5 +66,14 @@ export declare class UsersService {
         _id: import("mongoose").Types.ObjectId;
     }>) | null>;
     findByWallet(walletAddress: string): Promise<User | null>;
+    findAllRegistered(): Promise<(import("mongoose").Document<unknown, {}, User, {}, import("mongoose").DefaultSchemaOptions> & User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    } & {
+        id: string;
+    } & Required<{
+        _id: import("mongoose").Types.ObjectId;
+    }>)[]>;
     private detectProvider;
 }

@@ -179,7 +179,7 @@ const MainMenu = ({
       {/* =====================================================================
           TOP ARCADE HUD BAR (Gamer-first profile + Judge Under-the-Hood Toggle)
          ===================================================================== */}
-      <header className="w-full px-3 sm:px-6 md:px-10 py-2.5 sm:py-3.5 flex flex-wrap items-center justify-between gap-2 sm:gap-3 border-b border-white/10 bg-black/75 backdrop-blur-md z-30">
+      <header className="w-full px-3 sm:px-6 md:px-10 py-2.5 sm:py-3.5 [@media(max-height:540px)]:py-1.5 [@media(max-height:540px)]:px-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3 border-b border-white/10 bg-black/75 backdrop-blur-md z-30">
         {/* Left: Player Identity & War Chest */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           <button
@@ -288,27 +288,27 @@ const MainMenu = ({
       {/* =====================================================================
           MAIN SPLIT-STAGE ARCADE HUB (Left: Arcade Blades | Right: Champion)
          ===================================================================== */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 md:px-10 py-4 sm:py-6 pb-10 grid grid-cols-1 sm:grid-cols-12 items-center gap-6 sm:gap-8 z-20">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 md:px-10 py-4 sm:py-6 pb-10 [@media(max-height:540px)]:py-1.5 [@media(max-height:540px)]:pb-1.5 [@media(max-height:540px)]:px-4 grid grid-cols-1 sm:grid-cols-12 [@media(max-height:540px)]:grid-cols-12 items-center gap-6 sm:gap-8 [@media(max-height:540px)]:gap-4 z-20">
         {/* LEFT COLUMN (7 cols): Title & Angled Arcade Action Blades */}
-        <div className="sm:col-span-7 flex flex-col items-start justify-center space-y-4 sm:space-y-6 w-full">
+        <div className="sm:col-span-7 [@media(max-height:540px)]:col-span-7 flex flex-col items-start justify-center space-y-4 sm:space-y-6 [@media(max-height:540px)]:space-y-1.5 w-full">
           {/* Dramatic Title Block */}
           <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-shin-red/20 border border-shin-red/50 text-shin-red text-[9px] sm:text-[10px] font-cinzel font-bold tracking-[0.2em] uppercase mb-1.5">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-shin-red/20 border border-shin-red/50 text-shin-red text-[9px] sm:text-[10px] font-cinzel font-bold tracking-[0.2em] uppercase mb-1.5 [@media(max-height:540px)]:hidden">
               <Flame size={12} /> Shinobi &amp; Samurai Arcade Arena
             </div>
             <div className="relative">
-              <h1 className="text-5xl sm:text-7xl md:text-8xl font-black font-cinzel tracking-[0.12em] text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-shin-gold to-amber-600 leading-none drop-shadow-[0_0_25px_rgba(251,191,36,0.45)]">
+              <h1 className="text-5xl sm:text-7xl md:text-8xl [@media(max-height:540px)]:text-4xl font-black font-cinzel tracking-[0.12em] text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-shin-gold to-amber-600 leading-none drop-shadow-[0_0_25px_rgba(251,191,36,0.45)]">
                 SHIN
               </h1>
-              <div className="h-1 w-36 sm:w-48 bg-gradient-to-r from-shin-red via-shin-gold to-transparent mt-1.5 shadow-[0_0_15px_rgba(255,42,42,0.9)]" />
+              <div className="h-1 w-36 sm:w-48 [@media(max-height:540px)]:w-28 [@media(max-height:540px)]:mt-0.5 bg-gradient-to-r from-shin-red via-shin-gold to-transparent mt-1.5 shadow-[0_0_15px_rgba(255,42,42,0.9)]" />
             </div>
-            <p className="text-[11px] sm:text-xs md:text-sm font-cinzel text-shin-gold tracking-[0.35em] sm:tracking-[0.45em] uppercase mt-1.5 glow-gold">
+            <p className="text-[11px] sm:text-xs md:text-sm [@media(max-height:540px)]:text-[9px] [@media(max-height:540px)]:mt-0.5 font-cinzel text-shin-gold tracking-[0.35em] sm:tracking-[0.45em] uppercase mt-1.5 glow-gold">
               The Struggle • Enter The Pit
             </p>
           </div>
 
           {/* Primary Arcade Menu Blades */}
-          <div className="w-full max-w-xl space-y-2.5 sm:space-y-3.5 pt-1">
+          <div className="w-full max-w-xl space-y-2.5 sm:space-y-3.5 [@media(max-height:540px)]:space-y-1.5 pt-1 [@media(max-height:540px)]:pt-0">
             {/* BLADE 1: PLAY 1V1 KOMBAT (PVE / ONLINE PVP) */}
             <button
               onClick={() => {
@@ -316,23 +316,23 @@ const MainMenu = ({
                 setActiveModal('gamemode');
               }}
               onMouseEnter={playHoverSound}
-              className="group relative w-full text-left arcade-skew bg-gradient-to-r from-red-950/90 via-black/90 to-black/80 hover:from-shin-red hover:via-red-800 hover:to-black border-l-4 border-y border-r border-l-shin-red border-white/15 hover:border-white px-4 sm:px-7 py-3 sm:py-4 transition-all duration-200 shadow-[0_0_25px_rgba(255,42,42,0.2)] hover:shadow-[0_0_35px_rgba(255,42,42,0.6)] sm:hover:translate-x-2 cursor-pointer"
+              className="group relative w-full text-left arcade-skew bg-gradient-to-r from-red-950/90 via-black/90 to-black/80 hover:from-shin-red hover:via-red-800 hover:to-black border-l-4 border-y border-r border-l-shin-red border-white/15 hover:border-white px-4 sm:px-7 py-3 sm:py-4 [@media(max-height:540px)]:py-1.5 [@media(max-height:540px)]:px-3 transition-all duration-200 shadow-[0_0_25px_rgba(255,42,42,0.2)] hover:shadow-[0_0_35px_rgba(255,42,42,0.6)] sm:hover:translate-x-2 cursor-pointer"
             >
               <div className="arcade-unskew flex items-center justify-between gap-2">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 rounded-lg bg-shin-red/20 group-hover:bg-black/30 border border-shin-red/50 flex items-center justify-center text-shin-red group-hover:text-white">
-                    <Swords size={20} />
+                <div className="flex items-center gap-3 sm:gap-4 [@media(max-height:540px)]:gap-2">
+                  <div className="w-9 h-9 sm:w-11 sm:h-11 [@media(max-height:540px)]:w-7 [@media(max-height:540px)]:h-7 shrink-0 rounded-lg bg-shin-red/20 group-hover:bg-black/30 border border-shin-red/50 flex items-center justify-center text-shin-red group-hover:text-white">
+                    <Swords size={18} />
                   </div>
                   <div>
-                    <div className="font-cinzel font-black text-base sm:text-lg md:text-2xl tracking-[0.12em] sm:tracking-[0.15em] text-white uppercase">
+                    <div className="font-cinzel font-black text-base sm:text-lg md:text-2xl [@media(max-height:540px)]:text-xs tracking-[0.12em] sm:tracking-[0.15em] text-white uppercase">
                       FIGHT NOW (1V1 DUEL)
                     </div>
-                    <div className="text-[10px] sm:text-[11px] text-gray-300 group-hover:text-white/90 tracking-wider">
+                    <div className="text-[10px] sm:text-[11px] [@media(max-height:540px)]:hidden text-gray-300 group-hover:text-white/90 tracking-wider">
                       Control your warrior in Arcade Story (PvE) or Online Duel (PvP)
                     </div>
                   </div>
                 </div>
-                <span className="font-cinzel font-black text-xs text-shin-gold group-hover:text-white uppercase tracking-widest hidden sm:inline">
+                <span className="font-cinzel font-black text-xs [@media(max-height:540px)]:text-[10px] text-shin-gold group-hover:text-white uppercase tracking-widest hidden sm:inline">
                   PLAY →
                 </span>
               </div>
@@ -345,26 +345,26 @@ const MainMenu = ({
                 onOpenColosseum?.('LIVE_ARENA');
               }}
               onMouseEnter={playHoverSound}
-              className="group relative w-full text-left arcade-skew bg-gradient-to-r from-amber-950/80 via-black/90 to-black/80 hover:from-amber-600 hover:via-amber-900 hover:to-black border-l-4 border-y border-r border-l-shin-gold border-white/15 hover:border-shin-gold px-4 sm:px-7 py-3 sm:py-4 transition-all duration-200 shadow-[0_0_20px_rgba(251,191,36,0.15)] hover:shadow-[0_0_35px_rgba(251,191,36,0.5)] sm:hover:translate-x-2 cursor-pointer"
+              className="group relative w-full text-left arcade-skew bg-gradient-to-r from-amber-950/80 via-black/90 to-black/80 hover:from-amber-600 hover:via-amber-900 hover:to-black border-l-4 border-y border-r border-l-shin-gold border-white/15 hover:border-shin-gold px-4 sm:px-7 py-3 sm:py-4 [@media(max-height:540px)]:py-1.5 [@media(max-height:540px)]:px-3 transition-all duration-200 shadow-[0_0_20px_rgba(251,191,36,0.15)] hover:shadow-[0_0_35px_rgba(251,191,36,0.5)] sm:hover:translate-x-2 cursor-pointer"
             >
               <div className="arcade-unskew flex items-center justify-between gap-2">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 rounded-lg bg-shin-gold/20 group-hover:bg-black/30 border border-shin-gold/50 flex items-center justify-center text-shin-gold group-hover:text-white">
-                    <Flame size={20} />
+                <div className="flex items-center gap-3 sm:gap-4 [@media(max-height:540px)]:gap-2">
+                  <div className="w-9 h-9 sm:w-11 sm:h-11 [@media(max-height:540px)]:w-7 [@media(max-height:540px)]:h-7 shrink-0 rounded-lg bg-shin-gold/20 group-hover:bg-black/30 border border-shin-gold/50 flex items-center justify-center text-shin-gold group-hover:text-white">
+                    <Flame size={18} />
                   </div>
                   <div>
-                    <div className="font-cinzel font-black text-sm sm:text-base md:text-xl tracking-[0.12em] sm:tracking-[0.15em] text-white uppercase flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <div className="font-cinzel font-black text-sm sm:text-base md:text-xl [@media(max-height:540px)]:text-xs tracking-[0.12em] sm:tracking-[0.15em] text-white uppercase flex flex-wrap items-center gap-1.5 sm:gap-2">
                       <span>SHADOW BUDŌKAN</span>
                       <span className="text-[8px] sm:text-[9px] bg-shin-gold text-black font-mono font-bold px-2 py-0.5 rounded">
                         WINNER TAKES POOL
                       </span>
                     </div>
-                    <div className="text-[10px] sm:text-[11px] text-gray-300 group-hover:text-white/90 tracking-wider">
+                    <div className="text-[10px] sm:text-[11px] [@media(max-height:540px)]:hidden text-gray-300 group-hover:text-white/90 tracking-wider">
                       Send your Shadow Agent into 24/7 prize pools or bet on live AI battles
                     </div>
                   </div>
                 </div>
-                <span className="font-cinzel font-black text-xs text-shin-gold group-hover:text-white uppercase tracking-widest hidden sm:inline">
+                <span className="font-cinzel font-black text-xs [@media(max-height:540px)]:text-[10px] text-shin-gold group-hover:text-white uppercase tracking-widest hidden sm:inline">
                   ENTER →
                 </span>
               </div>
@@ -377,30 +377,30 @@ const MainMenu = ({
                 onOpenColosseum?.('MY_AGENTS');
               }}
               onMouseEnter={playHoverSound}
-              className="group relative w-full text-left arcade-skew bg-gradient-to-r from-emerald-950/75 via-black/90 to-black/80 hover:from-emerald-700 hover:via-emerald-900 hover:to-black border-l-4 border-y border-r border-l-emerald-400 border-white/15 hover:border-emerald-400 px-4 sm:px-7 py-3 sm:py-3.5 transition-all duration-200 sm:hover:translate-x-2 cursor-pointer"
+              className="group relative w-full text-left arcade-skew bg-gradient-to-r from-emerald-950/75 via-black/90 to-black/80 hover:from-emerald-700 hover:via-emerald-900 hover:to-black border-l-4 border-y border-r border-l-emerald-400 border-white/15 hover:border-emerald-400 px-4 sm:px-7 py-3 sm:py-3.5 [@media(max-height:540px)]:py-1.5 [@media(max-height:540px)]:px-3 transition-all duration-200 sm:hover:translate-x-2 cursor-pointer"
             >
               <div className="arcade-unskew flex items-center justify-between gap-2">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 group-hover:text-white">
-                    <Shield size={18} />
+                <div className="flex items-center gap-3 sm:gap-4 [@media(max-height:540px)]:gap-2">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 [@media(max-height:540px)]:w-7 [@media(max-height:540px)]:h-7 shrink-0 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 group-hover:text-white">
+                    <Shield size={16} />
                   </div>
                   <div>
-                    <div className="font-cinzel font-bold text-xs sm:text-sm md:text-lg tracking-[0.12em] sm:tracking-[0.15em] text-white uppercase">
-                      BARRACKS &amp; DOJO ({ownedChampions.length} WARRIORS)
+                    <div className="font-cinzel font-bold text-xs sm:text-sm md:text-lg [@media(max-height:540px)]:text-xs tracking-[0.12em] sm:tracking-[0.15em] text-white uppercase">
+                      SHINOBI CLAN &amp; DOJO ({ownedChampions.length} WARRIORS)
                     </div>
-                    <div className="text-[10px] sm:text-[11px] text-gray-400 group-hover:text-white/90 tracking-wider">
-                      Fill Fighter War Chests, set Per-Fight Stakes &amp; trade at Hanzo&apos;s Dojo
+                    <div className="text-[10px] sm:text-[11px] [@media(max-height:540px)]:hidden text-gray-400 group-hover:text-white/90 tracking-wider">
+                      Fill SHIN Pouches, set Per-Fight Stakes &amp; trade at Hanzo&apos;s Dojo
                     </div>
                   </div>
                 </div>
-                <span className="font-cinzel font-bold text-xs text-emerald-400 group-hover:text-white uppercase tracking-widest hidden sm:inline">
+                <span className="font-cinzel font-bold text-xs [@media(max-height:540px)]:text-[10px] text-emerald-400 group-hover:text-white uppercase tracking-widest hidden sm:inline">
                   MANAGE →
                 </span>
               </div>
             </button>
 
             {/* BLADE 4: DOJO SOCIAL LOBBY, TOURNAMENTS, AWAKEN WARRIOR & SPECTATE TV */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 [@media(max-height:540px)]:grid-cols-4 gap-2 [@media(max-height:540px)]:gap-1.5 pt-1 [@media(max-height:540px)]:pt-0">
               <button
                 onClick={() => {
                   playClickSound();
@@ -482,30 +482,30 @@ const MainMenu = ({
 
         {/* RIGHT COLUMN (5 cols): Living Champion Showcase Pedestal */}
         {activeChampion ? (
-          <div className="sm:col-span-5 flex flex-col items-center">
-            <div className="w-full max-w-md bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-shin-gold/40 rounded-2xl p-5 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden">
+          <div className="sm:col-span-5 [@media(max-height:540px)]:col-span-5 flex flex-col items-center">
+            <div className="w-full max-w-md bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-shin-gold/40 rounded-2xl p-5 [@media(max-height:540px)]:p-3 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden">
               {/* Top Champion Header */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4 [@media(max-height:540px)]:pb-1.5 [@media(max-height:540px)]:mb-2">
                 <div>
-                  <div className="text-[10px] font-cinzel text-shin-gold uppercase tracking-widest flex items-center gap-1.5">
-                    <Trophy size={12} /> Active Champion Showcase
+                  <div className="text-[10px] [@media(max-height:540px)]:text-[8px] font-cinzel text-shin-gold uppercase tracking-widest flex items-center gap-1.5">
+                    <Trophy size={12} /> Active Warrior
                   </div>
-                  <h2 className="text-xl font-cinzel font-black text-white uppercase mt-0.5">
+                  <h2 className="text-xl [@media(max-height:540px)]:text-sm font-cinzel font-black text-white uppercase mt-0.5">
                     {activeChampion.title}
                   </h2>
                 </div>
                 <div className="text-right">
-                  <span className="px-2.5 py-1 rounded bg-shin-gold text-black font-mono font-black text-xs">
+                  <span className="px-2.5 py-1 [@media(max-height:540px)]:px-1.5 [@media(max-height:540px)]:py-0.5 rounded bg-shin-gold text-black font-mono font-black text-xs [@media(max-height:540px)]:text-[10px]">
                     LV.{activeChampion.powerLevel}
                   </span>
-                  <div className="text-[10px] font-mono text-gray-400 mt-1">
+                  <div className="text-[10px] [@media(max-height:540px)]:text-[8px] font-mono text-gray-400 mt-1 [@media(max-height:540px)]:mt-0.5">
                     {activeChampion.elo} ELO • {activeChampion.wins}W/{activeChampion.losses}L
                   </div>
                 </div>
               </div>
 
               {/* Animated Fighter Stage */}
-              <div className="relative h-56 flex items-end justify-center bg-gradient-to-t from-red-950/30 via-black/40 to-transparent rounded-xl border border-white/10 mb-4 overflow-hidden">
+              <div className="relative h-56 [@media(max-height:540px)]:h-24 flex items-end justify-center bg-gradient-to-t from-red-950/30 via-black/40 to-transparent rounded-xl border border-white/10 mb-4 [@media(max-height:540px)]:mb-2 overflow-hidden">
                 {/* Glowing Dojo Aura Ring */}
                 <div className="absolute bottom-3 w-48 h-10 rounded-full bg-shin-gold/20 blur-md border border-shin-gold/40" />
 
@@ -550,31 +550,31 @@ const MainMenu = ({
               </div>
 
               {/* Fighter Attributes & War Chest Strip */}
-              <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-                <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+              <div className="grid grid-cols-3 gap-2 [@media(max-height:540px)]:gap-1.5 mb-4 [@media(max-height:540px)]:mb-2 text-center">
+                <div className="bg-white/5 border border-white/10 rounded-lg p-2 [@media(max-height:540px)]:p-1">
                   <div className="text-[9px] text-gray-400 uppercase">Attack</div>
-                  <div className="text-sm font-mono font-bold text-red-400">{activeChampion.atk}</div>
+                  <div className="text-sm [@media(max-height:540px)]:text-xs font-mono font-bold text-red-400">{activeChampion.atk}</div>
                 </div>
-                <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                <div className="bg-white/5 border border-white/10 rounded-lg p-2 [@media(max-height:540px)]:p-1">
                   <div className="text-[9px] text-gray-400 uppercase">Defense</div>
-                  <div className="text-sm font-mono font-bold text-emerald-400">
+                  <div className="text-sm [@media(max-height:540px)]:text-xs font-mono font-bold text-emerald-400">
                     {activeChampion.def}
                   </div>
                 </div>
-                <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+                <div className="bg-white/5 border border-white/10 rounded-lg p-2 [@media(max-height:540px)]:p-1">
                   <div className="text-[9px] text-gray-400 uppercase">Speed</div>
-                  <div className="text-sm font-mono font-bold text-blue-400">{activeChampion.spd}</div>
+                  <div className="text-sm [@media(max-height:540px)]:text-xs font-mono font-bold text-blue-400">{activeChampion.spd}</div>
                 </div>
               </div>
 
               {/* Fighter's Dedicated War Chest & Stake Info */}
-              <div className="bg-black/80 border border-shin-gold/30 rounded-xl p-3 mb-4 flex items-center justify-between">
+              <div className="bg-black/80 border border-shin-gold/30 rounded-xl p-3 [@media(max-height:540px)]:p-2 mb-4 [@media(max-height:540px)]:mb-2 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] text-gray-400 uppercase">
-                    Champion&apos;s Own War Chest
+                  <div className="text-[10px] [@media(max-height:540px)]:text-[8px] text-gray-400 uppercase">
+                    Warrior&apos;s SHIN Pouch
                   </div>
-                  <div className="text-sm font-mono font-bold text-shin-gold">
-                    {activeChampion.vaultBalanceNear.toFixed(2)} NEAR
+                  <div className="text-sm [@media(max-height:540px)]:text-xs font-mono font-bold text-shin-gold">
+                    {Math.round(activeChampion.vaultBalanceNear * 1000).toLocaleString()} $SHIN
                   </div>
                 </div>
                 <div className="text-right">
@@ -611,19 +611,19 @@ const MainMenu = ({
             </div>
           </div>
         ) : (
-          <div className="sm:col-span-5 flex flex-col items-center">
-            <div className="w-full max-w-md bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-white/15 rounded-2xl p-6 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden text-center">
-              <div className="text-[10px] font-cinzel text-shin-gold uppercase tracking-widest flex items-center justify-center gap-1.5 mb-1">
+          <div className="sm:col-span-5 [@media(max-height:540px)]:col-span-5 flex flex-col items-center">
+            <div className="w-full max-w-md bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-white/15 rounded-2xl p-6 [@media(max-height:540px)]:p-3 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden text-center">
+              <div className="text-[10px] [@media(max-height:540px)]:text-[8px] font-cinzel text-shin-gold uppercase tracking-widest flex items-center justify-center gap-1.5 mb-1 [@media(max-height:540px)]:mb-0.5">
                 <Trophy size={12} /> Active Warrior
               </div>
-              <h2 className="text-xl font-cinzel font-black text-white uppercase">
+              <h2 className="text-xl [@media(max-height:540px)]:text-sm font-cinzel font-black text-white uppercase">
                 No Warrior Yet
               </h2>
-              <p className="text-xs text-gray-400 mt-1 mb-5">
+              <p className="text-xs [@media(max-height:540px)]:text-[10px] text-gray-400 mt-1 mb-5 [@media(max-height:540px)]:mb-2">
                 Awaken a shinobi to unlock autonomous Shadow Duels, ELO ranks, and Dojo training.
               </p>
 
-              <div className="relative h-52 flex items-end justify-center bg-gradient-to-t from-shin-gold/15 via-black/40 to-transparent rounded-xl border border-dashed border-shin-gold/30 mb-5 overflow-hidden">
+              <div className="relative h-52 [@media(max-height:540px)]:h-24 flex items-end justify-center bg-gradient-to-t from-shin-gold/15 via-black/40 to-transparent rounded-xl border border-dashed border-shin-gold/30 mb-5 [@media(max-height:540px)]:mb-2 overflow-hidden">
                 <button
                   onClick={() => {
                     playClickSound();
@@ -649,7 +649,7 @@ const MainMenu = ({
                   key={previewFighter.id}
                   src={`/assets/Shin_gifs/${previewFighter.gif}`}
                   alt={previewFighter.name}
-                  className="w-44 h-44 object-contain scale-125 origin-bottom animate-float-idle z-10"
+                  className="w-44 h-44 [@media(max-height:540px)]:w-20 [@media(max-height:540px)]:h-20 object-contain scale-125 origin-bottom animate-float-idle z-10"
                   style={{ imageRendering: 'pixelated' }}
                 />
                 <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/80 border border-shin-gold/40 text-[10px] font-cinzel text-shin-gold uppercase tracking-wider">
@@ -665,7 +665,7 @@ const MainMenu = ({
                   playClickSound();
                   onAwakenWarrior?.(previewFighter.id);
                 }}
-                className="w-full py-3.5 px-4 bg-shin-gold hover:bg-yellow-400 text-black font-cinzel font-black text-xs uppercase tracking-widest rounded-xl shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 [@media(max-height:540px)]:py-1.5 px-4 bg-shin-gold hover:bg-yellow-400 text-black font-cinzel font-black text-xs [@media(max-height:540px)]:text-[10px] uppercase tracking-widest rounded-xl shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Plus size={15} />
                 <span>Recruit {previewFighter.name}</span>

@@ -16,6 +16,7 @@ exports.GameGateway = void 0;
 const websockets_1 = require("@nestjs/websockets");
 const socket_io_1 = require("socket.io");
 const game_service_1 = require("./game.service");
+const lobby_chat_service_1 = require("./lobby-chat.service");
 const near_relayer_service_1 = require("./near-relayer.service");
 const crypto_1 = require("crypto");
 const NEAR_ARENA_CONTRACT_ID = process.env.NEAR_CONTRACT_ID || 'shin-arena-28d.testnet';
@@ -23,15 +24,17 @@ const NEAR_RPC_URL = process.env.NEAR_RPC_URL || 'https://test.rpc.fastnear.com'
 let GameGateway = class GameGateway {
     gameService;
     nearRelayer;
+    lobbyChatService;
     server;
     activeMatches = new Map();
     matchmakingBuckets = new Map();
     lobbyUsers = new Map();
     offlineMessageQueue = new Map();
     chatFightProposals = new Map();
-    constructor(gameService, nearRelayer) {
+    constructor(gameService, nearRelayer, lobbyChatService) {
         this.gameService = gameService;
         this.nearRelayer = nearRelayer;
+        this.lobbyChatService = lobbyChatService;
     }
     handleConnection(client) {
         console.log(`Client connected: ${client.id}`);
@@ -257,7 +260,7 @@ let GameGateway = class GameGateway {
             currentBucket.push({ socket: client, data: userData });
         }
     }
-    handleLobbyRegisterPresence(client, userData) {
+    async handleLobbyRegisterPresence(client, userData) {
         if (!userData?.accountId)
             return;
         this.lobbyUsers.set(userData.accountId, {
@@ -271,7 +274,7 @@ let GameGateway = class GameGateway {
             wins: userData.wins || 0,
             losses: userData.losses || 0,
         });
-        const queued = this.offlineMessageQueue.get(userData.accountId) || [];
+        const queued = await this.lobbyChatService.getQueuedOfflineDms(userData.accountId);
         if (queued.length > 0) {
             queued.forEach((msg) => {
                 const deliveredMsg = {
@@ -287,16 +290,23 @@ let GameGateway = class GameGateway {
                     });
                 }
             });
-            this.offlineMessageQueue.delete(userData.accountId);
+            await this.lobbyChatService.markDmsReadOnWake(userData.accountId);
         }
         this.server.emit('lobby_presence_updated', Array.from(this.lobbyUsers.values()));
     }
-    handleLobbySendDm(client, msg) {
+    async handleLobbySendDm(client, msg) {
+        const timestamp = msg.timestamp || Date.now();
         if (!msg?.recipientAccountId) {
-            this.server.emit('lobby_chat_broadcast', {
+            const globalMsg = {
                 ...msg,
+                id: msg.id || `msg-${timestamp}`,
+                deliveryStatus: 'DELIVERED_LIVE',
+                timestamp,
+            };
+            await this.lobbyChatService.saveMessage(globalMsg);
+            this.server.emit('lobby_chat_broadcast', {
+                ...globalMsg,
                 socketId: client.id,
-                timestamp: msg.timestamp || Date.now(),
             });
             return { deliveryStatus: 'DELIVERED_LIVE' };
         }
@@ -304,23 +314,26 @@ let GameGateway = class GameGateway {
         if (recipient?.isOnline && recipient.socketId) {
             const liveMsg = {
                 ...msg,
+                id: msg.id || `dm-${timestamp}`,
                 deliveryStatus: 'DELIVERED_LIVE',
+                timestamp,
             };
+            await this.lobbyChatService.saveMessage(liveMsg);
             this.server.to(recipient.socketId).emit('lobby_receive_dm', liveMsg);
             return { deliveryStatus: 'DELIVERED_LIVE' };
         }
         else {
             const queuedMsg = {
                 ...msg,
+                id: msg.id || `dm-${timestamp}`,
                 deliveryStatus: 'QUEUED_OFFLINE',
+                timestamp,
             };
-            const existing = this.offlineMessageQueue.get(msg.recipientAccountId) || [];
-            existing.push(queuedMsg);
-            this.offlineMessageQueue.set(msg.recipientAccountId, existing);
+            await this.lobbyChatService.saveMessage(queuedMsg);
             return { deliveryStatus: 'QUEUED_OFFLINE' };
         }
     }
-    handleLobbySendFightProposal(client, msg) {
+    async handleLobbySendFightProposal(client, msg) {
         const offer = msg?.challengeOffer;
         if (!offer?.proposalId || !offer?.targetId)
             return;
@@ -328,12 +341,13 @@ let GameGateway = class GameGateway {
             ...offer,
             challengerSocketId: client.id,
         });
+        await this.lobbyChatService.saveMessage(msg);
         const recipient = this.lobbyUsers.get(offer.targetId);
         if (recipient?.isOnline && recipient.socketId) {
             this.server.to(recipient.socketId).emit('lobby_receive_dm', msg);
         }
     }
-    handleLobbyRespondFightProposal(client, data) {
+    async handleLobbyRespondFightProposal(client, data) {
         const offer = this.chatFightProposals.get(data.proposalId);
         if (!offer)
             return;
@@ -345,6 +359,7 @@ let GameGateway = class GameGateway {
             offer.wagerNear = data.wagerNear;
         }
         this.chatFightProposals.set(data.proposalId, offer);
+        await this.lobbyChatService.updateProposalStatus(data.proposalId, data.status, offer.wagerNear);
         const challenger = this.lobbyUsers.get(offer.challengerId);
         const target = this.lobbyUsers.get(offer.targetId);
         if (data.status === 'ACCEPTED') {
@@ -576,7 +591,7 @@ __decorate([
     __param(1, (0, websockets_1.MessageBody)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], GameGateway.prototype, "handleLobbyRegisterPresence", null);
 __decorate([
     (0, websockets_1.SubscribeMessage)('lobby_send_dm'),
@@ -584,7 +599,7 @@ __decorate([
     __param(1, (0, websockets_1.MessageBody)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], GameGateway.prototype, "handleLobbySendDm", null);
 __decorate([
     (0, websockets_1.SubscribeMessage)('lobby_send_fight_proposal'),
@@ -592,7 +607,7 @@ __decorate([
     __param(1, (0, websockets_1.MessageBody)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], GameGateway.prototype, "handleLobbySendFightProposal", null);
 __decorate([
     (0, websockets_1.SubscribeMessage)('lobby_respond_fight_proposal'),
@@ -600,7 +615,7 @@ __decorate([
     __param(1, (0, websockets_1.MessageBody)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], GameGateway.prototype, "handleLobbyRespondFightProposal", null);
 __decorate([
     (0, websockets_1.SubscribeMessage)('lobby_chat_message'),
@@ -667,6 +682,7 @@ exports.GameGateway = GameGateway = __decorate([
         },
     }),
     __metadata("design:paramtypes", [game_service_1.GameService,
-        near_relayer_service_1.NearRelayerService])
+        near_relayer_service_1.NearRelayerService,
+        lobby_chat_service_1.LobbyChatService])
 ], GameGateway);
 //# sourceMappingURL=game.gateway.js.map

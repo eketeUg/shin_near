@@ -1,17 +1,19 @@
 import { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { GameService } from './game.service';
+import { LobbyChatService } from './lobby-chat.service';
 import { NearRelayerService } from './near-relayer.service';
 export declare class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly gameService;
     private readonly nearRelayer;
+    private readonly lobbyChatService;
     server: Server;
     private activeMatches;
     private matchmakingBuckets;
     private lobbyUsers;
     private offlineMessageQueue;
     private chatFightProposals;
-    constructor(gameService: GameService, nearRelayer: NearRelayerService);
+    constructor(gameService: GameService, nearRelayer: NearRelayerService, lobbyChatService: LobbyChatService);
     handleConnection(client: Socket): void;
     handleDisconnect(client: Socket): void;
     handleCreateMatch(client: Socket, matchData: any): {
@@ -50,16 +52,16 @@ export declare class GameGateway implements OnGatewayConnection, OnGatewayDiscon
         elo?: number;
         wins?: number;
         losses?: number;
-    }): void;
-    handleLobbySendDm(client: Socket, msg: any): {
+    }): Promise<void>;
+    handleLobbySendDm(client: Socket, msg: any): Promise<{
         deliveryStatus: string;
-    };
-    handleLobbySendFightProposal(client: Socket, msg: any): void;
+    }>;
+    handleLobbySendFightProposal(client: Socket, msg: any): Promise<void>;
     handleLobbyRespondFightProposal(client: Socket, data: {
         proposalId: string;
         status: 'ACCEPTED' | 'COUNTERED' | 'DECLINED';
         wagerNear: number;
-    }): void;
+    }): Promise<void>;
     handleLobbyChatMessage(client: Socket, msgData: any): void;
     handleDirectChallengeRequest(client: Socket, challengeData: any): void;
     handleCancelMatchmaking(client: Socket): void;

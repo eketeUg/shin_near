@@ -212,13 +212,6 @@ h1, h2, h3, .font-cinzel {
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 540px),
        (orientation: landscape) and (max-height: 460px) {
   html {
-    font-size: 10.5px;
-  }
-}
-
-@media (pointer: coarse) and (orientation: landscape) and (max-height: 390px),
-       (orientation: landscape) and (max-height: 390px) {
-  html {
-    font-size: 9.5px;
+    font-size: 12px;
   }
 }

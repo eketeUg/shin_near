@@ -40,6 +40,14 @@ let UsersService = class UsersService {
     async findByWallet(walletAddress) {
         return this.userModel.findOne({ walletAddress }).exec();
     }
+    async findAllRegistered() {
+        return this.userModel
+            .find({ walletAddress: { $exists: true, $nin: [null, ''] } })
+            .select('username walletAddress rating level authProvider updatedAt')
+            .sort({ updatedAt: -1 })
+            .lean()
+            .exec();
+    }
     detectProvider(dto) {
         if (dto.email)
             return 'email';
