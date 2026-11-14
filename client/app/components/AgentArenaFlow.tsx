@@ -1640,22 +1640,22 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
         )}
 
         {/* ============================================================
-            TAB 4: BATTLE CHRONICLE (ON-CHAIN ACTIVITY FEED)
+            TAB 4: BATTLE CHRONICLE (PURE LORE SCROLL OF BATTLES)
            ============================================================ */}
         {activeTab === 'LEDGER' && (
           <div className="bg-gray-950 border border-white/15 rounded-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
                 <h3 className="text-base font-cinzel font-black text-white uppercase tracking-widest">
-                  Scroll of Battles &amp; NEAR Contract Ledger
+                  Scroll of Battles
                 </h3>
                 <p className="text-xs text-gray-400">
-                  Every warrior awakening, fight pot settlement, crowd payout, and dojo upgrade is
-                  recorded invisibly on NEAR.
+                  Recent duel outcomes, crowd spoils, warrior awakenings, and dojo training in the
+                  Shadow Budōkan.
                 </p>
               </div>
-              <span className="text-xs font-mono text-emerald-400">
-                shin-arena-28d.testnet
+              <span className="text-[11px] font-cinzel uppercase tracking-wider text-shin-gold">
+                Budōkan Chronicle
               </span>
             </div>
 
@@ -1668,28 +1668,20 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-shin-gold/15 text-shin-gold border border-shin-gold/30">
-                        {tx.type}
+                        {tx.type.replace(/_/g, ' ')}
                       </span>
                       <span className="text-xs text-white font-sans">{tx.summary}</span>
                     </div>
                     <div className="text-[10px] text-gray-500 font-mono">
-                      Actor: {tx.actorWallet} • Receipt: {tx.txHash.slice(0, 18)}…
+                      {new Date(tx.timestamp).toLocaleTimeString()}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     {tx.amountNear > 0 && (
                       <span className="text-xs font-mono font-bold text-emerald-400">
-                        {Math.round(tx.amountNear * 1000).toLocaleString()} $SHIN
+                        +{Math.round(tx.amountNear * 1000).toLocaleString()} $SHIN
                       </span>
                     )}
-                    <a
-                      href={`https://testnet.nearblocks.io/txns/${tx.txHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[10px] font-mono text-blue-400 hover:underline flex items-center gap-1"
-                    >
-                      NearBlocks <ExternalLink size={11} />
-                    </a>
                   </div>
                 </div>
               ))}
