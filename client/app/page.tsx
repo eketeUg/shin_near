@@ -550,7 +550,10 @@ export default function Home() {
           ownedCharacters={ownedChars}
           deployedCharacters={deployedChars}
           playerName={username}
-          balances={balances}
+          balances={{
+            ...balances,
+            SHIN: nearArenaEngine.getState().playerWallet.SHIN ?? 0,
+          }}
           onMintNew={(charId) => {
             setInitialMintChar(charId);
             setShowPreGameFlow(false);
@@ -661,14 +664,18 @@ export default function Home() {
               rounds: 1,
               wager:
                 duelConfig.wagerNear > 0
-                  ? { token: 'NEAR', amount: duelConfig.wagerNear }
+                  ? { token: 'SHIN', amount: Math.round(duelConfig.wagerNear * 1000) }
                   : null,
             });
           }}
           onJoinRoomCode={(code, wagerNear) => {
             setShowDojoLobby(false);
             setMatchmakingP1Char((ownedChars[0] as CharacterId) || 'fighter');
-            setWager(wagerNear > 0 ? { token: 'NEAR', amount: wagerNear } : null);
+            setWager(
+              wagerNear > 0
+                ? { token: 'SHIN', amount: Math.round(wagerNear * 1000) }
+                : null,
+            );
             setMatchmakingRoomCode(code);
             setShowMatchmaking(true);
           }}

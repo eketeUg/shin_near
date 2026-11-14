@@ -12,6 +12,8 @@ import { GameService } from './game.service';
 import { LobbyChatService } from './lobby-chat.service';
 import { NearRelayerService } from './near-relayer.service';
 import { TournamentService } from './tournament.service';
+import { UsersService } from '../users/users.service';
+import { AgentBrainService } from './agent-brain.service';
 import { createHash } from 'crypto';
 
 const NEAR_ARENA_CONTRACT_ID =
@@ -65,10 +67,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly nearRelayer: NearRelayerService,
     private readonly lobbyChatService: LobbyChatService,
     private readonly tournamentService: TournamentService,
+    private readonly usersService: UsersService,
+    private readonly agentBrainService: AgentBrainService,
   ) {}
 
   afterInit(server: Server) {
     this.tournamentService.registerGatewayServer(server);
+    this.agentBrainService.registerGatewayServer(server);
   }
 
   handleConnection(client: Socket) {
@@ -79,8 +84,23 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log(`Client disconnected: ${client.id}`);
     this.gameService.removePlayer(client.id);
 
-    // Remove from all matchmaking buckets
+    // Remove from all matchmaking buckets and refund any unmatched $SHIN duel escrow
     for (const [key, queue] of this.matchmakingBuckets.entries()) {
+      const leaving = queue.filter((p) => p.socket.id === client.id);
+      for (const entry of leaving) {
+        if (entry.data?.escrowId && entry.data?.accountId) {
+          void this.nearRelayer
+            .callMethod(
+              'refund_shin_duel',
+              {
+                escrow_id: entry.data.escrowId,
+                account_id: entry.data.accountId,
+              },
+              '80000000000000',
+            )
+            .catch(() => {});
+        }
+      }
       this.matchmakingBuckets.set(
         key,
         queue.filter((p) => p.socket.id !== client.id),
@@ -198,18 +218,25 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         .to(`match_${matchId}`)
         .emit('spectator_fire_event', eventData);
 
-      // If the match is over, NEAR Referee triggers `settle_match` on `shin-arena.testnet`
+      // If the match is over, NEAR Referee triggers settlement on `shin-arena-28d.testnet`
       if (
         eventData.type === 'match_event' &&
         eventData.data?.event === 'gameOver'
       ) {
+        const match = this.activeMatches.get(matchId);
+        const detail = eventData.data?.detail || {};
+        const resolvedWinner =
+          detail.winnerPubKey ||
+          (detail.winnerId === 'p1'
+            ? match?.p1AccountId
+            : detail.winnerId === 'p2'
+            ? match?.p2AccountId
+            : undefined) ||
+          'fighter-1.shin-arena.testnet';
         console.log(
-          `[NEAR REFEREE] Match ${matchId} concluded. Triggering settle_match on ${NEAR_ARENA_CONTRACT_ID}...`,
+          `[NEAR REFEREE] Match ${matchId} concluded. Triggering settlement on ${NEAR_ARENA_CONTRACT_ID} (Winner: ${resolvedWinner})...`,
         );
-        this.processNearMatchSettlement(
-          matchId,
-          eventData.data.detail?.winnerPubKey || 'fighter-1.shin-arena.testnet',
-        );
+        this.processNearMatchSettlement(matchId, resolvedWinner);
       }
     }
   }
@@ -262,21 +289,66 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     let explorerUrl = '';
     let onChain = false;
 
-    // Attempt live NEAR Testnet contract settlement if fighter token IDs are tracked
-    const winnerTokenId =
-      match?.p1?.accountId === winnerAccountId
-        ? match?.p1?.tokenId
-        : match?.p2?.tokenId;
-    if (winnerTokenId) {
-      const relay = await this.nearRelayer.callMethod('settle_match', {
-        match_id: matchId,
-        winner_token_id: winnerTokenId,
-      });
+    // 1. Settle 1v1 Human $SHIN Waged Duel directly to winner's NEAR wallet (95% pot / 5% dev fee)
+    if (
+      match?.wager?.token === 'SHIN' &&
+      Number(match?.wager?.amount) > 0 &&
+      match?.p1EscrowId &&
+      match?.p2EscrowId &&
+      match?.p1AccountId &&
+      match?.p2AccountId
+    ) {
+      const relay = await this.nearRelayer.callMethod(
+        'settle_shin_duel',
+        {
+          duel_id: matchId,
+          p1_escrow_id: match.p1EscrowId,
+          p1_account_id: match.p1AccountId,
+          p2_escrow_id: match.p2EscrowId,
+          p2_account_id: match.p2AccountId,
+          winner_account_id: winnerAccountId,
+        },
+        '120000000000000',
+      );
       if (relay.ok && relay.txHash) {
         receiptHash = relay.txHash;
         explorerUrl = relay.explorerUrl;
         onChain = true;
       }
+    } else {
+      // 2. Fallback: Agent/NFT match settlement if fighter token IDs are tracked
+      const winnerTokenId =
+        match?.p1?.accountId === winnerAccountId
+          ? match?.p1?.tokenId
+          : match?.p2?.tokenId;
+      if (winnerTokenId) {
+        const relay = await this.nearRelayer.callMethod('settle_match', {
+          match_id: matchId,
+          winner_token_id: winnerTokenId,
+        });
+        if (relay.ok && relay.txHash) {
+          receiptHash = relay.txHash;
+          explorerUrl = relay.explorerUrl;
+          onChain = true;
+        }
+      }
+    }
+
+    // Update MongoDB human player stats (wins/losses/rating/xp/totalShinEarned)
+    if (match?.p1AccountId && match?.p2AccountId) {
+      const totalPotShin =
+        match?.wager?.token === 'SHIN' ? Number(match.wager.amount || 0) * 2 : 0;
+      const winnerPayoutShin = Math.floor(totalPotShin * 0.95);
+      const loserAccountId =
+        winnerAccountId === match.p1AccountId
+          ? match.p2AccountId
+          : match.p1AccountId;
+      await this.usersService
+        .recordMatchOutcome(winnerAccountId, true, winnerPayoutShin)
+        .catch(() => {});
+      await this.usersService
+        .recordMatchOutcome(loserAccountId, false, 0)
+        .catch(() => {});
     }
 
     console.log(
@@ -350,11 +422,27 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // ==========================================
 
   @SubscribeMessage('join_matchmaking')
-  handleJoinMatchmaking(
+  async handleJoinMatchmaking(
     @ConnectedSocket() client: Socket,
     @MessageBody() userData: any,
   ) {
     const wager = userData.wager; // { token: string, amount: number } | null
+    if (wager && Number(wager.amount) > 0) {
+      const acct = String(userData?.accountId || '');
+      if (!acct || acct.startsWith('guest-')) {
+        client.emit('matchmaking_error', {
+          message: 'Guest players cannot compete in on-chain wager duels. Please sign in with Google or Email first.',
+        });
+        return;
+      }
+      const dbUser = await this.usersService.findByWallet(acct).catch(() => null);
+      if (dbUser?.authProvider === 'guest') {
+        client.emit('matchmaking_error', {
+          message: 'Guest players cannot compete in on-chain wager duels. Please sign in with Google or Email first.',
+        });
+        return;
+      }
+    }
     const roomCode = userData.roomCode ? String(userData.roomCode).trim().toUpperCase() : null;
     const bucketKey = roomCode
       ? `room_${roomCode}`
@@ -382,12 +470,16 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const matchId = 'online_' + Math.random().toString(36).substring(2, 9);
 
       this.activeMatches.set(matchId, {
-        hostId: null,
+        hostId: opponent.socket.id,
         matchId: matchId,
         hostName: opponent.data?.username || 'Player 1',
         p1Type: opponent.data?.charType || 'shinobi',
         p2Type: userData?.charType || 'samurai',
-        mode: roomCode ? `Room #${roomCode}` : wager ? 'NEAR Wager Fight' : 'Free Fight',
+        p1AccountId: opponent.data?.accountId || null,
+        p2AccountId: userData?.accountId || null,
+        p1EscrowId: opponent.data?.escrowId || null,
+        p2EscrowId: userData?.escrowId || null,
+        mode: roomCode ? `Room #${roomCode}` : wager ? 'SHIN Wager Fight' : 'Free Fight',
         wager: wager,
         viewers: 0,
         spectatorBets: [],
@@ -404,6 +496,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         roomCode,
         opponentId: client.id,
         opponentName: userData?.username || 'Player 2',
+        opponentAccountId: userData?.accountId || null,
         opponentChar: userData?.charType || 'samurai',
         myChar: opponent.data?.charType || 'shinobi',
       });
@@ -414,15 +507,43 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         roomCode,
         opponentId: opponent.socket.id,
         opponentName: opponent.data?.username || 'Player 1',
+        opponentAccountId: opponent.data?.accountId || null,
         opponentChar: opponent.data?.charType || 'shinobi',
         myChar: userData?.charType || 'samurai',
       });
 
+      opponent.socket.join(`match_${matchId}`);
       client.join(`match_${matchId}`);
       console.log(`Matchmaking [${bucketKey}] successful! Match ${matchId}`);
     } else {
       currentBucket.push({ socket: client, data: userData });
     }
+  }
+
+  @SubscribeMessage('cancel_matchmaking')
+  async handleCancelMatchmaking(@ConnectedSocket() client: Socket) {
+    for (const [key, queue] of this.matchmakingBuckets.entries()) {
+      const leaving = queue.filter((p) => p.socket.id === client.id);
+      for (const entry of leaving) {
+        if (entry.data?.escrowId && entry.data?.accountId) {
+          await this.nearRelayer
+            .callMethod(
+              'refund_shin_duel',
+              {
+                escrow_id: entry.data.escrowId,
+                account_id: entry.data.accountId,
+              },
+              '80000000000000',
+            )
+            .catch(() => {});
+        }
+      }
+      this.matchmakingBuckets.set(
+        key,
+        queue.filter((p) => p.socket.id !== client.id),
+      );
+    }
+    client.emit('matchmaking_cancelled', { refunded: true });
   }
 
   @SubscribeMessage('lobby_register_presence')
@@ -581,8 +702,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         hostName: offer.challengerName,
         p1Type: offer.challengerCharId || 'fighter',
         p2Type: offer.targetCharId || 'shinobi',
-        mode: offer.wagerNear > 0 ? `${offer.wagerNear} NEAR Chat Duel` : 'Free Chat Duel',
-        wager: offer.wagerNear > 0 ? { token: 'NEAR', amount: offer.wagerNear } : null,
+        mode:
+          offer.wagerNear > 0
+            ? `${Math.round(offer.wagerNear * 1000)} $SHIN Chat Duel`
+            : 'Free Chat Duel',
+        wager:
+          offer.wagerNear > 0
+            ? { token: 'SHIN', amount: Math.round(offer.wagerNear * 1000) }
+            : null,
         viewers: 0,
         spectatorBets: [],
       });
@@ -641,17 +768,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       challengerSocketId: client.id,
       timestamp: Date.now(),
     });
-  }
-
-  @SubscribeMessage('cancel_matchmaking')
-  handleCancelMatchmaking(@ConnectedSocket() client: Socket) {
-    for (const [key, queue] of this.matchmakingBuckets.entries()) {
-      this.matchmakingBuckets.set(
-        key,
-        queue.filter((p) => p.socket.id !== client.id),
-      );
-    }
-    console.log(`Client ${client.id} left all matchmaking queues.`);
   }
 
   @SubscribeMessage('host_bind_match')

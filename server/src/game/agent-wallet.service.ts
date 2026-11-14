@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -292,6 +293,70 @@ export class AgentWalletService {
       '60000000000000',
       {
         accountId: walletRecord.agentAccountId,
+        privateKey: decrypted.privateKey,
+      },
+      this.nearRelayer.shinTokenId,
+    );
+  }
+
+  /**
+   * Guarded autonomous Agent-to-Agent $SHIN transfer:
+   * - Max 100 $SHIN per autonomous transfer
+   * - Enforces 200 $SHIN minimum reserve in sender wallet
+   * - Target must be a registered standalone agent wallet in MongoDB
+   */
+  async autonomousAgentTransferShin(params: {
+    fromTokenId: string;
+    toTokenId: string;
+    amountShin: number;
+    memo?: string;
+  }) {
+    const cappedAmount = Math.min(100, Math.max(1, Math.floor(params.amountShin)));
+    if (params.fromTokenId === params.toTokenId) {
+      throw new BadRequestException('Cannot transfer to self.');
+    }
+
+    const fromWallet = await this.agentWalletModel
+      .findOne({ tokenId: params.fromTokenId })
+      .exec();
+    const toWallet = await this.agentWalletModel
+      .findOne({ tokenId: params.toTokenId })
+      .exec();
+
+    if (!fromWallet || !toWallet) {
+      throw new NotFoundException('Both sender and receiver must have standalone agent wallets.');
+    }
+
+    const bal = await this.getOnChainBalances(fromWallet.agentAccountId);
+    if (bal.shinBalance < cappedAmount + 200) {
+      throw new BadRequestException(
+        `Guardrail blocked: sender requires at least ${cappedAmount + 200} $SHIN (200 $SHIN reserve).`,
+      );
+    }
+
+    const decrypted = this.walletService.decryptSVMWallet(
+      this.getEncryptionPin(),
+      fromWallet.encryptedPrivateKey,
+    );
+    if (!decrypted?.privateKey) {
+      throw new Error('Failed to decrypt sender agent wallet key.');
+    }
+
+    const rawAmount = (
+      BigInt(Math.floor(cappedAmount * 1000)) * BigInt('1000000000000000')
+    ).toString();
+
+    return this.nearRelayer.callMethod(
+      'ft_transfer',
+      {
+        receiver_id: toWallet.agentAccountId,
+        amount: rawAmount,
+        memo: params.memo || `Autonomous Agent Tip (${params.fromTokenId} -> ${params.toTokenId})`,
+      },
+      '1yocto',
+      '60000000000000',
+      {
+        accountId: fromWallet.agentAccountId,
         privateKey: decrypted.privateKey,
       },
       this.nearRelayer.shinTokenId,

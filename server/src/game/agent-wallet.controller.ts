@@ -11,14 +11,32 @@ import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { UsersService } from '../users/users.service';
 import { AgentWalletService } from './agent-wallet.service';
+import { AgentBrainService } from './agent-brain.service';
 
 @Controller('agents')
 export class AgentWalletController {
   constructor(
     private readonly agentWalletService: AgentWalletService,
+    private readonly agentBrainService: AgentBrainService,
     private readonly jwtService: JwtService,
     private readonly usersService: UsersService,
   ) {}
+
+  @Get('brain/status')
+  getBrainStatus() {
+    return { ok: true, ...this.agentBrainService.getStatus() };
+  }
+
+  @Post('brain/think')
+  async triggerBrainThink(
+    @Body() body: { actorTokenId?: string; triggerText?: string },
+  ) {
+    const decision = await this.agentBrainService.reasonAndAct({
+      actorTokenId: body?.actorTokenId,
+      triggerText: body?.triggerText,
+    });
+    return { ok: true, decision };
+  }
 
   @Get('directory')
   async getDirectory() {

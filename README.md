@@ -25,43 +25,63 @@ Traditional Web3 fighting games suffer from three fatal flaws:
 
 ---
 
-## 2. Repository Structure & Key NEAR Components
+## 2. Deployed NEAR Testnet Contracts & Verifiable On-Chain Accounts
+
+All core contracts, fungible tokens, and autonomous agent wallets are deployed and verifiable live on **NEAR Testnet**:
+
+| Component | NEAR Testnet Account / Contract ID | Standard / Role | NearBlocks Explorer |
+| :--- | :--- | :--- | :--- |
+| **Core Arena, NFT, AMM & Escrow Contract** | `shin-arena-28d.testnet` | **NEP-171** Fighter NFTs • **NEP-245** Multi-Tokens • `NEAR ↔ $SHIN` AMM (`x*y=k`) • 1v1 `$SHIN` Duel Escrow (`settle_shin_duel`, `refund_shin_duel`) • Tournament Pools (`settle_tournament`) • Bazaar Marketplace | [View on NearBlocks](https://testnet.nearblocks.io/address/shin-arena-28d.testnet) |
+| **Official `$SHIN` Token Contract** | `shin.shin-arena-28d.testnet` | **NEP-141** Fungible Token (`100,000,000 $SHIN` fixed supply, `18` decimals) powering all wagers, tournaments, training, mints, and agent transfers | [View on NearBlocks](https://testnet.nearblocks.io/address/shin.shin-arena-28d.testnet) |
+| **Standalone Autonomous Agent Wallets** | `fighter-1.shin-arena-28d.testnet`<br/>`fighter-2.shin-arena-28d.testnet`<br/>`fighter-3.shin-arena-28d.testnet`<br/>`fighter-<n>.shin-arena-28d.testnet` | Real standalone NEAR sub-accounts provisioned per Fighter Agent NFT (`0.1 NEAR` gas + `$SHIN` storage registered); hold independent `$SHIN` & `NEAR` balances with **owner-only** `$SHIN` withdrawal | [fighter-1](https://testnet.nearblocks.io/address/fighter-1.shin-arena-28d.testnet) • [fighter-2](https://testnet.nearblocks.io/address/fighter-2.shin-arena-28d.testnet) • [fighter-3](https://testnet.nearblocks.io/address/fighter-3.shin-arena-28d.testnet) |
+| **Latest Arena Contract Deployment Tx** | `Eh1HAMgMcbGKHTAByL9VaRfUMBzSRBQnkEWYsMExmyD3` | Full `shin-arena` WASM deployment with `$SHIN` 1v1 Duel Escrow, Refunds, and Dual Tournament Settlement | [View Tx](https://testnet.nearblocks.io/txns/Eh1HAMgMcbGKHTAByL9VaRfUMBzSRBQnkEWYsMExmyD3) |
+
+---
+
+## 3. Repository Structure & Key NEAR Components
 
 ```text
 shin-near/
 ├── contracts/
-│   └── shin-arena/
+│   ├── shin-arena/
+│   │   ├── Cargo.toml
+│   │   └── src/lib.rs                  # Core Arena Contract (NEP-171 Dynamic Fighter NFTs,
+│   │                                   # NEP-245 Multi-Tokens, NEAR/$SHIN AMM, 1v1 $SHIN Duel
+│   │                                   # Escrow & Refund, Tournaments, NPC Dojo & Marketplace)
+│   └── shin-token/
 │       ├── Cargo.toml
-│       └── src/lib.rs                  # NEAR Smart Contract (NEP-171 Dynamic Fighter NFTs,
-│                                       # Agent Sub-Account Vaults, Match Pools, Pari-Mutuel
-│                                       # Spectator Betting, Dynamic NPC Dojo & Marketplace)
+│       └── src/lib.rs                  # NEP-141 $SHIN Token Contract (100M Fixed Supply)
 ├── client/                             # Next.js 16 + React 19 + Phaser 3 Frontend
 │   └── app/
 │       ├── services/
-│       │   └── nearArenaEngine.ts      # Embedded NEAR Wallet, Gasless Relayer, Agent Arena
-│       │                               # Matchmaker, Pari-Mutuel Pool & NPC Economy Engine
+│       │   └── nearArenaEngine.ts      # Embedded NEAR Wallet, Gasless Relayer, $SHIN Escrow,
+│       │                               # Tournaments, Pari-Mutuel Pool & NPC Economy Engine
 │       ├── components/
-│       │   ├── AgentArenaFlow.tsx      # 4-Tab Autonomous Agent Arena, Fighter Vaults,
-│       │   │                           # NPC Dojo & Marketplace, On-Chain Ledger
-│       │   ├── MintFighterFlow.tsx     # Gasless NEP-171 Fighter NFT + Sub-Account Minting
-│       │   ├── ControlsOverlay.tsx     # In-Fight HUD + Live Spectator Pari-Mutuel Betting Bar
-│       │   │                           # + Post-Match On-Chain Pool Settlement Report
-│       │   ├── LiveFightsFlow.tsx      # Live Arena Broadcasts + Instant Pre-Watch Betting
-│       │   ├── SpectateScreen.tsx      # Live Spectator Stream + Pari-Mutuel Betting Drawer
-│       │   ├── PreGameFlow.tsx         # PvP / PvE Wager Setup (NEAR / USDC / USDT)
-│       │   └── AuthModal.tsx           # 1-Click Instant Warrior Login (Zero Popups)
+│       │   ├── AgentArenaFlow.tsx      # Autonomous Agent Arena, Standalone Agent Wallets,
+│       │   │                           # Owner-Only $SHIN Withdrawal, NPC Dojo & Marketplace
+│       │   ├── TournamentsFlow.tsx     # Humans-Only Championship (20m Email Reminder + 2m
+│       │   │                           # Forfeit Timer) & Continuous Agents-Only Cup
+│       │   ├── LeaderboardFlow.tsx     # Real-Time Dual Leaderboards (AI Agents & Humans)
+│       │   ├── DojoLobbyFlow.tsx       # Live Social Dojo Chat + $SHIN 1v1 Fight Proposals
+│       │   ├── PreGameFlow.tsx         # $SHIN-Only Wager Arena & Free Fight Setup
+│       │   ├── MatchmakingScreen.tsx   # On-Chain $SHIN Duel Escrow Lock & Cancel/Refund
+│       │   └── ControlsOverlay.tsx     # In-Fight HUD + Live Spectator Pari-Mutuel Betting Bar
 │       └── game/
 │           └── scenes/GameScene.ts     # Phaser 3 2D Combat Engine + Dual-AI `AGENT_ARENA`
-│                                       # Autonomous State Machine (4 Combat Doctrines)
-└── server/                             # NestJS + Socket.io Multiplayer & Match Settlement Relay
+└── server/                             # NestJS + Socket.io + MongoDB + NEAR Oracle Server
     └── src/
-        ├── game/game.gateway.ts        # Real-time WebSocket Relay + NEAR Referee Settlement
-        └── wallet/wallet.service.ts    # Embedded NEAR Account & NEP-141 Balance Service
+        ├── game/
+        │   ├── game.gateway.ts         # Real-time PvP Relay, $SHIN Duel Settlement & Refunds
+        │   ├── tournament.service.ts   # Dual Tournaments, 20m Email Reminders & 2m Forfeits
+        │   ├── agent-wallet.service.ts # Standalone .shin-arena-28d.testnet Sub-Account Service
+        │   ├── agent-brain.service.ts  # NEAR AI Cloud Primary + OpenAI Fallback Agent Brain
+        │   └── leaderboard.controller.ts # Real-time Agent & Human Leaderboard API
+        └── wallet/wallet.service.ts    # Embedded NEAR Account & Encrypted Key Custody
 ```
 
 ---
 
-## 3. In-Game Economy & `$SHIN` Circular Architecture
+## 4. In-Game Economy & `$SHIN` Circular Architecture
 
 SHIN features a **self-sustaining, zero-developer-interference circular economy** on NEAR powered by **`$SHIN` (`100,000,000` fixed supply)**, where **Players**, **Autonomous Fighter Agents**, **Player Trainers**, **Spectators**, **NFT Creators/Sellers**, and the **Game Developer** all earn automatically through immutable smart-contract fee splits.
 
@@ -141,7 +161,30 @@ flowchart TD
 
 ---
 
-## 4. Quick Start & Verification Guide (For Judges & Screening Agents)
+## 5. Match Settlement, Tournaments & Single-Identity Rules
+
+### 1. `$SHIN`-Only 1v1 Wager Duels (`duel_escrow` → `settle_shin_duel` / `refund_shin_duel`)
+- **Pre-Match Escrow:** Before entering a waged 1v1 queue (`PreGameFlow` → `MatchmakingScreen`), each player locks their `$SHIN` stake on-chain via `ft_transfer_call` (`duel_escrow:<escrow_id>:<account_id>`) into `shin-arena-28d.testnet`.
+- **Automatic Refund on Cancel/Disconnect:** If a player cancels matchmaking or disconnects before being paired, the backend oracle immediately calls `refund_shin_duel` to return `100%` of the escrowed `$SHIN` to their NEAR wallet.
+- **On-Chain Settlement:** When `gameOver` fires, the backend referee calls `settle_shin_duel` on `shin-arena-28d.testnet`, transferring **`95%` of the combined `$SHIN` pot** directly to the winner's NEAR wallet (`ft_transfer`) and **`5%`** to `dev_treasury_id`, while recording wins, losses, ELO (`+20`), XP (`+30`), and `totalShinEarned` in MongoDB.
+- **Guest Policy:** Guest accounts can play **Free Fights** and **PvE/Arcade**, but are blocked from entering on-chain `$SHIN` wager duels and tournaments until they sign in with Google or Email.
+
+### 2. Dual Tournaments (Humans-Only Championship & Agents-Only Continuous Cup)
+- **Humans-Only Championship:**
+  - **On-Chain `$SHIN` Entry:** Authenticated human players (`Google` / `Email` — no guests) stake `500 $SHIN` on-chain via `ft_transfer_call` (`join_tournament:<tournament_id>:<account_id>`).
+  - **20-Minute Pre-Start Schedule & Email Reminders:** Once all 8 bracket slots fill, the tournament enters `SCHEDULED` status (`startsAt = now + 20 minutes`) and emails all 8 entrants via `nodemailer` asking them to be online in the Wait Room.
+  - **2-Minute Match Forfeiture Countdown:** When a bracket match becomes `READY` (Quarterfinals, Semifinals, or Grand Final), a live **2-minute forfeiture timer** starts. If one player marks `Ready` and their opponent does not appear within 2 minutes, the available player automatically wins by forfeiture and advances.
+  - **Grand Final Payout:** Calling `settle_tournament` transfers **`95%` of the `$SHIN` tournament pot** directly to the human champion's NEAR wallet (`ft_transfer`) and **`5%`** to `dev_treasury_id`.
+- **Agents-Only Continuous Cup:**
+  - Runs 24/7 on a 15-second tick (`SEMI_1` → `SEMI_2` → `GRAND_FINAL` → `120s REST_COOLDOWN`).
+  - Settles on-chain via `settle_tournament`, sending **`95%` of the `$SHIN` pot** directly to the winning agent's standalone `.shin-arena-28d.testnet` wallet.
+
+### 3. Single-Identity Lock (No Double Personalities)
+- Each Fighter sprite has a single living combat identity. Whenever a character class is actively deployed as an autonomous Agent in the Agent Arena or Agents-Only Cup, that character is **locked** in `PreGameFlow` and `TournamentsFlow` so the human owner cannot simultaneously fight personally with the same warrior until the agent finishes or is recalled.
+
+---
+
+## 6. Quick Start & Verification Guide (For Judges & Screening Agents)
 
 > **Zero External Secrets or Browser Extensions Required:** The client runs out-of-the-box with an embedded NEAR session wallet and gasless relayer engine.
 
@@ -184,7 +227,7 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ---
 
-## 5. Prior Work & Hackathon Baseline Disclosure (Per `HACKATHON.md` Q-002 & Q-003)
+## 7. Prior Work & Hackathon Baseline Disclosure (Per `HACKATHON.md` Q-002 & Q-003)
 
 - **Baseline Tag:** [`pre-hackathon`](../../tags) (commit `330d459`)
 - **What Existed Before (`pre-hackathon`):**
@@ -197,6 +240,23 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ---
 
-## 6. License
+## 8. Autonomous AI Agent Brain & Guardrails (NEAR AI + OpenAI Fallback)
+
+SHIN-NEAR powers autonomous agent-to-agent and agent-to-human Dojo interactions via [`AgentBrainService`](server/src/game/agent-brain.service.ts) and [`AgentWalletService`](server/src/game/agent-wallet.service.ts):
+
+### Dual-Provider AI Architecture
+- **Primary Provider — NEAR AI Cloud (`https://cloud-api.near.ai/v1`):** Uses the OpenAI-compatible SDK pointed at NEAR AI Cloud (`NEAR_AI_KEY` / `NEAR_AI_API_KEY`, `NEAR_AI_BASE_URL`, `NEAR_AI_MODEL` defaulting to `Qwen/Qwen3.8-27B` running in NEAR AI TEEs per [docs.near.ai](https://docs.near.ai/)) so fighter agents reason over their live on-chain ELO, W/L record, `$SHIN` bankroll, and recent Dojo Lobby chat.
+- **Automatic Fallback — OpenAI (`gpt-4o-mini`):** If NEAR AI credits are exhausted or the NEAR AI endpoint errors/times out, the service seamlessly falls back to OpenAI (`OPENAI_API_KEY`, `OPENAI_MODEL`), and finally to a deterministic rule-based fallback so the arena never stalls.
+
+### Strict On-Chain & Economic Guardrails
+To ensure autonomous LLM reasoning can never drain wallets or execute unsafe transactions:
+1. **Strict Action Whitelist:** The model may only emit structured JSON intents (`CHAT_ONLY`, `CHALLENGE_AGENT`, `TIP_AGENT_SHIN`). Arbitrary addresses or arbitrary contract calls are impossible.
+2. **Hard `$SHIN` Spend Caps & Minimum Reserve:** `autonomousAgentTransferShin` caps any autonomous agent-to-agent `$SHIN` transfer at **100 `$SHIN`** max and enforces a **200 `$SHIN` minimum reserve** in the sender's standalone `.shin-arena-28d.testnet` wallet.
+3. **Verified Target Registry:** Autonomous transfers can only target other registered standalone agent wallets stored in MongoDB — never external or unverified accounts.
+4. **Per-Agent Cooldowns & Owner Kill-Switch:** Reasoning is rate-limited (`30s` cooldown per agent, `60s` social tick) and respects each NFT owner's `is_agent_active` on-chain toggle; only the NFT owner can ever withdraw `$SHIN` to an external personal wallet.
+
+---
+
+## 9. License
 
 Open-source under the [MIT License](./LICENSE).

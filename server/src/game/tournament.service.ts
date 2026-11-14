@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { Server } from 'socket.io';
+import * as nodemailer from 'nodemailer';
 import { UsersService } from '../users/users.service';
 import { NearRelayerService } from './near-relayer.service';
 
@@ -19,6 +20,8 @@ export interface TournamentBracketMatch {
   winnerId?: string;
   winnerName?: string;
   status: 'WAITING' | 'READY' | 'COMPLETED';
+  forfeitDeadlineAt?: number;
+  forfeited?: boolean;
 }
 
 export interface HumanEntrant {
@@ -35,7 +38,9 @@ export interface HumanCupState {
   title: string;
   entryFeeShin: number;
   maxPlayers: number;
-  status: 'REGISTRATION' | 'IN_PROGRESS' | 'SETTLED';
+  status: 'REGISTRATION' | 'SCHEDULED' | 'IN_PROGRESS' | 'SETTLED';
+  scheduledStartAt?: number;
+  reminderEmailsSent?: boolean;
   entrants: HumanEntrant[];
   matches: TournamentBracketMatch[];
   createTxHash?: string;
@@ -106,14 +111,30 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
 
   private readonly HUMAN_ENTRY_SHIN = 500;
   private readonly HUMAN_MAX_PLAYERS = 8;
+  private readonly HUMAN_PRE_START_DELAY_MS = 20 * 60 * 1000; // 20 minutes
+  private readonly HUMAN_FORFEIT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
   private readonly AGENT_ENTRY_SHIN = 500;
   private readonly ROUND_DURATION_MS = 15000;
   private readonly REST_DURATION_SEC = 120;
+  private isAdvancingHumanCup = false;
+  private mailTransporter: nodemailer.Transporter | null = null;
 
   constructor(
     private readonly nearRelayer: NearRelayerService,
     private readonly usersService: UsersService,
-  ) {}
+  ) {
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      this.mailTransporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: Number(process.env.SMTP_PORT || 465),
+        secure: Number(process.env.SMTP_PORT || 465) === 465,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+    }
+  }
 
   public registerGatewayServer(server: Server) {
     this.ioServer = server;
@@ -135,6 +156,7 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
 
     this.tickInterval = setInterval(() => {
       void this.tickAgentCup();
+      void this.tickHumanCup();
     }, 1000);
   }
 
@@ -361,6 +383,18 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
     charId: string;
     joinTxHash: string;
   }): Promise<HumanCupState> {
+    if (!params.accountId || params.accountId.startsWith('guest-')) {
+      throw new Error(
+        'Guest players cannot participate in tournaments. Please sign in with Google or Email first.',
+      );
+    }
+    const dbUser = await this.usersService.findByWallet(params.accountId).catch(() => null);
+    if (dbUser?.authProvider === 'guest') {
+      throw new Error(
+        'Guest players cannot participate in tournaments. Please sign in with Google or Email first.',
+      );
+    }
+
     await this.ensureHumanCupOnChain();
 
     if (this.humanCup.status === 'SETTLED') {
@@ -397,14 +431,24 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
       targetMatch.p2Id = entrant.accountId;
       targetMatch.p2Name = entrant.username;
       targetMatch.p2CharId = entrant.charId;
-      targetMatch.status = 'READY';
     }
 
     if (this.humanCup.entrants.length >= this.humanCup.maxPlayers) {
-      this.humanCup.status = 'IN_PROGRESS';
-      if (this.ioServer) {
-        this.ioServer.emit('tournament_started', this.humanCup);
-      }
+      this.humanCup.status = 'SCHEDULED';
+      this.humanCup.scheduledStartAt = Date.now() + this.HUMAN_PRE_START_DELAY_MS;
+      this.humanCup.reminderEmailsSent = true;
+      void this.notifyHumanCupPlayers(
+        this.humanCup.entrants.map((e) => e.accountId),
+        `[SHIN] ${this.humanCup.title} Starts in 20 Minutes!`,
+        (username) => `
+          <div style="font-family:sans-serif;padding:20px;background:#0a0a0a;color:#fff;border:1px solid #fbbf24;border-radius:12px;">
+            <h2 style="color:#fbbf24;">⚔️ ${this.humanCup.title} Starts in 20 Minutes!</h2>
+            <p>Hi <strong>${username}</strong>,</p>
+            <p>All ${this.humanCup.maxPlayers} warriors have registered for the <strong>${this.humanCup.totalPoolShin.toLocaleString()} $SHIN</strong> Championship.</p>
+            <p>Please be online in the Arena Wait Room in <strong>20 minutes</strong>. Once your match begins, you will have a <strong>2-minute forfeiture countdown</strong> to ready up — if you are absent, your opponent wins automatically by forfeiture.</p>
+          </div>
+        `,
+      );
     }
 
     this.broadcastTournamentUpdate();
@@ -499,6 +543,18 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
     for (const nextM of [semi1, semi2, finalMatch]) {
       if (nextM.p1Id && nextM.p2Id && nextM.status === 'WAITING') {
         nextM.status = 'READY';
+        nextM.forfeitDeadlineAt = Date.now() + this.HUMAN_FORFEIT_TIMEOUT_MS;
+        void this.notifyHumanCupPlayers(
+          [nextM.p1Id, nextM.p2Id],
+          `[SHIN] ${this.humanCup.title} — ${nextM.label} Is Ready! (2-Min Forfeit Timer)`,
+          (username) => `
+            <div style="font-family:sans-serif;padding:20px;background:#0a0a0a;color:#fff;border:1px solid #fbbf24;border-radius:12px;">
+              <h2 style="color:#fbbf24;">⚔️ ${nextM.label} Match Ready!</h2>
+              <p>Hi <strong>${username}</strong>, your ${nextM.label} match (${nextM.p1Name} vs ${nextM.p2Name}) is now live.</p>
+              <p>You have <strong>2 minutes</strong> to enter the Wait Room and Ready Up before match forfeiture.</p>
+            </div>
+          `,
+        );
       }
     }
 
@@ -711,6 +767,105 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
       : 200;
     const probP1 = Math.min(0.8, Math.max(0.2, s1 / (s1 + s2)));
     return Math.random() < probP1 ? 'p1' : 'p2';
+  }
+
+  private async notifyHumanCupPlayers(
+    accountIds: string[],
+    subject: string,
+    buildHtml: (username: string) => string,
+  ) {
+    if (!this.mailTransporter) {
+      this.logger.log(`[Tournament Email Skipped - No SMTP] ${subject} -> ${accountIds.join(', ')}`);
+      return;
+    }
+    for (const accountId of accountIds) {
+      try {
+        const user = await this.usersService.findByWallet(accountId);
+        if (!user?.email) continue;
+        await this.mailTransporter.sendMail({
+          from: process.env.SMTP_FROM || `"SHIN Arena" <${process.env.SMTP_USER}>`,
+          to: user.email,
+          subject,
+          html: buildHtml(user.username || accountId),
+        });
+        this.logger.log(`Tournament email sent to ${user.email} (${subject})`);
+      } catch (err) {
+        this.logger.warn(`Failed tournament email to ${accountId}: ${String(err)}`);
+      }
+    }
+  }
+
+  private async tickHumanCup() {
+    if (this.isAdvancingHumanCup) return;
+    this.isAdvancingHumanCup = true;
+    try {
+      const now = Date.now();
+
+      // 1. Transition SCHEDULED -> IN_PROGRESS when 20-minute pre-start countdown expires
+      if (
+        this.humanCup.status === 'SCHEDULED' &&
+        this.humanCup.scheduledStartAt &&
+        now >= this.humanCup.scheduledStartAt
+      ) {
+        this.humanCup.status = 'IN_PROGRESS';
+        for (const m of this.humanCup.matches) {
+          if (m.round.startsWith('QF_') && m.p1Id && m.p2Id && m.status === 'WAITING') {
+            m.status = 'READY';
+            m.forfeitDeadlineAt = now + this.HUMAN_FORFEIT_TIMEOUT_MS;
+          }
+        }
+        if (this.ioServer) {
+          this.ioServer.emit('tournament_started', this.humanCup);
+        }
+        this.broadcastTournamentUpdate();
+        void this.notifyHumanCupPlayers(
+          this.humanCup.entrants.map((e) => e.accountId),
+          `[SHIN] ${this.humanCup.title} Has Started — 2 Minutes to Ready Up!`,
+          (username) => `
+            <div style="font-family:sans-serif;padding:20px;background:#0a0a0a;color:#fff;border:1px solid #ef4444;border-radius:12px;">
+              <h2 style="color:#ef4444;">🔥 ${this.humanCup.title} Has Started!</h2>
+              <p>Hi <strong>${username}</strong>, your Quarterfinal match is now READY.</p>
+              <p>You have <strong>2 minutes</strong> to appear and click Ready in the Wait Room or your opponent will be declared the winner by forfeiture.</p>
+            </div>
+          `,
+        );
+        return;
+      }
+
+      // 2. Enforce 2-minute match forfeiture countdown on READY matches
+      if (this.humanCup.status === 'IN_PROGRESS') {
+        const expiredReady = this.humanCup.matches.filter(
+          (m) =>
+            m.status === 'READY' &&
+            m.forfeitDeadlineAt &&
+            now >= m.forfeitDeadlineAt &&
+            !(m.p1Ready && m.p2Ready),
+        );
+        for (const m of expiredReady) {
+          let forfeitWinnerId: string | null = null;
+          if (m.p1Ready && !m.p2Ready) {
+            forfeitWinnerId = m.p1Id;
+          } else if (m.p2Ready && !m.p1Ready) {
+            forfeitWinnerId = m.p2Id;
+          } else {
+            // Neither showed up within 2 minutes -> higher seed advances so bracket doesn't deadlock
+            forfeitWinnerId = m.p1Id || m.p2Id;
+          }
+          if (forfeitWinnerId) {
+            m.forfeited = true;
+            this.logger.log(
+              `[FORFEIT] Match ${m.id} (${m.label}) expired after 2m. Winner by forfeiture: ${forfeitWinnerId}`,
+            );
+            await this.reportHumanMatchResult({
+              matchId: m.id,
+              winnerAccountId: forfeitWinnerId,
+            });
+          }
+        }
+      }
+    } finally {
+      this.isAdvancingHumanCup = false;
+    }
   }
 
   private async tickAgentCup() {

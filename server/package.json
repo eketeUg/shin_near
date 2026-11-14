@@ -35,6 +35,7 @@
     "mongoose": "^9.2.2",
     "near-api-js": "^5.1.1",
     "nodemailer": "^8.0.5",
+    "openai": "^7.57.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "reflect-metadata": "^0.2.2",

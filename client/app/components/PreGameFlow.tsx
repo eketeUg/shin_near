@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Coins, Wallet, ShieldCheck, Sword, Zap, Loader2, Landmark, DollarSign, ArrowRight } from 'lucide-react';
+import { nearArenaEngine } from '../services/nearArenaEngine';
 
 export type GameMode = 'PVP' | 'PVE';
 export type CharacterId = string;
@@ -14,7 +15,7 @@ interface PreGameFlowProps {
   deployedCharacters?: string[];
   onMintNew: (charId: CharacterId) => void;
   playerName?: string;
-  balances?: { NEAR: number, USDC: number, USDT: number };
+  balances?: { NEAR: number, USDC: number, USDT: number, SHIN?: number };
 }
 
 export const Roster = [
@@ -39,8 +40,10 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
   
   // Wager State
   const [wagerType, setWagerType] = useState<'FREE' | 'WAGER'>('FREE');
-  const [selectedToken, setSelectedToken] = useState<'NEAR' | 'USDC' | 'USDT'>('NEAR');
-  const [wagerAmount, setWagerAmount] = useState<number>(0);
+  const [selectedToken, setSelectedToken] = useState<'SHIN'>('SHIN');
+  const [wagerAmount, setWagerAmount] = useState<number>(100);
+  const walletAccountId = nearArenaEngine.getState().playerWallet.accountId;
+  const isGuestPlayer = !walletAccountId || walletAccountId.startsWith('guest-');
   const [customWager, setCustomWager] = useState<string>('');
   const [isLocking, setIsLocking] = useState(false);
 
@@ -84,7 +87,7 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
     else onBack();
   };
 
-  const wagerPresets = [2, 5, 10, 15, 20, 25, 30];
+  const wagerPresets = [50, 100, 250, 500, 1000, 2500];
 
   return (
     <div className="fixed inset-0 z-40 overflow-y-auto bg-black/95 text-white backdrop-blur-xl">
@@ -156,15 +159,22 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
                         </button>
 
                         <button 
+                            disabled={isGuestPlayer}
                             onClick={() => { setWagerType('WAGER'); setStep('PVP_TYPE_SELECT'); }}
-                            className="group flex flex-col items-center justify-center p-8 bg-shin-gold/5 border border-shin-gold/20 hover:border-shin-gold/50 hover:bg-shin-gold/10 transition-all rounded-xl gap-4 shadow-[0_0_30px_rgba(212,175,55,0.05)]"
+                            className={`group flex flex-col items-center justify-center p-8 border transition-all rounded-xl gap-4 ${
+                              isGuestPlayer
+                                ? 'bg-white/5 border-white/10 opacity-50 cursor-not-allowed'
+                                : 'bg-shin-gold/5 border-shin-gold/20 hover:border-shin-gold/50 hover:bg-shin-gold/10 shadow-[0_0_30px_rgba(212,175,55,0.05)]'
+                            }`}
                         >
                             <div className="w-16 h-16 rounded-full bg-shin-gold/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <Coins size={32} className="text-shin-gold" />
                             </div>
                             <div className="text-center">
                                 <h3 className="font-cinzel font-bold text-xl text-shin-gold">Wager Fight</h3>
-                                <p className="text-[10px] text-shin-gold/40 uppercase tracking-widest mt-1">High stakes battle</p>
+                                <p className="text-[10px] text-shin-gold/60 uppercase tracking-widest mt-1">
+                                  {isGuestPlayer ? 'Sign in with Google or Email (No Guests)' : 'High stakes $SHIN battle'}
+                                </p>
                             </div>
                         </button>
                     </div>
@@ -203,27 +213,26 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
                     </button>
                 </div>
             ) : (
-                <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="w-full max-w-md mx-auto">
                     {[
-                        { id: 'NEAR', icon: Zap, color: 'text-emerald-400', balance: balances.NEAR },
-                        { id: 'USDC', icon: DollarSign, color: 'text-blue-400', balance: balances.USDC },
-                        { id: 'USDT', icon: DollarSign, color: 'text-green-400', balance: balances.USDT }
+                        { id: 'SHIN', icon: Zap, color: 'text-shin-gold', balance: balances.SHIN ?? 0 }
                     ].map(token => (
                         <button 
                             key={token.id}
-                            onClick={() => { setSelectedToken(token.id as any); setStep('WAGER_AMOUNT_SELECT'); }}
-                            className="group relative flex flex-col items-center p-6 bg-white/5 border border-white/10 hover:border-white/30 rounded-xl transition-all"
+                            onClick={() => { setSelectedToken('SHIN'); setStep('WAGER_AMOUNT_SELECT'); }}
+                            className="w-full group relative flex flex-col items-center p-8 bg-white/5 border border-shin-gold/40 hover:border-shin-gold rounded-xl transition-all"
                         >
-                            <div className={`w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform ${token.color}`}>
-                                <token.icon size={24} />
+                            <div className={`w-14 h-14 rounded-full bg-shin-gold/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform ${token.color}`}>
+                                <token.icon size={28} />
                             </div>
-                            <h4 className="font-cinzel font-bold text-lg text-white mb-1">{token.id}</h4>
-                            <div className="flex items-center gap-1 text-gray-500 text-[10px] uppercase tracking-widest">
-                                <Wallet size={10} />
-                                <span>{token.balance.toFixed(2)}</span>
+                            <h4 className="font-cinzel font-bold text-xl text-white mb-1">${token.id}</h4>
+                            <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-2">Official Arena Duel Token (95% Winner / 5% Treasury)</p>
+                            <div className="flex items-center gap-1 text-shin-gold text-xs uppercase tracking-widest">
+                                <Wallet size={12} />
+                                <span>{Math.round(token.balance).toLocaleString()} $SHIN</span>
                             </div>
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <ArrowRight size={14} className="text-shin-gold" />
+                            <div className="absolute top-3 right-3 opacity-70 group-hover:opacity-100 transition-opacity">
+                                <ArrowRight size={16} className="text-shin-gold" />
                             </div>
                         </button>
                     ))}
@@ -248,28 +257,28 @@ const PreGameFlow: React.FC<PreGameFlowProps> = ({ initialMode, onStartFight, on
                             onClick={() => { setWagerAmount(val); setCustomWager(''); }}
                             className={`py-4 rounded border font-cinzel font-bold text-lg transition-all ${wagerAmount === val && !customWager ? 'bg-shin-gold text-black border-shin-gold shadow-[0_0_20px_rgba(212,175,55,0.2)]' : 'bg-black/40 border-white/10 text-gray-400 hover:border-white/30'}`}
                         >
-                            ${val}
+                            {val} $SHIN
                         </button>
                     ))}
                     <div className="relative col-span-4 mt-2">
                         <input 
                             type="number"
-                            placeholder="Custom Amount..."
+                            placeholder="Custom $SHIN Amount..."
                             value={customWager}
                             onChange={(e) => {
                                 setCustomWager(e.target.value);
                                 setWagerAmount(Number(e.target.value) || 0);
                             }}
-                            className="w-full bg-black/60 border border-white/10 p-4 rounded text-white font-cinzel focus:outline-none focus:border-shin-gold transition-colors pl-12"
+                            className="w-full bg-black/60 border border-white/10 p-4 rounded text-white font-cinzel focus:outline-none focus:border-shin-gold transition-colors pl-20"
                         />
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-shin-gold font-cinzel text-xl">$</div>
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-shin-gold font-cinzel text-sm font-bold">$SHIN</div>
                     </div>
                 </div>
 
                 <div className="flex justify-between items-center px-2 py-4 bg-white/5 rounded border border-white/5">
                     <div className="flex flex-col">
                         <span className="text-[9px] text-gray-500 uppercase tracking-widest">Wager Total</span>
-                        <span className="text-xl font-cinzel text-white">${wagerAmount} {selectedToken}</span>
+                        <span className="text-xl font-cinzel text-white">{wagerAmount} ${selectedToken}</span>
                     </div>
                     <button 
                         disabled={wagerAmount <= 0}

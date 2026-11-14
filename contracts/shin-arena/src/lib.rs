@@ -1202,6 +1202,23 @@ impl ShinArenaContract {
             let prev = self.mt_balances.get(&pot_key).unwrap_or(0);
             self.mt_balances.insert(&pot_key, &(prev + amount.0));
             PromiseOrValue::Value(U128(0))
+        } else if let Some(rest) = msg.strip_prefix("duel_escrow:") {
+            // Format: "duel_escrow:<escrow_id>:<player_account_id>"
+            let parts: Vec<&str> = rest.split(':').collect();
+            assert!(parts.len() == 2, "Invalid duel_escrow msg format");
+            let escrow_id = parts[0].to_string();
+            let player_account_id = parts[1].to_string();
+            assert!(amount.0 > 0, "Must attach $SHIN to lock duel escrow");
+
+            let key = format!("duel_shin_escrow:{}:{}", escrow_id, player_account_id);
+            let prev = self.mt_balances.get(&key).unwrap_or(0);
+            self.mt_balances.insert(&key, &(prev + amount.0));
+
+            env::log_str(&format!(
+                "DUEL_SHIN_ESCROWED:{{\"escrow_id\":\"{}\",\"player\":\"{}\",\"amount\":\"{}\"}}",
+                escrow_id, player_account_id, amount.0
+            ));
+            PromiseOrValue::Value(U128(0))
         } else {
             // Refund unused tokens for unrecognized messages
             PromiseOrValue::Value(amount)
@@ -1259,6 +1276,97 @@ impl ShinArenaContract {
                 .with_static_gas(GAS_FOR_FT_TRANSFER)
                 .ft_transfer(self.dev_treasury_id.clone(), U128(dev_pot_cut), Some("SHIN Match 5% Dev Fee".to_string()));
         }
+    }
+
+    pub fn get_duel_shin_escrow(&self, escrow_id: String, account_id: String) -> U128 {
+        let key = format!("duel_shin_escrow:{}:{}", escrow_id, account_id);
+        U128(self.mt_balances.get(&key).unwrap_or(0))
+    }
+
+    /// Settle a 1v1 human $SHIN waged duel: 95% of combined escrowed pot directly to winner's NEAR wallet, 5% to Dev Treasury
+    pub fn settle_shin_duel(
+        &mut self,
+        duel_id: String,
+        p1_escrow_id: String,
+        p1_account_id: AccountId,
+        p2_escrow_id: String,
+        p2_account_id: AccountId,
+        winner_account_id: AccountId,
+    ) {
+        assert_eq!(env::predecessor_account_id(), self.oracle_id, "Only oracle can settle $SHIN duel");
+        assert!(
+            winner_account_id == p1_account_id || winner_account_id == p2_account_id,
+            "Winner must be one of the duel participants"
+        );
+
+        let settled_key = format!("duel_shin_settled:{}", duel_id);
+        assert_eq!(self.mt_balances.get(&settled_key).unwrap_or(0), 0, "Duel already settled");
+        self.mt_balances.insert(&settled_key, &1);
+
+        let k1 = format!("duel_shin_escrow:{}:{}", p1_escrow_id, p1_account_id);
+        let k2 = format!("duel_shin_escrow:{}:{}", p2_escrow_id, p2_account_id);
+        let amt1 = self.mt_balances.get(&k1).unwrap_or(0);
+        let amt2 = self.mt_balances.get(&k2).unwrap_or(0);
+        self.mt_balances.insert(&k1, &0);
+        self.mt_balances.insert(&k2, &0);
+
+        let total_pot = amt1.saturating_add(amt2);
+        assert!(total_pot > 0, "No escrowed $SHIN found for duel");
+
+        let dev_cut = total_pot.saturating_mul(5) / 100;
+        let winner_payout = total_pot.saturating_sub(dev_cut);
+
+        if winner_payout > 0 {
+            let _ = ext_ft::ext(self.shin_token_id.clone())
+                .with_attached_deposit(NearToken::from_yoctonear(1))
+                .with_static_gas(GAS_FOR_FT_TRANSFER)
+                .ft_transfer(
+                    winner_account_id.clone(),
+                    U128(winner_payout),
+                    Some(format!("SHIN 1v1 Duel {} Winner Payout", duel_id)),
+                );
+        }
+
+        if dev_cut > 0 && self.dev_treasury_id != env::current_account_id() {
+            let _ = ext_ft::ext(self.shin_token_id.clone())
+                .with_attached_deposit(NearToken::from_yoctonear(1))
+                .with_static_gas(GAS_FOR_FT_TRANSFER)
+                .ft_transfer(
+                    self.dev_treasury_id.clone(),
+                    U128(dev_cut),
+                    Some(format!("SHIN 1v1 Duel {} 5% Dev Fee", duel_id)),
+                );
+        }
+
+        env::log_str(&format!(
+            "DUEL_SHIN_SETTLED:{{\"duel_id\":\"{}\",\"winner\":\"{}\",\"pot\":\"{}\",\"winner_payout\":\"{}\",\"dev_cut\":\"{}\"}}",
+            duel_id, winner_account_id, total_pot, winner_payout, dev_cut
+        ));
+    }
+
+    /// Refund an unmatched/cancelled 1v1 $SHIN duel escrow back to the player's NEAR wallet
+    pub fn refund_shin_duel(&mut self, escrow_id: String, account_id: AccountId) {
+        assert_eq!(env::predecessor_account_id(), self.oracle_id, "Only oracle can refund $SHIN duel");
+        let key = format!("duel_shin_escrow:{}:{}", escrow_id, account_id);
+        let amt = self.mt_balances.get(&key).unwrap_or(0);
+        if amt == 0 {
+            return;
+        }
+        self.mt_balances.insert(&key, &0);
+
+        let _ = ext_ft::ext(self.shin_token_id.clone())
+            .with_attached_deposit(NearToken::from_yoctonear(1))
+            .with_static_gas(GAS_FOR_FT_TRANSFER)
+            .ft_transfer(
+                account_id.clone(),
+                U128(amt),
+                Some(format!("SHIN 1v1 Duel {} Escrow Refund", escrow_id)),
+            );
+
+        env::log_str(&format!(
+            "DUEL_SHIN_REFUNDED:{{\"escrow_id\":\"{}\",\"player\":\"{}\",\"amount\":\"{}\"}}",
+            escrow_id, account_id, amt
+        ));
     }
 
     // =========================================================================

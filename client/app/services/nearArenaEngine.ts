@@ -3556,6 +3556,58 @@ class NearArenaEngine {
     );
   }
 
+  public async lockDuelShinEscrow(escrowId: string, shinAmount: number): Promise<{
+    ok: boolean;
+    txHash?: string;
+    escrowId: string;
+    accountId: string;
+    error?: string;
+  }> {
+    const accountId = this.state.playerWallet.accountId;
+    if (!accountId || accountId.startsWith('guest-')) {
+      return {
+        ok: false,
+        escrowId,
+        accountId: accountId || '',
+        error: 'Guest players cannot compete in on-chain wager duels. Please sign in with Google or Email first.',
+      };
+    }
+    const walletShin = this.state.playerWallet.SHIN ?? 0;
+    if (walletShin < shinAmount) {
+      return {
+        ok: false,
+        escrowId,
+        accountId,
+        error: `Insufficient $SHIN (${Math.round(walletShin).toLocaleString()} $SHIN). Need ${shinAmount.toLocaleString()} $SHIN.`,
+      };
+    }
+
+    const rawShin = (BigInt(Math.floor(shinAmount * 1000)) * BigInt('1000000000000000')).toString();
+    const res = await this.relayCallAsync(
+      'ft_transfer_call',
+      {
+        receiver_id: this.arenaContractId,
+        amount: rawShin,
+        msg: `duel_escrow:${escrowId}:${accountId}`,
+      },
+      '1yocto',
+      this.shinTokenId,
+      '120000000000000',
+    );
+    if (!res?.ok || !res?.txHash) {
+      return {
+        ok: false,
+        escrowId,
+        accountId,
+        error: res?.error || 'Failed to lock $SHIN duel escrow on-chain.',
+      };
+    }
+    // Optimistically reflect escrowed $SHIN in local balance until next RPC sync
+    this.state.playerWallet.SHIN = Math.max(0, walletShin - shinAmount);
+    this.saveState();
+    return { ok: true, txHash: res.txHash, escrowId, accountId };
+  }
+
   public async settleShinMatchOnChain(matchId: string, winnerTokenId: string, stakeShin: number) {
     const rawShin = (BigInt(Math.floor(stakeShin * 1000)) * BigInt('1000000000000000')).toString();
     return this.relayCallAsync('settle_shin_match', {
@@ -3593,6 +3645,12 @@ class NearArenaEngine {
   }
 
   public async joinHumanTournamentOnChain(charId: string) {
+    const accountId = this.state.playerWallet.accountId;
+    if (!accountId || accountId.startsWith('guest-')) {
+      throw new Error(
+        'Guest players cannot participate in tournaments. Please sign in with Google or Email first.',
+      );
+    }
     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
     const { humanCup } = await this.fetchLiveTournamentsState();
     const entryFeeShin: number = humanCup.entryFeeShin || 500;

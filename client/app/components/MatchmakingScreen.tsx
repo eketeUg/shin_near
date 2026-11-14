@@ -31,8 +31,10 @@ const MatchmakingScreen: React.FC<MatchmakingScreenProps> = ({
   const [roomCodeInput, setRoomCodeInput] = useState<string>(initialRoomCode || '');
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
   const [searchTime, setSearchTime] = useState(0);
+  const [escrowError, setEscrowError] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
+  const escrowRef = useRef<{ escrowId: string; accountId: string } | null>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
   const matchedRef = useRef<boolean>(false);
   const clientInstanceIdRef = useRef<string>(
@@ -174,12 +176,15 @@ const MatchmakingScreen: React.FC<MatchmakingScreenProps> = ({
       socketRef.current = socket;
 
       socket.on('connect', () => {
+        const engineState = nearArenaEngine.getState();
         socket.emit('join_matchmaking', {
           username: playerName,
           charType,
           wager,
           roomCode: cleanCode || null,
           rating: 1200,
+          accountId: escrowRef.current?.accountId || engineState.playerWallet.accountId || null,
+          escrowId: escrowRef.current?.escrowId || null,
         });
       });
 
@@ -202,19 +207,37 @@ const MatchmakingScreen: React.FC<MatchmakingScreenProps> = ({
   };
 
   useEffect(() => {
-    if (wager) {
-      setStatus(`Locking ${wager.amount} ${wager.token} in NEAR Escrow Pool (0 Popups)...`);
-      const lockTimer = setTimeout(() => {
+    let cancelled = false;
+
+    const initQueue = async () => {
+      if (wager && wager.amount > 0) {
+        if (wager.token !== 'SHIN') {
+          setEscrowError('1v1 Wager Duels currently support $SHIN only.');
+          setIsLocking(false);
+          return;
+        }
+        setStatus(`Escrowing ${wager.amount} $SHIN on-chain in shin-arena-28d.testnet...`);
+        const escrowId = 'duel_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        const res = await nearArenaEngine.lockDuelShinEscrow(escrowId, wager.amount);
+        if (cancelled) return;
+        if (!res.ok) {
+          setEscrowError(res.error || 'Failed to lock $SHIN escrow.');
+          setIsLocking(false);
+          return;
+        }
+        escrowRef.current = { escrowId: res.escrowId, accountId: res.accountId };
         setIsLocking(false);
         setIsSearching(true);
         startMatchmaking(roomCode);
-      }, 1200);
-      return () => clearTimeout(lockTimer);
-    } else {
-      startMatchmaking(roomCode);
-    }
+      } else {
+        startMatchmaking(roomCode);
+      }
+    };
+
+    void initQueue();
 
     return () => {
+      cancelled = true;
       if (socketRef.current) {
         socketRef.current.emit('cancel_matchmaking');
         socketRef.current.disconnect();
@@ -291,8 +314,13 @@ const MatchmakingScreen: React.FC<MatchmakingScreenProps> = ({
                 : `Human Queue Window (${Math.max(0, HUMAN_QUEUE_TIMEOUT_SECS - searchTime)}s before Agent Fallback)`}
             </span>
             <h3 className="text-sm sm:text-base font-cinzel text-white uppercase tracking-wider">
-              {status}
+              {escrowError ? 'Escrow Failed' : status}
             </h3>
+            {escrowError && (
+              <p className="text-xs font-mono text-red-400 bg-red-950/50 border border-red-500/40 rounded-lg px-3 py-2 max-w-md">
+                {escrowError}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4 pt-2 max-w-xs mx-auto">
@@ -356,10 +384,16 @@ const MatchmakingScreen: React.FC<MatchmakingScreenProps> = ({
             <Bot size={15} /> Fight Funded NEAR Agent Now
           </button>
           <button
-            onClick={onCancel}
+            onClick={() => {
+              if (socketRef.current) {
+                socketRef.current.emit('cancel_matchmaking');
+                socketRef.current.disconnect();
+              }
+              onCancel();
+            }}
             className="px-5 py-3 bg-white/5 border border-white/10 hover:border-shin-red text-gray-300 hover:text-white font-cinzel font-bold text-xs tracking-widest uppercase rounded-xl flex items-center justify-center gap-2 cursor-pointer"
           >
-            <X size={15} /> Cancel
+            <X size={15} /> {escrowError ? 'Back' : 'Cancel & Refund'}
           </button>
         </div>
       </div>

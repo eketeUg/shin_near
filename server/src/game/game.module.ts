@@ -13,6 +13,7 @@ import { TournamentController } from './tournament.controller';
 import { TournamentService } from './tournament.service';
 import { AgentWalletController } from './agent-wallet.controller';
 import { AgentWalletService } from './agent-wallet.service';
+import { AgentBrainService } from './agent-brain.service';
 import { LeaderboardController } from './leaderboard.controller';
 import { LobbyMessage, LobbyMessageSchema } from './schema/lobby-message.schema';
 import { AgentWallet, AgentWalletSchema } from './schema/agent-wallet.schema';
@@ -41,12 +42,14 @@ import { AgentWallet, AgentWalletSchema } from './schema/agent-wallet.schema';
     LobbyChatService,
     TournamentService,
     AgentWalletService,
+    AgentBrainService,
   ],
   exports: [
     NearRelayerService,
     LobbyChatService,
     TournamentService,
     AgentWalletService,
+    AgentBrainService,
   ],
 })
 export class GameModule {}

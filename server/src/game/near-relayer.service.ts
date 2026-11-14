@@ -32,6 +32,8 @@ const ALLOWED_WRITE_METHODS = new Set([
   'ft_transfer_call',
   'withdraw_agent_shin',
   'settle_shin_match',
+  'settle_shin_duel',
+  'refund_shin_duel',
 ]);
 
 export interface NearRelayResult {

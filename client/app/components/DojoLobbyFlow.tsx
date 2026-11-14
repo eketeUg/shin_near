@@ -239,6 +239,13 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
       showToast('Select a Human or Agent from the left sidebar to send a 1v1 Fight Request!');
       return;
     }
+    const myAcct = arenaState.playerWallet.accountId;
+    if (proposedWagerNear > 0 && (!myAcct || myAcct.startsWith('guest-'))) {
+      showToast(
+        'Guest players cannot compete in $SHIN wager duels. Sign in with Google or Email, or choose Free Match (0 $SHIN).',
+      );
+      return;
+    }
     try {
       const proposalMsg = nearArenaEngine.sendChatFightProposal({
         targetAccountId: activeContact.accountId,

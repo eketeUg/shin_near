@@ -35,6 +35,8 @@ interface BracketMatch {
   winnerId?: string;
   winnerName?: string;
   status: 'WAITING' | 'READY' | 'COMPLETED';
+  forfeitDeadlineAt?: number;
+  forfeited?: boolean;
 }
 
 interface HumanCupState {
@@ -43,7 +45,9 @@ interface HumanCupState {
   title: string;
   entryFeeShin: number;
   maxPlayers: number;
-  status: 'REGISTRATION' | 'IN_PROGRESS' | 'SETTLED';
+  status: 'REGISTRATION' | 'SCHEDULED' | 'IN_PROGRESS' | 'SETTLED';
+  scheduledStartAt?: number;
+  reminderEmailsSent?: boolean;
   entrants: Array<{
     accountId: string;
     username: string;
@@ -130,6 +134,7 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
   const [selectedChar, setSelectedChar] = useState(availableChars[0] || 'fighter');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [showInspectorModal, setShowInspectorModal] = useState(false);
   const [agentsDirectory, setAgentsDirectory] = useState<
     Array<{
@@ -175,6 +180,19 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
   }, []);
 
   useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatCountdown = (targetMs?: number) => {
+    if (!targetMs) return '00:00';
+    const secs = Math.max(0, Math.ceil((targetMs - nowMs) / 1000));
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
     const sync = () => setArenaState({ ...nearArenaEngine.getState() });
     window.addEventListener('nearArenaStateUpdated', sync);
 
@@ -213,6 +231,7 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
 
   const walletShin = Math.round(arenaState.playerWallet.SHIN ?? 0).toLocaleString();
   const myAccountId = arenaState.playerWallet.accountId;
+  const isGuestPlayer = !myAccountId || myAccountId.startsWith('guest-');
 
   const hasJoinedHumanCup = Boolean(
     humanCup?.entrants.some((e) => e.accountId === myAccountId),
@@ -472,9 +491,9 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                                 </span>
                                 <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-300">
                                   {m.status === 'COMPLETED'
-                                    ? `🏆 ${m.winnerName}`
+                                    ? `${m.forfeited ? '🏳️ Forfeit: ' : '🏆 '}${m.winnerName}`
                                     : m.status === 'READY'
-                                    ? '⚔️ Ready'
+                                    ? `⚔️ Ready${m.forfeitDeadlineAt ? ` • ⏱ ${formatCountdown(m.forfeitDeadlineAt)}` : ''}`
                                     : '⏳ Waiting'}
                                 </span>
                               </div>
@@ -521,6 +540,18 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
 
                 {/* Human Tournament Controls */}
                 <div className="pt-2 space-y-3">
+                  {humanCup.status === 'SCHEDULED' && (
+                    <div className="bg-amber-950/30 border border-shin-gold/50 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-cinzel font-black text-shin-gold uppercase flex items-center gap-2">
+                          <Timer size={14} /> Bracket Full — Starts in {formatCountdown(humanCup.scheduledStartAt)}
+                        </div>
+                        <p className="text-[11px] font-mono text-gray-300 mt-1">
+                          20-minute reminder emails have been sent to all {humanCup.maxPlayers} registered players. Once the tournament starts, each match has a 2-minute forfeiture countdown.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {humanCup.status === 'SETTLED' ? (
                     <div className="bg-emerald-950/30 border border-emerald-500/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
@@ -585,8 +616,14 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                           })}
                         </div>
                       )}
+                      {isGuestPlayer && (
+                        <div className="text-[11px] font-mono text-red-300 bg-red-950/40 border border-red-500/40 rounded-lg px-3 py-2">
+                          Guest accounts cannot participate in tournaments. Please sign in with Google or Email first.
+                        </div>
+                      )}
                       <button
                         disabled={
+                          isGuestPlayer ||
                           isSubmitting ||
                           isSelectedCharDeployed ||
                           humanCup.entrants.length >= humanCup.maxPlayers
