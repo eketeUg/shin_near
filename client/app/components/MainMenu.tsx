@@ -230,7 +230,7 @@ const MainMenu = ({
             <div>
               <div className="text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider">SHIN Pouch</div>
               <div className="text-[11px] sm:text-sm font-mono font-bold text-shin-gold">
-                {(arenaState.playerWallet.SHIN ?? 0).toFixed(1)} SHIN
+                {Math.round(arenaState.playerWallet.SHIN ?? 0).toLocaleString()} $SHIN
               </div>
             </div>
             <button
@@ -614,13 +614,13 @@ const MainMenu = ({
           <div className="sm:col-span-5 flex flex-col items-center">
             <div className="w-full max-w-md bg-gradient-to-b from-gray-900/90 via-black/95 to-black border-2 border-white/15 rounded-2xl p-6 shadow-[0_0_50px_rgba(0,0,0,0.9)] relative overflow-hidden text-center">
               <div className="text-[10px] font-cinzel text-shin-gold uppercase tracking-widest flex items-center justify-center gap-1.5 mb-1">
-                <Trophy size={12} /> Active Champion Showcase
+                <Trophy size={12} /> Active Warrior
               </div>
               <h2 className="text-xl font-cinzel font-black text-white uppercase">
-                No Fighter NFT Yet
+                No Warrior Yet
               </h2>
               <p className="text-xs text-gray-400 mt-1 mb-5">
-                Recruit an on-chain NEP-245 Fighter NFT to unlock your autonomous Agent Vault, ELO progression, and Dojo training.
+                Awaken a shinobi to unlock autonomous Shadow Duels, ELO ranks, and Dojo training.
               </p>
 
               <div className="relative h-52 flex items-end justify-center bg-gradient-to-t from-shin-gold/15 via-black/40 to-transparent rounded-xl border border-dashed border-shin-gold/30 mb-5 overflow-hidden">

@@ -233,14 +233,14 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       <div className="px-3 sm:px-6 md:px-8 pt-3 sm:pt-5 pb-2 max-w-7xl mx-auto w-full flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 w-full lg:w-auto">
           {[
-            { id: 'LIVE_ARENA', label: '🔥 Shōbu Pit', icon: Flame },
+            { id: 'LIVE_ARENA', label: 'Shōbu Pit', icon: Flame },
             {
               id: 'MY_AGENTS',
-              label: `⚔ Shinobi Clan (${ownedFighters.length})`,
+              label: `Shinobi Clan (${ownedFighters.length})`,
               icon: Shield,
             },
-            { id: 'DOJO_MARKET', label: "🏮 Dojo & Bazaar", icon: Store },
-            { id: 'LEDGER', label: '📜 Chronicle', icon: ScrollText },
+            { id: 'DOJO_MARKET', label: 'Dojo & Bazaar', icon: Store },
+            { id: 'LEDGER', label: 'Chronicle', icon: ScrollText },
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
