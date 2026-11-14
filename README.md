@@ -61,7 +61,87 @@ shin-near/
 
 ---
 
-## 3. Quick Start & Verification Guide (For Judges & Screening Agents)
+## 3. In-Game Economy & `$SHIN` Circular Architecture
+
+SHIN features a **self-sustaining, zero-developer-interference circular economy** on NEAR powered by **`$SHIN` (`100,000,000` fixed supply)**, where **Players**, **Autonomous Fighter Agents**, **Player Trainers**, **Spectators**, **NFT Creators/Sellers**, and the **Game Developer** all earn automatically through immutable smart-contract fee splits.
+
+### Token & NFT Standards Stack
+
+| Asset | NEAR Standard | Role in Economy |
+| :--- | :--- | :--- |
+| **`$SHIN`** | **NEP-141** (`100,000,000` fixed supply, `18` decimals) | **Sole in-game currency** for minting, wagers, bets, training, tournaments, and marketplace trades |
+| **Fighter Sprites** | **NEP-171 + NEP-177 + NEP-181 + NEP-199** | Dynamic warriors with on-chain animated `media` GIFs, live evolving stats (`LV`, `ATK`, `DEF`, `SPD`, `ELO`, `XP`), embedded War Chest, and perpetual creator royalties |
+| **Scrolls & Steel** | **NEP-245** (inside `shin-arena-28d.testnet`) | Consumable stat-boost scrolls, forging materials, and Dojo inventory |
+| **`NEAR`** | Native L1 | Gas + built-in **`NEAR ↔ $SHIN` AMM Swap** (`x * y = k`) entry and cash-out ramp |
+
+### Circular Economy Flow Diagram
+
+```mermaid
+flowchart TD
+    Player["Player Wallet (NEAR)"] -->|"Swap NEAR -> $SHIN"| SwapPool["NEAR / $SHIN AMM Pool (x*y=k, 0.5% fee)"]
+    SwapPool -->|"$SHIN"| PlayerWallet["Player $SHIN Balance"]
+    SwapPool -->|"0.3% Fee"| DevTreasury["Developer Treasury"]
+
+    PlayerWallet -->|"Mint Fighter ($SHIN)"| MintSplit["80% Dev / 20% Swap Liquidity"]
+    MintSplit -->|"80%"| DevTreasury
+    MintSplit -->|"20%"| SwapPool
+    MintSplit -->|"NEP-171 Mint"| FighterNFT["Dynamic Fighter NFT + War Chest"]
+
+    PlayerWallet -->|"Hire Trainer ($SHIN)"| Training["Player Trainer Service"]
+    Training -->|"XP + Stats Boost"| FighterNFT
+    Training -->|"90%"| Trainer["Trainer Player ($SHIN)"]
+    Training -->|"10%"| DevTreasury
+
+    FighterNFT -->|"PvP & 24/7 AI Arena Wagers"| MatchPot["Match Escrow Pot"]
+    MatchPot -->|"95% Winner"| FighterNFT
+    MatchPot -->|"5% Fee"| DevTreasury
+
+    PlayerWallet -->|"Tournament Entry ($SHIN)"| TourneyPot["Player-Funded Tournament Pool"]
+    TourneyPot -->|"95% Winners"| PlayerWallet
+    TourneyPot -->|"5% Fee"| DevTreasury
+
+    Spectators["Spectators ($SHIN Bets)"] -->|"Bet on Winner"| BetPool["Spectator Pari-Mutuel Pool"]
+    BetPool -->|"90% Winning Bettors"| Spectators
+    BetPool -->|"5% Fighter Royalty"| FighterNFT
+    BetPool -->|"5% Fee"| DevTreasury
+
+    FighterNFT -->|"List & Sell ($SHIN)"| Bazaar["NEP-171 / NEP-199 Bazaar"]
+    Bazaar -->|"92.5% Seller"| PlayerWallet
+    Bazaar -->|"2.5% Original Minter"| Creator["Original Minter"]
+    Bazaar -->|"5% Dev Fee"| DevTreasury
+
+    PlayerWallet -->|"Swap $SHIN -> NEAR"| SwapPool
+```
+
+### Revenue & Fee Splits
+
+| Activity | Split / Formula | Recipients |
+| :--- | :--- | :--- |
+| **`$SHIN` Total Supply** | **`100,000,000 $SHIN`** | 40% Swap Pool Reserve • 30% Community/Ecosystem • 20% Dev Treasury • 10% Early Player Incentives |
+| **`NEAR ↔ $SHIN` Swap** | **`x * y = k` AMM + `0.5%` fee** | `0.3%` → Dev Treasury • `0.2%` → Stays in LP Pool |
+| **Character Minting** | **`80% / 20%`** | `80%` → Dev Treasury • `20%` → `NEAR / $SHIN` Liquidity Pool |
+| **Player Trainers** | **`90% / 10%`** | `90%` → Trainer • `10%` → Dev Treasury |
+| **Match Pots (PvP & AI)** | **`95% / 5%`** | `95%` → Winning Fighter • `5%` → Dev Treasury |
+| **Tournaments** | **Player Entry Fees (`95% / 5%`)** | `95%` → Tournament Winners (1st/2nd/3rd) • `5%` → Dev Treasury |
+| **Spectator Bets** | **`90% / 5% / 5%`** | `90%` → Winning Bettors • `5%` → Winning Fighter Royalty • `5%` → Dev Treasury |
+| **NFT Secondary Sales (NEP-199)** | **`92.5% / 2.5% / 5%`** | `92.5%` → Seller • `2.5%` → Original Minter • `5%` → Dev Treasury |
+
+### How Every Participant Earns
+
+1. **Active Players (PvP & Tournaments):** Players stake `$SHIN` in 1v1 duels (`95%` pot to winner) or enter **player-funded Tournaments** where `95%` of total entry fees are paid out to the top finishers.
+2. **Autonomous Fighter Agents (24/7 Passive Income):** Owners fund a Fighter NFT's **War Chest** with `$SHIN`, pick a `CombatDoctrine`, and deploy it to the Shadow Colosseum. Agents fight autonomously 24/7, earning **`95%`** of won match pots plus a **`5%` royalty** from all spectator bets placed on their matches.
+3. **Player Trainers (Training-as-a-Service):** Experienced players offer sparring and conditioning sessions to level up other players' Fighter NFTs (`XP`, `Power Level`, `ATK/DEF/SPD`) without risking `ELO`. Trainers keep **`90%`** of the `$SHIN` training fee (`10%` goes to Dev Treasury).
+4. **Spectators & Bettors:** Fans watch live AI vs. AI and PvP bouts and bet `$SHIN` on the outcome; winning bettors split **`90%`** of the pari-mutuel pool proportionally.
+5. **NFT Traders & Original Minters (NEP-199 Royalties):** Leveled-up Fighter NFTs (with higher `Power Level`, `ELO`, win records, and War Chests) can be sold on the **NEP-171 Bazaar** for `$SHIN`. Every secondary sale pays **`92.5%`** to the seller, **`2.5%`** forever to the **Original Minter**, and **`5%`** to the Developer Treasury.
+6. **Game Developer (Protocol Treasury):** Earns automatically on-chain from mints (`80%`), swaps (`0.3%` direct + `0.2%` LP growth), match pots (`5%`), tournaments (`5%`), spectator pools (`5%`), trainer sessions (`10%`), and secondary NFT resales (`5%`)—with zero manual payout management.
+
+### Dynamic On-Chain Evolution & Self-Balancing Growth
+- **Every Match Updates NFTs On-Chain:** Settling a match updates the winner's `wins`, `power_level`, `atk`, `elo` (`+24`), and War Chest, and updates the loser's `losses` and `elo` (`-18`), automatically recalculating global leaderboard rankings.
+- **Auto-Deepening Liquidity:** `20%` of every new Fighter mint feeds into the `NEAR / $SHIN` AMM pool, strengthening token liquidity organically as more players join.
+
+---
+
+## 4. Quick Start & Verification Guide (For Judges & Screening Agents)
 
 > **Zero External Secrets or Browser Extensions Required:** The client runs out-of-the-box with an embedded NEAR session wallet and gasless relayer engine.
 
@@ -104,7 +184,7 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ---
 
-## 4. Prior Work & Hackathon Baseline Disclosure (Per `HACKATHON.md` Q-002 & Q-003)
+## 5. Prior Work & Hackathon Baseline Disclosure (Per `HACKATHON.md` Q-002 & Q-003)
 
 - **Baseline Tag:** [`pre-hackathon`](../../tags) (commit `330d459`)
 - **What Existed Before (`pre-hackathon`):**
@@ -117,6 +197,6 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 ---
 
-## 5. License
+## 6. License
 
 Open-source under the [MIT License](./LICENSE).
