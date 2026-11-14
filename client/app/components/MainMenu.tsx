@@ -464,7 +464,7 @@ const MainMenu = ({
               >
                 <div className="arcade-unskew flex items-center justify-center gap-1.5 font-cinzel font-bold text-[10px] sm:text-[11px] tracking-wider text-blue-300 group-hover:text-white uppercase">
                   <Eye size={13} />
-                  <span>Spectate TV</span>
+                  <span>Watch Duels</span>
                 </div>
               </button>
             </div>
