@@ -1106,6 +1106,81 @@ impl ShinArenaContract {
             let prev = self.mt_balances.get(&npc_key).unwrap_or(0);
             self.mt_balances.insert(&npc_key, &(prev + amount.0));
             PromiseOrValue::Value(U128(0))
+        } else if let Some(token_id) = msg.strip_prefix("fund_agent:") {
+            // Deposit $SHIN into Fighter NFT's War Chest
+            let _fighter = self.fighters.get(&token_id.to_string()).expect("Fighter NFT not found");
+            let key = format!("vault_shin:{}", token_id);
+            let prev = self.mt_balances.get(&key).unwrap_or(0);
+            self.mt_balances.insert(&key, &(prev + amount.0));
+            PromiseOrValue::Value(U128(0))
+        } else if let Some(rest) = msg.strip_prefix("bet_match:") {
+            // Format: "bet_match:<match_id>:<predicted_fighter_token_id>"
+            let parts: Vec<&str> = rest.split(':').collect();
+            assert!(parts.len() == 2, "Invalid bet_match msg format");
+            let match_id = parts[0];
+            let predicted_id = parts[1];
+            assert!(amount.0 > 0, "Bet must be > 0 $SHIN");
+            let spec_key = format!("match_shin_spec:{}:{}", match_id, predicted_id);
+            let prev = self.mt_balances.get(&spec_key).unwrap_or(0);
+            self.mt_balances.insert(&spec_key, &(prev + amount.0));
+            let total_key = format!("match_shin_spec_total:{}", match_id);
+            let prev_total = self.mt_balances.get(&total_key).unwrap_or(0);
+            self.mt_balances.insert(&total_key, &(prev_total + amount.0));
+            PromiseOrValue::Value(U128(0))
+        } else if let Some(token_id) = msg.strip_prefix("buy_fighter:") {
+            // Buy listed Fighter NFT in $SHIN (92.5% Seller / 2.5% Original Minter / 5% Dev Treasury)
+            let mut fighter = self.fighters.get(&token_id.to_string()).expect("Fighter not found");
+            assert!(fighter.market_price_milli_near > 0, "Fighter not listed for sale");
+            let seller = fighter.owner_id.clone();
+            let minter = self.original_minters.get(&token_id.to_string()).unwrap_or_else(|| seller.clone());
+
+            let minter_cut = amount.0.saturating_mul(25) / 1_000;
+            let dev_cut = amount.0.saturating_mul(50) / 1_000;
+            let seller_cut = amount.0.saturating_sub(minter_cut).saturating_sub(dev_cut);
+
+            fighter.owner_id = sender_id.clone();
+            fighter.market_price_milli_near = 0;
+            self.fighters.insert(&token_id.to_string(), &fighter);
+
+            let nep245_id = format!("fighter:{}", token_id);
+            self.internal_mt_transfer(seller.as_str(), sender_id.as_str(), &[nep245_id], &[1], Some("Bought Fighter NFT with $SHIN"));
+
+            if seller_cut > 0 {
+                let _ = ext_ft::ext(self.shin_token_id.clone())
+                    .with_attached_deposit(NearToken::from_yoctonear(1))
+                    .with_static_gas(GAS_FOR_FT_TRANSFER)
+                    .ft_transfer(seller, U128(seller_cut), Some("SHIN Fighter Sale 92.5%".to_string()));
+            }
+            if minter_cut > 0 {
+                let _ = ext_ft::ext(self.shin_token_id.clone())
+                    .with_attached_deposit(NearToken::from_yoctonear(1))
+                    .with_static_gas(GAS_FOR_FT_TRANSFER)
+                    .ft_transfer(minter, U128(minter_cut), Some("SHIN Original Minter 2.5% Royalty".to_string()));
+            }
+            if dev_cut > 0 && self.dev_treasury_id != env::current_account_id() {
+                let _ = ext_ft::ext(self.shin_token_id.clone())
+                    .with_attached_deposit(NearToken::from_yoctonear(1))
+                    .with_static_gas(GAS_FOR_FT_TRANSFER)
+                    .ft_transfer(self.dev_treasury_id.clone(), U128(dev_cut), Some("SHIN Market 5% Dev Fee".to_string()));
+            }
+            PromiseOrValue::Value(U128(0))
+        } else if let Some(rest) = msg.strip_prefix("join_tournament:") {
+            // Format: "join_tournament:<tournament_id>:<token_id>"
+            let parts: Vec<&str> = rest.split(':').collect();
+            assert!(parts.len() == 2, "Invalid join_tournament msg format");
+            let tournament_id = parts[0].to_string();
+            let token_id = parts[1].to_string();
+            let mut pool = self.tournaments.get(&tournament_id).expect("Tournament not found");
+            assert!(!pool.is_settled, "Tournament already settled");
+            assert!((pool.entrants.len() as u32) < pool.max_players, "Tournament is full");
+            assert!(!pool.entrants.contains(&token_id), "Fighter already entered");
+            pool.entrants.push(token_id);
+            self.tournaments.insert(&tournament_id, &pool);
+
+            let pot_key = format!("tourney_shin_pot:{}", tournament_id);
+            let prev = self.mt_balances.get(&pot_key).unwrap_or(0);
+            self.mt_balances.insert(&pot_key, &(prev + amount.0));
+            PromiseOrValue::Value(U128(0))
         } else {
             // Refund unused tokens for unrecognized messages
             PromiseOrValue::Value(amount)
@@ -1114,6 +1189,55 @@ impl ShinArenaContract {
 
     pub fn get_npc_shin_treasury(&self) -> U128 {
         U128(self.mt_balances.get(&"npc:hanzo-dojo:shin".to_string()).unwrap_or(0))
+    }
+
+    pub fn get_fighter_shin_vault(&self, token_id: String) -> U128 {
+        U128(self.mt_balances.get(&format!("vault_shin:{}", token_id)).unwrap_or(0))
+    }
+
+    pub fn withdraw_agent_shin(&mut self, token_id: String, amount_shin: U128) -> Promise {
+        let fighter = self.fighters.get(&token_id).expect("Fighter NFT not found");
+        let caller = env::predecessor_account_id();
+        assert_eq!(caller, fighter.owner_id, "Only owner can withdraw $SHIN");
+        let key = format!("vault_shin:{}", token_id);
+        let bal = self.mt_balances.get(&key).unwrap_or(0);
+        assert!(bal >= amount_shin.0, "Insufficient $SHIN in Fighter War Chest");
+        self.mt_balances.insert(&key, &(bal - amount_shin.0));
+        ext_ft::ext(self.shin_token_id.clone())
+            .with_attached_deposit(NearToken::from_yoctonear(1))
+            .with_static_gas(GAS_FOR_FT_TRANSFER)
+            .ft_transfer(caller, amount_shin, Some("SHIN War Chest Withdrawal".to_string()))
+    }
+
+    /// Settle a $SHIN match: 95% pot + 5% spectator royalty to winner's $SHIN War Chest, 5% to Dev Treasury
+    pub fn settle_shin_match(&mut self, match_id: String, winner_token_id: String, stake_shin: U128) {
+        assert_eq!(env::predecessor_account_id(), self.oracle_id, "Only oracle can settle $SHIN match");
+        let mut winner = self.fighters.get(&winner_token_id).expect("Winner not found");
+        let spec_total_key = format!("match_shin_spec_total:{}", match_id);
+        let spec_total = self.mt_balances.get(&spec_total_key).unwrap_or(0);
+
+        let fighter_royalty = spec_total.saturating_mul(5) / 100;
+        let pot = stake_shin.0.saturating_mul(2);
+        let dev_pot_cut = pot.saturating_mul(5) / 100;
+        let winner_pot = pot.saturating_sub(dev_pot_cut);
+
+        let w_key = format!("vault_shin:{}", winner_token_id);
+        let w_prev = self.mt_balances.get(&w_key).unwrap_or(0);
+        self.mt_balances.insert(&w_key, &(w_prev + winner_pot + fighter_royalty));
+
+        winner.wins += 1;
+        winner.power_level += 1;
+        winner.elo += 24;
+        self.fighters.insert(&winner_token_id, &winner);
+        let xp = self.fighter_xp.get(&winner_token_id).unwrap_or(0) + 25;
+        self.fighter_xp.insert(&winner_token_id, &xp);
+
+        if dev_pot_cut > 0 && self.dev_treasury_id != env::current_account_id() {
+            let _ = ext_ft::ext(self.shin_token_id.clone())
+                .with_attached_deposit(NearToken::from_yoctonear(1))
+                .with_static_gas(GAS_FOR_FT_TRANSFER)
+                .ft_transfer(self.dev_treasury_id.clone(), U128(dev_pot_cut), Some("SHIN Match 5% Dev Fee".to_string()));
+        }
     }
 
     // =========================================================================
@@ -1736,5 +1860,39 @@ mod tests {
         );
         assert_eq!(contract.fighters.get(&f1.token_id).unwrap().spd, 92);
         assert_eq!(contract.get_trainer("sensei.testnet".parse().unwrap()).unwrap().sessions_completed, 1);
+    }
+
+    #[test]
+    fn test_full_shin_economy_vault_bet_settle_and_market() {
+        testing_env!(get_context("alice.testnet", 1_000));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let f1 = contract.mint_fighter("hayabusa".to_string(), "Hayabusa".to_string(), 80, 70, 90);
+
+        let shin_1000: u128 = 1_000 * 1_000_000_000_000_000_000;
+        let shin_200: u128 = 200 * 1_000_000_000_000_000_000;
+
+        // Fund Fighter War Chest in $SHIN
+        testing_env!(get_context("shin.shin-arena-28d.testnet", 0));
+        let _ = contract.ft_on_transfer(
+            "alice.testnet".parse().unwrap(),
+            U128(shin_1000),
+            format!("fund_agent:{}", f1.token_id),
+        );
+        assert_eq!(contract.get_fighter_shin_vault(f1.token_id.clone()).0, shin_1000);
+
+        // Spectator bet in $SHIN
+        let _ = contract.ft_on_transfer(
+            "bob.testnet".parse().unwrap(),
+            U128(shin_200),
+            format!("bet_match:m-shin-1:{}", f1.token_id),
+        );
+
+        // Settle $SHIN match: 95% of 2000 (1900) + 5% of 200 (10) = +1910 $SHIN to winner vault -> 2910 $SHIN
+        testing_env!(get_context("oracle.testnet", 0));
+        contract.settle_shin_match("m-shin-1".to_string(), f1.token_id.clone(), U128(shin_1000));
+        assert_eq!(
+            contract.get_fighter_shin_vault(f1.token_id).0,
+            2_910 * 1_000_000_000_000_000_000
+        );
     }
 }

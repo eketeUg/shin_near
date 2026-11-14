@@ -107,15 +107,21 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
   const handleFaucetTopUp = () => {
     nearArenaEngine.claimFaucetOrIntentSwap();
     setArenaState({ ...nearArenaEngine.getState() });
-    showToast('+15 NEAR added to your War Chest!');
+    showToast('+15,000 $SHIN added to your SHIN Pouch!');
   };
 
   const handlePlaceLobbyBet = (matchId: string, side: 'p1' | 'p2', fighterName: string) => {
     const amt = betAmounts[matchId] || 1.0;
+    const shinAmt = Math.round(amt * 1000);
     try {
       nearArenaEngine.placeSpectatorBet(matchId, side, amt);
+      const match = arenaState.activeMatches.find((m) => m.matchId === matchId);
+      const targetTokenId = side === 'p1' ? match?.p1.tokenId : match?.p2.tokenId;
+      if (targetTokenId) {
+        void nearArenaEngine.placeSpectatorBetShin(matchId, targetTokenId, shinAmt);
+      }
       setArenaState({ ...nearArenaEngine.getState() });
-      showToast(`🔥 Backed ${fighterName} with ${amt} NEAR! Click ENTER PIT to watch live!`);
+      showToast(`🔥 Backed ${fighterName} with ${shinAmt.toLocaleString()} $SHIN! Click ENTER PIT to watch live!`);
     } catch (e: any) {
       showToast(e.message || 'Backing failed');
     }
@@ -203,7 +209,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                 {showNearUnderHood ? arenaState.playerWallet.accountId : 'War Chest'}
               </div>
               <div className="text-[11px] sm:text-sm font-mono font-bold text-shin-gold">
-                {arenaState.playerWallet.NEAR.toFixed(1)} NEAR
+                {Math.round(arenaState.playerWallet.NEAR * 1000).toLocaleString()} $SHIN
               </div>
             </div>
             <button
@@ -303,7 +309,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                 <div className="bg-black/80 border border-shin-gold/30 px-4 py-2 rounded-xl text-center">
                   <div className="text-[9px] text-gray-400 uppercase">Dojo Sensei Fee</div>
                   <div className="text-lg font-mono font-bold text-shin-gold">
-                    {arenaState.npcDojo.currentDynamicCostNear.toFixed(2)} NEAR
+                    {Math.round(arenaState.npcDojo.currentDynamicCostNear * 1000).toLocaleString()} $SHIN
                   </div>
                 </div>
               </div>
@@ -335,7 +341,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                       </span>
                       <span className="bg-shin-red/20 text-shin-red border border-shin-red/50 text-[10px] font-cinzel font-black px-3 py-0.5 rounded-full flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-shin-red animate-ping" />
-                        FIGHT POT: {match.fighterPoolNear.toFixed(1)} NEAR
+                        FIGHT POT: {Math.round(match.fighterPoolNear * 1000).toLocaleString()} $SHIN
                       </span>
                     </div>
 
@@ -400,13 +406,13 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                       <div className="bg-shin-gold/10 border border-shin-gold/30 rounded-lg p-2">
                         <div className="text-[9px] text-gray-400 uppercase">Warrior Winner Pot</div>
                         <div className="text-sm font-mono font-bold text-shin-gold">
-                          {match.fighterPoolNear.toFixed(1)} NEAR
+                          {Math.round(match.fighterPoolNear * 1000).toLocaleString()} $SHIN
                         </div>
                       </div>
                       <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2">
                         <div className="text-[9px] text-gray-400 uppercase">Crowd Backing Pot</div>
                         <div className="text-sm font-mono font-bold text-emerald-400">
-                          {totalSpec.toFixed(1)} NEAR
+                          {Math.round(totalSpec * 1000).toLocaleString()} $SHIN
                         </div>
                       </div>
                     </div>
@@ -428,7 +434,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                   : 'bg-black/60 text-gray-400 border-white/10'
                               }`}
                             >
-                              {val}
+                              {(val * 1000).toLocaleString()} $SHIN
                             </button>
                           ))}
                         </div>
@@ -525,7 +531,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         )}
                         <div className="flex items-center justify-between mt-2 text-xs font-mono">
                           <span className="text-shin-gold font-bold">
-                            War Chest: {fighter.vaultBalanceNear.toFixed(1)} NEAR
+                            War Chest: {Math.round(fighter.vaultBalanceNear * 1000).toLocaleString()} $SHIN
                           </span>
                           <span className="text-gray-400">
                             {fighter.wins}W - {fighter.losses}L
@@ -590,7 +596,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         <span>
                           SPOILS WON:{' '}
                           <strong className="text-emerald-400">
-                            +{selectedFighter.totalEarningsNear.toFixed(2)} NEAR
+                            +{Math.round(selectedFighter.totalEarningsNear * 1000).toLocaleString()} $SHIN
                           </strong>
                         </span>
                       </div>
@@ -630,11 +636,11 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         Champion&apos;s War Chest
                       </span>
                       <span className="text-xl font-mono font-bold text-shin-gold">
-                        {selectedFighter.vaultBalanceNear.toFixed(2)} NEAR
+                        {Math.round(selectedFighter.vaultBalanceNear * 1000).toLocaleString()} $SHIN
                       </span>
                     </div>
                     <p className="text-[11px] text-gray-400">
-                      Load coins into this warrior&apos;s personal War Chest so they can keep entering
+                      Load $SHIN into this warrior&apos;s personal War Chest so they can keep entering
                       winner-takes-all Budōkan pools.
                     </p>
                     <div className="flex gap-1.5">
@@ -644,9 +650,10 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                           onClick={() => {
                             try {
                               nearArenaEngine.fundAgentWallet(selectedFighter.tokenId, quickAmt);
+                              nearArenaEngine.fundFighterShin(selectedFighter.tokenId, quickAmt * 1000).catch(() => {});
                               setArenaState({ ...nearArenaEngine.getState() });
                               showToast(
-                                `Added +${quickAmt} NEAR to ${selectedFighter.title}'s War Chest!`,
+                                `Added +${(quickAmt * 1000).toLocaleString()} $SHIN to ${selectedFighter.title}'s War Chest!`,
                               );
                             } catch (e: any) {
                               showToast(e.message);
@@ -654,7 +661,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                           }}
                           className="flex-1 py-2 bg-shin-gold/20 hover:bg-shin-gold hover:text-black text-shin-gold border border-shin-gold/50 rounded-lg font-mono font-bold text-xs transition-all cursor-pointer"
                         >
-                          +{quickAmt} NEAR
+                          +{(quickAmt * 1000).toLocaleString()} $SHIN
                         </button>
                       ))}
                     </div>
@@ -685,12 +692,17 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                       <button
                         onClick={() => {
                           try {
+                            const amt = Number(withdrawAmount);
                             nearArenaEngine.withdrawFromAgentWallet(
                               selectedFighter.tokenId,
-                              Number(withdrawAmount),
+                              amt,
                             );
+                            nearArenaEngine.withdrawFighterShin(
+                              selectedFighter.tokenId,
+                              Math.round(amt * 1000),
+                            ).catch(() => {});
                             setArenaState({ ...nearArenaEngine.getState() });
-                            showToast(`Collected ${withdrawAmount} NEAR from ${selectedFighter.title}!`);
+                            showToast(`Collected ${Math.round(amt * 1000).toLocaleString()} $SHIN from ${selectedFighter.title}!`);
                           } catch (e: any) {
                             showToast(e.message);
                           }
@@ -724,7 +736,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                               wagerPerFightNear: stake,
                             });
                             setArenaState({ ...nearArenaEngine.getState() });
-                            showToast(`Set Fight Stake to ${stake} NEAR per match`);
+                            showToast(`Set Fight Stake to ${(stake * 1000).toLocaleString()} $SHIN per match`);
                           }}
                           className={`px-3 py-2 rounded-lg font-mono text-xs font-bold border transition-all cursor-pointer ${
                             selectedFighter.wagerPerFightNear === stake
@@ -732,7 +744,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                               : 'bg-black/60 text-gray-400 border-white/10 hover:border-white/30'
                           }`}
                         >
-                          {stake}
+                          {(stake * 1000).toLocaleString()}
                         </button>
                       ))}
                     </div>
@@ -1499,14 +1511,15 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                   disabled={!selectedFighter || !onChainCupId.trim()}
                   onClick={async () => {
                     if (!selectedFighter) return;
-                    const res = await nearArenaEngine.joinOnChainTournament(
+                    const entryShin = Math.round((parseFloat(onChainEntryNear) || 0.5) * 1000);
+                    const res = await nearArenaEngine.joinTournamentWithShin(
                       onChainCupId.trim(),
                       selectedFighter.tokenId,
-                      parseFloat(onChainEntryNear) || 0.5,
+                      entryShin,
                     );
                     showToast(
                       res.ok
-                        ? `${selectedFighter.title} joined "${onChainCupId.trim()}" on-chain!`
+                        ? `${selectedFighter.title} joined "${onChainCupId.trim()}" with ${entryShin.toLocaleString()} $SHIN!`
                         : res.error || 'Join tournament failed',
                     );
                   }}
@@ -1548,7 +1561,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                           marketPriceNear: Number(listPrice),
                         });
                         setArenaState({ ...nearArenaEngine.getState() });
-                        showToast(`Listed ${selectedFighter.title} in the Bazaar for ${listPrice} NEAR!`);
+                        showToast(`Listed ${selectedFighter.title} in the Bazaar for ${(Number(listPrice) * 1000).toLocaleString()} $SHIN!`);
                       }}
                       className="px-3 py-1.5 bg-shin-red text-white font-cinzel font-bold text-[10px] uppercase rounded cursor-pointer"
                     >
@@ -1579,7 +1592,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                             Lv.{listed.powerLevel} • {listed.elo} ELO ({listed.wins}W/{listed.losses}L)
                           </div>
                           <div className="text-[10px] font-mono text-emerald-400 mt-1">
-                            Includes War Chest: {listed.vaultBalanceNear.toFixed(2)} NEAR
+                            Includes War Chest: {Math.round(listed.vaultBalanceNear * 1000).toLocaleString()} $SHIN
                           </div>
                         </div>
                       </div>
@@ -1588,7 +1601,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                         <div>
                           <div className="text-[9px] text-gray-500 uppercase">Recruit Tribute</div>
                           <div className="text-lg font-mono font-bold text-white">
-                            {listed.marketPriceNear.toFixed(2)} NEAR
+                            {Math.round(listed.marketPriceNear * 1000).toLocaleString()} $SHIN
                           </div>
                         </div>
                         {listed.ownerAccountId === arenaState.playerWallet.accountId ? (
@@ -1609,9 +1622,13 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                             onClick={() => {
                               try {
                                 nearArenaEngine.buyFighterFromMarket(listed.tokenId);
+                                nearArenaEngine.buyFighterWithShin(
+                                  listed.tokenId,
+                                  Math.round(listed.marketPriceNear * 1000),
+                                ).catch(() => {});
                                 setArenaState({ ...nearArenaEngine.getState() });
                                 showToast(
-                                  `Recruited ${listed.title} + their ${listed.vaultBalanceNear.toFixed(2)} NEAR War Chest!`,
+                                  `Recruited ${listed.title} + their ${Math.round(listed.vaultBalanceNear * 1000).toLocaleString()} $SHIN War Chest!`,
                                 );
                               } catch (e: any) {
                                 showToast(e.message);
@@ -1670,7 +1687,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                   <div className="flex items-center gap-3 shrink-0">
                     {tx.amountNear > 0 && (
                       <span className="text-xs font-mono font-bold text-emerald-400">
-                        {tx.amountNear.toFixed(2)} NEAR
+                        {Math.round(tx.amountNear * 1000).toLocaleString()} $SHIN
                       </span>
                     )}
                     <a

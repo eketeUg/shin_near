@@ -615,11 +615,11 @@ const ControlsOverlay = ({
                                         BACK {p1Name.slice(0, 12)}
                                     </div>
                                     <div className="text-[10px] sm:text-xs text-white font-mono">
-                                        {p1SpecPool.toFixed(1)}N ({p1Odds}x)
+                                        {Math.round(p1SpecPool * 1000).toLocaleString()} $SHIN ({p1Odds}x)
                                     </div>
                                 </div>
                                 <span className="arcade-unskew bg-shin-gold text-black font-cinzel font-black text-[10px] sm:text-xs px-2 sm:px-3 py-1 rounded shrink-0">
-                                    +{betAmount}N
+                                    +{Math.round(betAmount * 1000)} $SHIN
                                 </span>
                             </button>
 
@@ -629,14 +629,14 @@ const ControlsOverlay = ({
                                 className="w-full md:flex-1 arcade-skew-right bg-gradient-to-l from-red-950/90 to-black hover:from-red-800 border-r-4 border-y border-l border-r-shin-red border-white/20 px-2.5 sm:px-4 py-2 flex items-center justify-between transition-all cursor-pointer group"
                             >
                                 <span className="arcade-unskew-right bg-shin-red text-white font-cinzel font-black text-[10px] sm:text-xs px-2 sm:px-3 py-1 rounded shrink-0">
-                                    +{betAmount}N
+                                    +{Math.round(betAmount * 1000)} $SHIN
                                 </span>
                                 <div className="arcade-unskew-right text-right truncate pl-1">
                                     <div className="text-[9px] sm:text-[10px] text-red-400 font-cinzel font-black uppercase tracking-wider truncate">
                                         BACK {p2Name.slice(0, 12)}
                                     </div>
                                     <div className="text-[10px] sm:text-xs text-white font-mono">
-                                        {p2SpecPool.toFixed(1)}N ({p2Odds}x)
+                                        {Math.round(p2SpecPool * 1000).toLocaleString()} $SHIN ({p2Odds}x)
                                     </div>
                                 </div>
                             </button>
@@ -752,7 +752,7 @@ const ControlsOverlay = ({
                                 <div className="bg-black/70 p-3 rounded-xl border border-white/10">
                                     <div className="text-[10px] text-gray-400 uppercase">Champion Fight Pot</div>
                                     <div className="text-xl font-mono font-bold text-shin-gold">
-                                        +{settlementReport.fighterPotWonNear.toFixed(2)} NEAR
+                                        +{Math.round(settlementReport.fighterPotWonNear * 1000).toLocaleString()} $SHIN
                                     </div>
                                     <div className="text-[10px] text-gray-400 mt-0.5">
                                         Added to Winner&apos;s War Chest
@@ -770,7 +770,7 @@ const ControlsOverlay = ({
                                 <div className="bg-black/70 p-3 rounded-xl border border-white/10">
                                     <div className="text-[10px] text-gray-400 uppercase">Your Crowd Backing Payout</div>
                                     <div className="text-xl font-mono font-bold text-emerald-400">
-                                        +{settlementReport.spectatorPayoutNear.toFixed(2)} NEAR
+                                        +{Math.round(settlementReport.spectatorPayoutNear * 1000).toLocaleString()} $SHIN
                                     </div>
                                     <div className="text-[10px] text-gray-400 mt-0.5">
                                         Instant Payout (0 Popups)
@@ -780,7 +780,7 @@ const ControlsOverlay = ({
                             {showTechDetails && (
                                 <div className="mt-3 pt-2.5 border-t border-white/10 text-[11px] font-mono text-gray-300 flex flex-wrap items-center justify-between gap-2">
                                     <span>Winner Sub-Account: <strong className="text-shin-gold">{settlementReport.winnerWallet}</strong></span>
-                                    <span className="text-emerald-400">Contract: shin-arena.testnet::settle_match</span>
+                                    <span className="text-emerald-400">Contract: shin-arena-28d.testnet::settle_shin_match</span>
                                 </div>
                             )}
                         </div>

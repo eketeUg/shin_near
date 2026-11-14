@@ -2331,12 +2331,14 @@ class NearArenaEngine {
       timestamp: Date.now(),
     });
 
-    // Relay match settlement on-chain when both fighters are registered on shin-arena-28d.testnet
+    // Relay match settlement on-chain when at least one fighter is registered on shin-arena-28d.testnet
     if (!winner.isNpc || !loser.isNpc) {
       this.relayOnChain(settleLedgerId, 'settle_match', {
         match_id: matchId,
         winner_token_id: winner.tokenId,
       });
+      const stakeShin = Math.max(100, Math.round((match.fighterPoolNear / 2) * 1000));
+      this.settleShinMatchOnChain(matchId, winner.tokenId, stakeShin).catch(() => {});
     }
 
     // Autonomous Agent-to-NPC Dojo Commerce
@@ -3455,6 +3457,72 @@ class NearArenaEngine {
       }
     }
     return res;
+  }
+
+  public async fundFighterShin(tokenId: string, shinAmount: number) {
+    const rawShin = (BigInt(Math.floor(shinAmount * 1000)) * BigInt('1000000000000000')).toString();
+    return this.relayCallAsync(
+      'ft_transfer_call',
+      { receiver_id: this.arenaContractId, amount: rawShin, msg: `fund_agent:${tokenId}` },
+      '1yocto',
+      this.shinTokenId,
+      '120000000000000',
+    );
+  }
+
+  public async withdrawFighterShin(tokenId: string, shinAmount: number) {
+    const rawShin = (BigInt(Math.floor(shinAmount * 1000)) * BigInt('1000000000000000')).toString();
+    return this.relayCallAsync('withdraw_agent_shin', { token_id: tokenId, amount_shin: rawShin });
+  }
+
+  public async placeSpectatorBetShin(matchId: string, predictedFighterTokenId: string, shinAmount: number) {
+    const rawShin = (BigInt(Math.floor(shinAmount * 1000)) * BigInt('1000000000000000')).toString();
+    return this.relayCallAsync(
+      'ft_transfer_call',
+      {
+        receiver_id: this.arenaContractId,
+        amount: rawShin,
+        msg: `bet_match:${matchId}:${predictedFighterTokenId}`,
+      },
+      '1yocto',
+      this.shinTokenId,
+      '120000000000000',
+    );
+  }
+
+  public async buyFighterWithShin(tokenId: string, shinAmount: number) {
+    const rawShin = (BigInt(Math.floor(shinAmount * 1000)) * BigInt('1000000000000000')).toString();
+    return this.relayCallAsync(
+      'ft_transfer_call',
+      { receiver_id: this.arenaContractId, amount: rawShin, msg: `buy_fighter:${tokenId}` },
+      '1yocto',
+      this.shinTokenId,
+      '120000000000000',
+    );
+  }
+
+  public async joinTournamentWithShin(tournamentId: string, tokenId: string, shinAmount: number) {
+    const rawShin = (BigInt(Math.floor(shinAmount * 1000)) * BigInt('1000000000000000')).toString();
+    return this.relayCallAsync(
+      'ft_transfer_call',
+      {
+        receiver_id: this.arenaContractId,
+        amount: rawShin,
+        msg: `join_tournament:${tournamentId}:${tokenId}`,
+      },
+      '1yocto',
+      this.shinTokenId,
+      '120000000000000',
+    );
+  }
+
+  public async settleShinMatchOnChain(matchId: string, winnerTokenId: string, stakeShin: number) {
+    const rawShin = (BigInt(Math.floor(stakeShin * 1000)) * BigInt('1000000000000000')).toString();
+    return this.relayCallAsync('settle_shin_match', {
+      match_id: matchId,
+      winner_token_id: winnerTokenId,
+      stake_shin: rawShin,
+    });
   }
 
   public async getOnChainTournament(tournamentId: string): Promise<{
