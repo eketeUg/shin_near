@@ -75,9 +75,11 @@ const DojoLobbyFlow: React.FC<DojoLobbyFlowProps> = ({
   useEffect(() => {
     window.addEventListener('nearArenaStateUpdated', refreshAll);
 
-    // Sync real registered players from MongoDB & on-chain Fighter NFTs from NEAR Testnet
+    // Sync real registered players & persisted chat history from MongoDB + on-chain Fighter NFTs
+    const acct = nearArenaEngine.getState().playerWallet.accountId;
     void nearArenaEngine.syncRegisteredUsersFromDb();
-    void nearArenaEngine.syncOnChainState(nearArenaEngine.getState().playerWallet.accountId);
+    void nearArenaEngine.syncLobbyChatFromDb(acct);
+    void nearArenaEngine.syncOnChainState(acct);
 
     // Cross-Tab DM & Presence Sync
     try {

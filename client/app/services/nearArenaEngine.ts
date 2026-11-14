@@ -2499,6 +2499,35 @@ class NearArenaEngine {
     return [...humanContacts, ...agentContacts];
   }
 
+  public async syncLobbyChatFromDb(accountId?: string): Promise<void> {
+    if (typeof window === 'undefined') return;
+    try {
+      const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+      const url = accountId
+        ? `${serverUrl}/api/chat/history?accountId=${encodeURIComponent(accountId)}`
+        : `${serverUrl}/api/chat/history`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data?.ok || !Array.isArray(data?.messages)) return;
+
+      const existingById = new Map<string, LobbyChatMessage>();
+      for (const m of this.state.lobbyChat || []) {
+        existingById.set(m.id, m);
+      }
+      for (const m of data.messages as LobbyChatMessage[]) {
+        existingById.set(m.id, m);
+      }
+      this.state.lobbyChat = Array.from(existingById.values()).sort(
+        (a, b) => a.timestamp - b.timestamp,
+      );
+      this.saveState();
+      window.dispatchEvent(new Event('nearArenaStateUpdated'));
+    } catch {
+      // Ignore if server is offline
+    }
+  }
+
   public async syncRegisteredUsersFromDb(): Promise<void> {
     if (typeof window === 'undefined') return;
     try {

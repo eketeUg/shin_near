@@ -9,6 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { GameService } from './game.service';
+import { LobbyChatService } from './lobby-chat.service';
 import { NearRelayerService } from './near-relayer.service';
 import { createHash } from 'crypto';
 
@@ -61,6 +62,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly gameService: GameService,
     private readonly nearRelayer: NearRelayerService,
+    private readonly lobbyChatService: LobbyChatService,
   ) {}
 
   handleConnection(client: Socket) {
@@ -418,7 +420,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('lobby_register_presence')
-  handleLobbyRegisterPresence(
+  async handleLobbyRegisterPresence(
     @ConnectedSocket() client: Socket,
     @MessageBody()
     userData: {
@@ -443,8 +445,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       losses: userData.losses || 0,
     });
 
-    // Deliver any queued offline DMs waiting for this user!
-    const queued = this.offlineMessageQueue.get(userData.accountId) || [];
+    // Deliver any persisted queued offline DMs from MongoDB!
+    const queued = await this.lobbyChatService.getQueuedOfflineDms(
+      userData.accountId,
+    );
     if (queued.length > 0) {
       queued.forEach((msg) => {
         const deliveredMsg = {
@@ -460,7 +464,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
           });
         }
       });
-      this.offlineMessageQueue.delete(userData.accountId);
+      await this.lobbyChatService.markDmsReadOnWake(userData.accountId);
     }
 
     this.server.emit(
@@ -470,16 +474,23 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('lobby_send_dm')
-  handleLobbySendDm(
+  async handleLobbySendDm(
     @ConnectedSocket() client: Socket,
     @MessageBody() msg: any,
   ) {
+    const timestamp = msg.timestamp || Date.now();
     if (!msg?.recipientAccountId) {
-      // Global Dojo Lounge broadcast
-      this.server.emit('lobby_chat_broadcast', {
+      // Global Dojo Lounge broadcast + persist to MongoDB
+      const globalMsg = {
         ...msg,
+        id: msg.id || `msg-${timestamp}`,
+        deliveryStatus: 'DELIVERED_LIVE' as const,
+        timestamp,
+      };
+      await this.lobbyChatService.saveMessage(globalMsg);
+      this.server.emit('lobby_chat_broadcast', {
+        ...globalMsg,
         socketId: client.id,
-        timestamp: msg.timestamp || Date.now(),
       });
       return { deliveryStatus: 'DELIVERED_LIVE' };
     }
@@ -488,24 +499,27 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (recipient?.isOnline && recipient.socketId) {
       const liveMsg = {
         ...msg,
-        deliveryStatus: 'DELIVERED_LIVE',
+        id: msg.id || `dm-${timestamp}`,
+        deliveryStatus: 'DELIVERED_LIVE' as const,
+        timestamp,
       };
+      await this.lobbyChatService.saveMessage(liveMsg);
       this.server.to(recipient.socketId).emit('lobby_receive_dm', liveMsg);
       return { deliveryStatus: 'DELIVERED_LIVE' };
     } else {
       const queuedMsg = {
         ...msg,
-        deliveryStatus: 'QUEUED_OFFLINE',
+        id: msg.id || `dm-${timestamp}`,
+        deliveryStatus: 'QUEUED_OFFLINE' as const,
+        timestamp,
       };
-      const existing = this.offlineMessageQueue.get(msg.recipientAccountId) || [];
-      existing.push(queuedMsg);
-      this.offlineMessageQueue.set(msg.recipientAccountId, existing);
+      await this.lobbyChatService.saveMessage(queuedMsg);
       return { deliveryStatus: 'QUEUED_OFFLINE' };
     }
   }
 
   @SubscribeMessage('lobby_send_fight_proposal')
-  handleLobbySendFightProposal(
+  async handleLobbySendFightProposal(
     @ConnectedSocket() client: Socket,
     @MessageBody() msg: any,
   ) {
@@ -516,6 +530,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       ...offer,
       challengerSocketId: client.id,
     });
+    await this.lobbyChatService.saveMessage(msg);
 
     const recipient = this.lobbyUsers.get(offer.targetId);
     if (recipient?.isOnline && recipient.socketId) {
@@ -524,7 +539,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('lobby_respond_fight_proposal')
-  handleLobbyRespondFightProposal(
+  async handleLobbyRespondFightProposal(
     @ConnectedSocket() client: Socket,
     @MessageBody()
     data: {
@@ -543,6 +558,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       offer.wagerNear = data.wagerNear;
     }
     this.chatFightProposals.set(data.proposalId, offer);
+    await this.lobbyChatService.updateProposalStatus(
+      data.proposalId,
+      data.status,
+      offer.wagerNear,
+    );
 
     const challenger = this.lobbyUsers.get(offer.challengerId);
     const target = this.lobbyUsers.get(offer.targetId);
