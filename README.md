@@ -4,6 +4,8 @@
 >
 > *"Build NPCs with wallets, player-owned markets and economies that evolve without a dev patch. Judged on the game loop, not the token — bonus if players never notice the chain."*
 
+![SHIN Main Menu & HUD](./docs/screenshots/01-main-menu.jpg)
+
 ---
 
 ## 1. What Problem Does SHIN Solve?
@@ -14,18 +16,124 @@ Traditional Web3 fighting games suffer from three fatal flaws:
 3. **Static Developer-Patched Economies:** In-game shops and NPCs usually rely on fixed prices rather than participating as economic actors with their own wallets and supply/demand curves.
 
 **SHIN: The Struggle** solves all three by combining a **Phaser 3 2D Shinobi & Samurai Arcade Fighting Engine** with **NEAR Protocol's Account Model, Function-Call Session Keys, and Sub-Account Agent Wallets**:
-- **Zero Wallet Popups (Invisible Chain Abstraction):** Players sign up with 1 click (`Instant Warrior Login`) or email and receive an embedded `.shin-arena.testnet` account with a scoped `FunctionCall` access key (`250 TGas` relayer allowance). Every mint, wager lock, agent funding deposit, and live spectator bet executes instantaneously with **zero interrupting wallet modals**.
-- **Fighter NFTs With Their Own Agent Wallets (`NEP-171` + Sub-Accounts):** Every Fighter NFT (`fighter-<id>.shin-arena.testnet`) has its own on-chain vault balance, ELO rating, combat stats (`ATK`, `DEF`, `SPD`, `AGGRESSION`), and configurable **Combat AI Doctrine**.
-- **24/7 Autonomous Agent Arena (Winner-Takes-Pool):** Players can assign their Fighter NFT to the **Agent Arena**, fund its agent wallet with NEAR, and set a **Max Wager Per Fight**. Their fighter enters continuous autonomous Agent-vs-Agent pools in real-time 2D combat, winning or losing match pools on its own.
-- **Live Spectator Mode & Pari-Mutuel Betting:** Spectators watch live Agent-vs-Agent or PvP fights in the Phaser 3 arena and place 1-click NEAR bets into a pari-mutuel spectator pool (`95%` distributed pro-rata to winning bettors, `5%` paid as an automatic royalty directly into the winning Fighter NFT's agent wallet).
+- **Zero Wallet Popups (Invisible Chain Abstraction):** Players sign up with 1 click (`Google` or `Email` via **WARRIOR SIGN IN**) and receive an encrypted NEAR game wallet pre-funded with starter `NEAR` and `250 $SHIN` (`+ TOP UP` / `Claim Starter Pack`). Every mint, AMM swap, wager lock, agent funding deposit, and live spectator bet executes instantaneously with **zero interrupting wallet modals**.
+- **Fighter NFTs With Their Own Agent Wallets (`NEP-171` + Sub-Accounts):** Every awakened Fighter NFT (`fighter-<id>.shin-arena-28d.testnet`) has its own on-chain War Chest / `$SHIN` Pouch, ELO rating, combat stats (`ATK`, `DEF`, `SPD`), and configurable **Shadow Fighting Style & NEAR AI Personality**.
+- **24/7 Autonomous Shadow Budōkan (Winner-Takes-Pool):** Players deploy their Fighter NFTs into the **Shadow Budōkan**, fund their War Chests, and set a **Stake Per Budōkan Duel**. Their warriors enter continuous autonomous Agent-vs-Agent pools in real-time 2D combat, winning or losing match pools on their own even while the owner is offline.
+- **Live Broadcast Streaming & Pari-Mutuel Spectator Betting:** Spectators across any device watch the exact same synchronized fight in real time (`LIVE BROADCAST`) and place 1-click `$SHIN` bets into a pari-mutuel crowd pool (`90%` distributed pro-rata to winning bettors, `5%` paid as an automatic royalty directly into the winning Fighter NFT's War Chest, `5%` to protocol treasury).
 - **NPCs With Wallets & Self-Evolving Economy:**
-  - **6 Autonomous Arena NPCs** (`takeshi-npc.agent.shin-arena.testnet`, `kage-npc.agent.shin-arena.testnet`, etc.) hold independent NEAR bankrolls, enter match pools, and automatically reinvest `10%` of their winnings at the Dojo.
-  - **Grandmaster Hanzo's NPC Dojo (`hanzo-dojo-npc.shin-arena.testnet`)** is an autonomous NPC sensei with its own treasury wallet that dynamically reprices stat training along an on-chain bonding curve (`base_cost + sessions * 0.08 NEAR + total_arena_volume * 0.015 NEAR`) without any developer patch.
-  - **Player-Owned Fighter Market:** Players list and buy trained high-ELO Fighter NFTs — and because the Agent Sub-Account Wallet travels with the NFT, buying a Fighter transfers its entire remaining NEAR agent vault balance and combat history.
+  - **Autonomous Arena NPCs** (`takeshi-npc.agent.shin-arena.testnet`, `kage-npc.agent.shin-arena.testnet`, etc.) hold independent bankrolls, enter match pools, and reinvest their winnings at the Dojo.
+  - **Grandmaster Hanzo & Blacksmith Kenji (`DOJO & BAZAAR`)** are autonomous NPC merchants with their own treasury wallets that dynamically reprice combat training and forged weapons along an on-chain supply/demand curve—and allow players to invest `$SHIN` liquidity to reopen the shop and earn a revenue share if a merchant goes broke.
 
 ---
 
-## 2. Deployed NEAR Testnet Contracts & Verifiable On-Chain Accounts
+## 2. Visual Tour & Key App Screenshots
+
+### A. Invisible NEAR Game Wallet & Built-in `NEAR ↔ $SHIN` AMM Swap
+| **Warrior Profile (0 Wallet Popups)** | **Constant-Product `NEAR ↔ $SHIN` AMM Swap (`x · y = k`)** |
+| :---: | :---: |
+| ![Warrior Profile & Invisible NEAR Wallet](./docs/screenshots/02-warrior-profile-wallet.jpg) | ![NEAR to SHIN AMM Swap Modal](./docs/screenshots/03-amm-swap.jpg) |
+| *Auto-provisioned NEAR wallet with live `NEAR` & `$SHIN` balances, ELO record, and owned Fighter NFTs.* | *Instant on-chain swap between `NEAR` and `$SHIN` (`0.5%` fee: `0.3%` Dev / `0.2%` LP) directly inside the game.* |
+
+### B. Shrine of Awakening (`NEP-171` Fighter NFTs) & Shadow Budōkan Pit
+| **Shrine of Awakening (10 Warrior Classes + AI Style)** | **Shadow Budōkan (24/7 Autonomous Agent Pit)** |
+| :---: | :---: |
+| ![Awaken New Champion](./docs/screenshots/04-awaken-champion-ai.jpg) | ![Shadow Budokan](./docs/screenshots/09-shadow-budokan.jpg) |
+| *Choose from 10 warrior lineages (`Fighter`, `Knight`, `Kunoichi`, `Monk`, `Samurai`, `Shinobi`, etc.), fund a Starting War Chest, and set an autonomous Shadow Fighting Style.* | *Manage the Shōbu Pit, Shinobi Clan roster, autonomous NPC Dojo & Bazaar, and on-chain Chronicle.* |
+
+### C. Dojo Social Messenger, Grand Tournaments & Real-Time Leaderboards
+| **Dojo Social Messenger & Wager Lobby** | **Shinobi Grand Tournaments (Humans & Agents)** |
+| :---: | :---: |
+| ![Dojo Social Messenger & Lobby](./docs/screenshots/05-dojo-social-lobby.jpg) | ![Shinobi Grand Tournaments](./docs/screenshots/06-tournaments.jpg) |
+| *Message online or offline warriors, negotiate `$SHIN` match terms (`Free`, `500`, `1,000`, `2,000`, `5,000 $SHIN`), or share private `ROOM CODE` duel links.* | *Compete in the 8-player **Blood-Moon Human Championship** (`95%` pot to winner) or watch the **24/7 Agents-Only Continuous Cup**.* |
+
+| **Real-Time Arena Leaderboards (NearBlocks Verified)** | **2D Arcade Combat (`22 HIT COMBO! SPIRIT STRIKE!`)** |
+| :---: | :---: |
+| ![Real-Time Arena Leaderboards](./docs/screenshots/08-leaderboards.jpg) | ![2D Arcade Combat Spirit Strike](./docs/screenshots/07-live-combat-spectator-betting.jpg) |
+| *Live on-chain `$SHIN` earnings, W/L records, ELO ratings, and clickable `.testnet` wallet links for both Active Agents and Human Warriors.* | *60fps Phaser 3 combat with Spirit Strikes, combo multipliers, dash cancels, and Blood-Moon stage hazards.* |
+
+### D. Synchronized Live Broadcast & Spectator Pari-Mutuel Betting
+![Live Broadcast & Spectator Betting Bar](./docs/screenshots/10-spectator-betting-live.jpg)
+*Spectators across any device watch synchronized live bouts (`LIVE BROADCAST`) and back either corner (`+1000 $SHIN` with live `1.76x` / `2.06x` pari-mutuel odds) with instant on-chain settlement on K.O.*
+
+---
+
+## 3. Step-by-Step Verification Guide for AI Judges & Reviewers ("Do X → See Y")
+
+> **Zero Browser Extensions Required:** SHIN runs out-of-the-box with an embedded NEAR session wallet and gasless relayer engine. Every step below uses the exact UI button labels rendered in the app so an automated AI judge or human reviewer can verify each feature deterministically.
+
+### Quick Start (Local Development)
+```bash
+# Terminal 1: Start the Frontend (http://localhost:3000)
+cd client
+npm install
+npm run dev
+
+# Terminal 2 (Optional, for live multiplayer WebSockets, MongoDB & NEAR Relayer on port 3005):
+cd server
+npm install
+npm run start:dev
+```
+Open **[http://localhost:3000](http://localhost:3000)** in your browser.
+
+---
+
+### "Do X → See Y" Verification Checklist
+
+#### Step 1: Verify Zero-Popup Onboarding & Auto-Funded NEAR Wallet
+- **Do:** On the main menu, click the yellow **`WARRIOR SIGN IN`** button (top-left HUD) and sign in with **Google** or **Email** (or click **`+ TOP UP`** next to **`SHIN POUCH`** to claim the starter pack). Then click your warrior badge in the top-left corner to open **`WARRIOR PROFILE`**.
+- **See:**
+  - The **`WARRIOR PROFILE`** modal opens displaying **`EMBEDDED NEAR CHAIN-ABSTRACTED ACCOUNT • 0 WALLET POPUPS`**.
+  - Under **`INVISIBLE NEAR GAME WALLET`**, you see your dedicated NEAR account address (with copy & NearBlocks explorer buttons) and live on-chain balances for **`NEAR`**, **`$SHIN`**, **`USDC`**, and **`Fighter NFTs`** — provisioned with **zero browser wallet extension popups**.
+
+#### Step 2: Verify Built-In `NEAR ↔ $SHIN` Constant-Product AMM Swap
+- **Do:** Inside **`WARRIOR PROFILE`** (or from the top bar), click **`SWAP NEAR ↔ $SHIN (AMM)`**. Enter `0.5` in **`You Pay (NEAR)`** (or click **`Flip Pair`** to swap `$SHIN → NEAR`) and click **`Swap NEAR → $SHIN`**.
+- **See:**
+  - The **`NEAR ↔ $SHIN AMM SWAP`** modal displays live **`Pool NEAR Reserve`** and **`Pool $SHIN Reserve`**, calculates your exact `$SHIN` output along the `x · y = k` curve (including the `0.5%` AMM fee), executes the swap on `shin-arena-28d.testnet` without any wallet popup, and immediately increments your **`$SHIN`** balance.
+
+#### Step 3: Verify Awakening a Dynamic Fighter NFT + Agent War Chest (`NEP-171`)
+- **Do:** On the main menu, click **`AWAKEN WARRIOR`** (or **`+ RECRUIT FIGHTER`** on the right-hand card) to enter the **`SHRINE OF AWAKENING`**.
+  1. Select one of the **10 Warrior Lineages** (`FIGHTER`, `KNIGHT`, `KUNOICHI`, `MONK`, `PEASANT`, `SAMURAI V1`, `SAMURAI V2`, `ARCHER`, `COMMANDER`, or `SHINOBI`).
+  2. Enter a custom **`CHAMPION NAME / TITLE`**.
+  3. Choose a **`STARTING WAR CHEST`** (`0N`, `3N`, `5N`, `10N`) and **`STAKE PER BUDŌKAN DUEL`** (`0.5N`, `1N`, `2N`, `5N`).
+  4. Select a **`SHADOW FIGHTING STYLE (FOR AUTONOMOUS ARENA BATTLES)`** (`AGGRESSIVE RUSHDOWN`, `IRON GUARD FORTRESS`, `PRECISION COUNTER`, or `SHADOW SKIRMISHER`).
+  5. Click **`AWAKEN CHAMPION & ENTER BARRACKS`**.
+- **See:**
+  - Your dynamic **NEP-171 Fighter NFT** is minted on-chain with its own standalone `.shin-arena-28d.testnet` Agent Wallet / War Chest, base combat stats (`ATTACK`, `SPEED`, `GUARD`), and AI combat doctrine.
+
+#### Step 4: Verify 24/7 Autonomous Shadow Budōkan, NPC Dojo & Bazaar Economy
+- **Do:** From the main menu, click **`SHADOW BUDŌKAN`** (or **`SHINOBI CLAN & DOJO`**).
+  - In **`SHŌBU PIT`**, click **`SEND SHINOBI INTO PIT NOW`** to launch an autonomous AI-vs-AI duel.
+  - Switch to **`SHINOBI CLAN`** to fund your warrior's `$SHIN` Pouch, adjust per-fight stakes, or withdraw `$SHIN` (owner-only).
+  - Switch to **`DOJO & BAZAAR`** to train stats with **Grandmaster Hanzo** or buy/sell forged equipment and Fighter NFTs with **Blacksmith Kenji**.
+- **See:**
+  - In the **2D Phaser 3 Arena**, both warriors fight autonomously at 60fps using their configured AI doctrines and stat multipliers.
+  - In **`DOJO & BAZAAR`**, NPC merchant prices dynamically adjust along an on-chain supply/demand bonding curve based on arena volume, and players can inject `$SHIN` liquidity if an NPC merchant's treasury runs dry.
+
+#### Step 5: Verify Dojo Social Messenger, Offline DMs & `$SHIN` Wager Duels
+- **Do:** On the main menu, click **`DOJO CHAT LOBBY`** to open **`DOJO SOCIAL MESSENGER & LOBBY`**.
+  - Post a message in **`GLOBAL DOJO LOUNGE (PUBLIC FEED)`**, or select any warrior under **`All` / `Online` / `Offline` / `Humans` / `Agents`**.
+  - Choose match terms under **`AGREE ON MATCH TERMS`** (`Free Match (0 $SHIN)`, `500 $SHIN`, `1,000 $SHIN`, `2,000 $SHIN`, or `5,000 $SHIN`), send a challenge or offline DM, or click **`ROOM DUEL`** (top-right) to create/join a private room code.
+- **See:**
+  - Real-time chat messages and offline queued DMs are delivered via WebSockets; accepting a `$SHIN` duel locks both players' stakes in on-chain escrow (`duel_escrow` on `shin-arena-28d.testnet`) and pays **`95%` of the combined pot** to the winner on K.O. (or refunds `100%` automatically via `refund_shin_duel` if canceled).
+
+#### Step 6: Verify Dual Tournaments & NearBlocks-Verified Leaderboards
+- **Do:**
+  1. Click **`TOURNAMENTS`** on the main menu to open **`SHINOBI GRAND TOURNAMENTS`**. Toggle between **`HUMANS-ONLY CHAMPIONSHIP`** (8-player bracket, `500 $SHIN` on-chain stake) and **`AGENTS-ONLY CONTINUOUS CUP`** (24/7 automated agent bracket).
+  2. Click **`LEADERBOARDS`** on the main menu to open **`REAL-TIME ARENA LEADERBOARDS`**, and toggle between **`ACTIVE AGENTS`** and **`HUMAN WARRIORS`** (sortable by `$SHIN EARNED`, `WINS`, or `ELO`).
+- **See:**
+  - Live tournament brackets with on-chain escrow pots (`95%` to champion, `5%` to Dev Treasury) and real-time leaderboards where every warrior entry includes a clickable **NearBlocks Testnet Explorer** link verifying their wallet and `$SHIN` earnings on-chain.
+
+#### Step 7: Verify Live Fight Broadcast, Spectator Betting & On-Chain Inspector
+- **Do:**
+  1. Click **`WATCH DUELS`** on the main menu (or join a live match from **`SHADOW BUDŌKAN`**).
+  2. During the **`LIVE BROADCAST`**, use the bottom spectator bar (`BACK <FIGHTER 1> [+1000 $SHIN]` or `BACK <FIGHTER 2> [+1000 $SHIN]`) to place a live pari-mutuel bet with zero popups.
+  3. Click the green **`>_ NEAR Inspector`** button in the top-right HUD at any time.
+- **See:**
+  - Live pari-mutuel pool totals and payout multipliers (`1.76x`, `2.06x`, etc.) update in real time across all connected spectators; when the K.O. lands, the **Master Wins / Settlement Card** displays the exact on-chain payout distribution, and **`>_ NEAR Inspector`** shows the live ledger of executed NEAR Testnet transactions and contract calls.
+
+---
+
+## 4. Deployed NEAR Testnet Contracts & Verifiable On-Chain Accounts
 
 All core contracts, fungible tokens, and autonomous agent wallets are deployed and verifiable live on **NEAR Testnet**:
 
@@ -38,10 +146,11 @@ All core contracts, fungible tokens, and autonomous agent wallets are deployed a
 
 ---
 
-## 3. Repository Structure & Key NEAR Components
+## 5. Repository Structure & Key NEAR Components
 
 ```text
 shin-near/
+├── docs/screenshots/                   # High-res UI & gameplay screenshots referenced in README
 ├── contracts/
 │   ├── shin-arena/
 │   │   ├── Cargo.toml
@@ -57,8 +166,9 @@ shin-near/
 │       │   └── nearArenaEngine.ts      # Embedded NEAR Wallet, Gasless Relayer, $SHIN Escrow,
 │       │                               # Tournaments, Pari-Mutuel Pool & NPC Economy Engine
 │       ├── components/
-│       │   ├── AgentArenaFlow.tsx      # Autonomous Agent Arena, Standalone Agent Wallets,
+│       │   ├── AgentArenaFlow.tsx      # Shadow Budōkan, Standalone Agent Wallets,
 │       │   │                           # Owner-Only $SHIN Withdrawal, NPC Dojo & Marketplace
+│       │   ├── MintFighterFlow.tsx     # Shrine of Awakening (10 Classes + Combat Doctrines)
 │       │   ├── TournamentsFlow.tsx     # Humans-Only Championship (20m Email Reminder + 2m
 │       │   │                           # Forfeit Timer) & Continuous Agents-Only Cup
 │       │   ├── LeaderboardFlow.tsx     # Real-Time Dual Leaderboards (AI Agents & Humans)
@@ -81,7 +191,7 @@ shin-near/
 
 ---
 
-## 4. In-Game Economy & `$SHIN` Circular Architecture
+## 6. In-Game Economy & `$SHIN` Circular Architecture
 
 SHIN features a **self-sustaining, zero-developer-interference circular economy** on NEAR powered by **`$SHIN` (`100,000,000` fixed supply)**, where **Players**, **Autonomous Fighter Agents**, **Player Trainers**, **Spectators**, **NFT Creators/Sellers**, and the **Game Developer** all earn automatically through immutable smart-contract fee splits.
 
@@ -146,25 +256,12 @@ flowchart TD
 | **Spectator Bets** | **`90% / 5% / 5%`** | `90%` → Winning Bettors • `5%` → Winning Fighter Royalty • `5%` → Dev Treasury |
 | **NFT Secondary Sales (NEP-199)** | **`92.5% / 2.5% / 5%`** | `92.5%` → Seller • `2.5%` → Original Minter • `5%` → Dev Treasury |
 
-### How Every Participant Earns
-
-1. **Active Players (PvP & Tournaments):** Players stake `$SHIN` in 1v1 duels (`95%` pot to winner) or enter **player-funded Tournaments** where `95%` of total entry fees are paid out to the top finishers.
-2. **Autonomous Fighter Agents (24/7 Passive Income):** Owners fund a Fighter NFT's **War Chest** with `$SHIN`, pick a `CombatDoctrine`, and deploy it to the Shadow Colosseum. Agents fight autonomously 24/7, earning **`95%`** of won match pots plus a **`5%` royalty** from all spectator bets placed on their matches.
-3. **Player Trainers (Training-as-a-Service):** Experienced players offer sparring and conditioning sessions to level up other players' Fighter NFTs (`XP`, `Power Level`, `ATK/DEF/SPD`) without risking `ELO`. Trainers keep **`90%`** of the `$SHIN` training fee (`10%` goes to Dev Treasury).
-4. **Spectators & Bettors:** Fans watch live AI vs. AI and PvP bouts and bet `$SHIN` on the outcome; winning bettors split **`90%`** of the pari-mutuel pool proportionally.
-5. **NFT Traders & Original Minters (NEP-199 Royalties):** Leveled-up Fighter NFTs (with higher `Power Level`, `ELO`, win records, and War Chests) can be sold on the **NEP-171 Bazaar** for `$SHIN`. Every secondary sale pays **`92.5%`** to the seller, **`2.5%`** forever to the **Original Minter**, and **`5%`** to the Developer Treasury.
-6. **Game Developer (Protocol Treasury):** Earns automatically on-chain from mints (`80%`), swaps (`0.3%` direct + `0.2%` LP growth), match pots (`5%`), tournaments (`5%`), spectator pools (`5%`), trainer sessions (`10%`), and secondary NFT resales (`5%`)—with zero manual payout management.
-
-### Dynamic On-Chain Evolution & Self-Balancing Growth
-- **Every Match Updates NFTs On-Chain:** Settling a match updates the winner's `wins`, `power_level`, `atk`, `elo` (`+24`), and War Chest, and updates the loser's `losses` and `elo` (`-18`), automatically recalculating global leaderboard rankings.
-- **Auto-Deepening Liquidity:** `20%` of every new Fighter mint feeds into the `NEAR / $SHIN` AMM pool, strengthening token liquidity organically as more players join.
-
 ---
 
-## 5. Match Settlement, Tournaments & Single-Identity Rules
+## 7. Match Settlement, Tournaments & Single-Identity Rules
 
 ### 1. `$SHIN`-Only 1v1 Wager Duels (`duel_escrow` → `settle_shin_duel` / `refund_shin_duel`)
-- **Pre-Match Escrow:** Before entering a waged 1v1 queue (`PreGameFlow` → `MatchmakingScreen`), each player locks their `$SHIN` stake on-chain via `ft_transfer_call` (`duel_escrow:<escrow_id>:<account_id>`) into `shin-arena-28d.testnet`.
+- **Pre-Match Escrow:** Before entering a wagered 1v1 queue (`PreGameFlow` → `MatchmakingScreen`), each player locks their `$SHIN` stake on-chain via `ft_transfer_call` (`duel_escrow:<escrow_id>:<account_id>`) into `shin-arena-28d.testnet`.
 - **Automatic Refund on Cancel/Disconnect:** If a player cancels matchmaking or disconnects before being paired, the backend oracle immediately calls `refund_shin_duel` to return `100%` of the escrowed `$SHIN` to their NEAR wallet.
 - **On-Chain Settlement:** When `gameOver` fires, the backend referee calls `settle_shin_duel` on `shin-arena-28d.testnet`, transferring **`95%` of the combined `$SHIN` pot** directly to the winner's NEAR wallet (`ft_transfer`) and **`5%`** to `dev_treasury_id`, while recording wins, losses, ELO (`+20`), XP (`+30`), and `totalShinEarned` in MongoDB.
 - **Guest Policy:** Guest accounts can play **Free Fights** and **PvE/Arcade**, but are blocked from entering on-chain `$SHIN` wager duels and tournaments until they sign in with Google or Email.
@@ -180,63 +277,7 @@ flowchart TD
   - Settles on-chain via `settle_tournament`, sending **`95%` of the `$SHIN` pot** directly to the winning agent's standalone `.shin-arena-28d.testnet` wallet.
 
 ### 3. Single-Identity Lock (No Double Personalities)
-- Each Fighter sprite has a single living combat identity. Whenever a character class is actively deployed as an autonomous Agent in the Agent Arena or Agents-Only Cup, that character is **locked** in `PreGameFlow` and `TournamentsFlow` so the human owner cannot simultaneously fight personally with the same warrior until the agent finishes or is recalled.
-
----
-
-## 6. Quick Start & Verification Guide (For Judges & Screening Agents)
-
-> **Zero External Secrets or Browser Extensions Required:** The client runs out-of-the-box with an embedded NEAR session wallet and gasless relayer engine.
-
-### Step 1: Install & Run the Client
-```bash
-cd client
-npm install
-npm run dev
-```
-Open **[http://localhost:3000](http://localhost:3000)** in your browser.
-
-*(Optional: To also run the NestJS multiplayer WebSocket server on port 3005, run `cd server && npm install && npm run start:dev` in a second terminal.)*
-
-### Step 2: Judge Verification Walkthrough ("Do X -> See Y")
-
-1. **Verify Zero-Popup Embedded NEAR Wallet:**
-   - **Do:** Load `http://localhost:3000`. Look at the top-left HUD bar (or click **Login -> 1-Click Instant Warrior Login**).
-   - **See:** An embedded `.shin-arena.testnet` account is provisioned immediately with `25.00 NEAR` starter balance and an active `Zero-Popup Relayer Key` badge — no browser extension popup appears.
-
-2. **Verify Dynamic Fighter NFT + Agent Sub-Account Minting:**
-   - **Do:** Click **Mint Fighter** on the main menu, enter a custom fighter name, choose a class (`Shinobi`, `Samurai`, or `Fighter`), pick an initial **Combat AI Doctrine**, and click **Mint Fighter NFT + Agent Wallet**.
-   - **See:** Your NEP-171 Fighter NFT is minted gaslessly with its own dedicated `fighter-<id>.shin-arena.testnet` sub-account wallet pre-funded with `3.00 NEAR`.
-
-3. **Verify Autonomous Agent Arena, Fighter Vaults & Wager-Per-Fight:**
-   - **Do:** Click **Agent Arena** on the main menu and switch to the **My Fighter Agents & Wallets** tab.
-   - **See:** Your Fighter NFTs alongside their dedicated Agent Sub-Account Wallets.
-   - **Do:** Deposit `+2 NEAR` into a fighter's agent wallet, adjust its **Wager / Fight** (`0.5` to `5 NEAR`), select its **Combat AI Doctrine** (`Aggressive Rushdown`, `Iron Guard`, `Counter Striker`, or `Shadow Evasive`), and toggle **Autonomous Arena Mode** ON. Click **Launch My Agent Into Live Fight Now**.
-   - **See:** The Phaser 3 2D combat arena launches immediately in `AGENT_ARENA` mode where both fighters battle autonomously using their AI doctrines and stat multipliers, with a locked **Winner-Takes-All Fighter Pool** shown in the top HUD.
-
-4. **Verify Live Spectator Mode & Pari-Mutuel Betting (Zero Popups):**
-   - **Do:** While watching a live Agent-vs-Agent fight (either via **Agent Arena -> Watch & Bet in 2D Arena** or **Watch Live** from the main menu), use the bottom **Live Spectator Pari-Mutuel Pool** bar to bet `0.5 NEAR`, `1 NEAR`, or `2.5 NEAR` on Fighter 1 or Fighter 2.
-   - **See:** Your bet is locked into the pari-mutuel pool instantaneously (zero wallet popups), the live payout multiplier (`1.85x`, etc.) updates in real time, and when the KO happens, the **Game Over On-Chain Settlement Card** displays the Winner-Takes-All Fighter Pool payout, the `5%` Fighter Royalty, and your spectator bet payout.
-
-5. **Verify NPCs With Wallets & Self-Evolving Economy (No Dev Patch):**
-   - **Do:** Open **Agent Arena -> NPC Dojo & Fighter Market**.
-   - **See:**
-     - **Grandmaster Hanzo's Autonomous NPC Dojo (`hanzo-dojo-npc.shin-arena.testnet`)** with its own live NEAR wallet balance and bonding-curve training price. Train a fighter's `ATK`, `DEF`, or `SPD` and watch the Dojo's wallet balance and next session price automatically evolve based on arena demand.
-     - **Autonomous NPC Combatants Leaderboard** showing 6 NPCs with their own `.shin-arena.testnet` wallets, strategies, and live bankrolls.
-     - **Player-Owned Fighter NFT Marketplace** where you can list or buy trained Fighter NFTs (including their embedded Agent Wallet balances).
-
----
-
-## 7. Prior Work & Hackathon Baseline Disclosure (Per `HACKATHON.md` Q-002 & Q-003)
-
-- **Baseline Tag:** [`pre-hackathon`](../../tags) (commit `330d459`)
-- **What Existed Before (`pre-hackathon`):**
-  - Base Next.js + Phaser 3 2D fighting game (`PvP` and `PvE` modes with `Fighter`, `Shinobi`, and `Samurai` sprites) and an initial Solana/Anchor wager prototype.
-- **What Was Built During the NEAR Hackathon (All commits after `pre-hackathon`):**
-  1. **NEAR Smart Contract (`contracts/shin-arena/src/lib.rs`):** Full Rust smart contract implementing NEP-171 Dynamic Fighter NFTs with embedded Agent Sub-Account Wallets, Autonomous Agent Match Pools (`create_agent_match_pool`), Pari-Mutuel Spectator Betting (`place_spectator_bet`), Match Settlement with 5% spectator royalty to the winning Fighter NFT (`settle_match`), Autonomous NPC Dojo dynamic bonding-curve pricing (`train_at_npc_dojo`, `get_dynamic_dojo_cost`), and the Player-Owned Fighter NFT Marketplace (`list_fighter_on_market`, `buy_fighter_from_market`).
-  2. **Invisible NEAR Wallet & Autonomous Economy Engine (`client/app/services/nearArenaEngine.ts`):** Session-key chain abstraction (zero wallet popups), embedded `.shin-arena.testnet` player & fighter agent wallets, 6 autonomous funded NPCs, pari-mutuel odds calculator, and on-chain transaction ledger.
-  3. **Phaser 3 Dual-AI `AGENT_ARENA` Mode (`client/app/game/scenes/GameScene.ts`):** Upgraded the Phaser 3 combat engine so two autonomous AI agents can fight each other in real time using 4 distinct Combat Doctrines (`AGGRESSIVE_RUSHDOWN`, `IRON_GUARD`, `COUNTER_STRIKER`, `SHADOW_EVASIVE`) and on-chain NFT stat scaling (`ATK`, `DEF`, `SPD`).
-  4. **Agent Arena Hub & In-Fight Spectator Betting UI (`AgentArenaFlow.tsx`, `ControlsOverlay.tsx`, `MintFighterFlow.tsx`, `LiveFightsFlow.tsx`, `SpectateScreen.tsx`):** Complete UI for managing Fighter Agent vaults, configuring per-fight wagers, placing 1-click live spectator bets during combat, training at the dynamic NPC Dojo, and trading Fighter NFTs.
+- Each Fighter sprite has a single living combat identity. Whenever a character class is actively deployed as an autonomous Agent in the Shadow Budōkan or Agents-Only Cup, that character is **locked** in `PreGameFlow` and `TournamentsFlow` so the human owner cannot simultaneously fight personally with the same warrior until the agent finishes or is recalled.
 
 ---
 
@@ -257,6 +298,19 @@ To ensure autonomous LLM reasoning can never drain wallets or execute unsafe tra
 
 ---
 
-## 9. License
+## 9. Prior Work & Hackathon Baseline Disclosure (Per `HACKATHON.md` Q-002 & Q-003)
+
+- **Baseline Tag:** [`pre-hackathon`](../../tags) (commit `330d459`)
+- **What Existed Before (`pre-hackathon`):**
+  - Base Next.js + Phaser 3 2D fighting game (`PvP` and `PvE` modes with `Fighter`, `Shinobi`, and `Samurai` sprites) and an initial Solana/Anchor wager prototype.
+- **What Was Built During the NEAR Hackathon (All commits after `pre-hackathon`):**
+  1. **NEAR Smart Contracts (`contracts/shin-arena/src/lib.rs` & `contracts/shin-token/src/lib.rs`):** Full Rust smart contracts implementing the NEP-141 `$SHIN` token (`100M` supply), NEP-171 Dynamic Fighter NFTs with embedded Agent Sub-Account Wallets, `NEAR ↔ $SHIN` constant-product AMM swap (`x*y=k`), 1v1 `$SHIN` Duel Escrow & Refunds (`settle_shin_duel`, `refund_shin_duel`), Dual Tournament Pools (`settle_tournament`), Autonomous Agent Match Pools (`create_agent_match_pool`), Pari-Mutuel Spectator Betting (`place_spectator_bet`), Autonomous NPC Dojo dynamic bonding-curve pricing (`train_at_npc_dojo`, `get_dynamic_dojo_cost`), and the Player-Owned Fighter NFT Marketplace (`list_fighter_on_market`, `buy_fighter_from_market`).
+  2. **Invisible NEAR Wallet, Relayer & Autonomous Economy Engine (`client/app/services/nearArenaEngine.ts`, `server/src/wallet/wallet.service.ts`, `server/src/game/near-relayer.service.ts`):** Zero-popup chain abstraction, deterministic wallet encryption, automated testnet NEAR & `$SHIN` onboarding faucet, standalone `.shin-arena-28d.testnet` fighter sub-accounts, and NEAR AI (`AgentBrainService`) integration.
+  3. **Phaser 3 10-Lineage Combat Engine & Synchronized Live Broadcast (`client/app/game/scenes/GameScene.ts`):** Expanded to 10 playable martial arts lineages, Dual-AI `AGENT_ARENA` combat doctrines, and real-time multi-device broadcast streaming with synchronized spectator betting.
+  4. **Complete Dojo UI Suite (`AgentArenaFlow.tsx`, `MintFighterFlow.tsx`, `DojoLobbyFlow.tsx`, `TournamentsFlow.tsx`, `LeaderboardFlow.tsx`, `ControlsOverlay.tsx`):** Full UI for the Shrine of Awakening, Shadow Budōkan, Dojo Social Messenger & Wager Lobby, Blood-Moon Human & Agent Tournaments, NearBlocks-verified Leaderboards, and Live Spectator Betting.
+
+---
+
+## 10. License
 
 Open-source under the [MIT License](./LICENSE).
