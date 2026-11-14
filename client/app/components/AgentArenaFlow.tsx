@@ -65,6 +65,8 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
   const [trainerFee, setTrainerFee] = useState<string>('0.5');
   const [trainerSpecialty, setTrainerSpecialty] = useState<'ATK' | 'DEF' | 'SPD'>('ATK');
   const [targetTrainerId, setTargetTrainerId] = useState<string>('');
+  const [onChainCupId, setOnChainCupId] = useState<string>('shin-cup-1');
+  const [onChainEntryNear, setOnChainEntryNear] = useState<string>('0.5');
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -1411,6 +1413,76 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* PLAYER-FUNDED ON-CHAIN TOURNAMENTS (95% Winners / 5% Dev Treasury) */}
+            <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-950/30 via-black to-zinc-950 p-5 space-y-4">
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-amber-400">
+                  On-Chain Tournaments • 95% Winners / 5% Dev Treasury
+                </div>
+                <h3 className="text-lg font-cinzel font-black text-white uppercase tracking-wider">
+                  🏆 Player-Funded Tournaments
+                </h3>
+                <p className="text-xs text-gray-400">
+                  Create or join an on-chain tournament pool on NEAR Testnet. All entry fees go into the prize pot (95% to winners, 5% Dev Treasury).
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  value={onChainCupId}
+                  onChange={(e) => setOnChainCupId(e.target.value)}
+                  placeholder="Tournament ID (e.g. shin-cup-1)"
+                  className="bg-zinc-900 border border-white/15 rounded px-2.5 py-1.5 text-xs font-mono text-white"
+                />
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={onChainEntryNear}
+                  onChange={(e) => setOnChainEntryNear(e.target.value)}
+                  className="w-24 bg-zinc-900 border border-white/15 rounded px-2.5 py-1.5 text-xs font-mono text-white"
+                  placeholder="Entry NEAR"
+                />
+                <button
+                  disabled={!onChainCupId.trim()}
+                  onClick={async () => {
+                    const res = await nearArenaEngine.createOnChainTournament(
+                      onChainCupId.trim(),
+                      parseFloat(onChainEntryNear) || 0.5,
+                      4,
+                    );
+                    showToast(
+                      res.ok
+                        ? `Created on-chain tournament "${onChainCupId.trim()}"!`
+                        : res.error || 'Create tournament failed',
+                    );
+                  }}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-cinzel font-bold text-[10px] uppercase rounded disabled:opacity-40 cursor-pointer"
+                >
+                  Create Pool
+                </button>
+                <button
+                  disabled={!selectedFighter || !onChainCupId.trim()}
+                  onClick={async () => {
+                    if (!selectedFighter) return;
+                    const res = await nearArenaEngine.joinOnChainTournament(
+                      onChainCupId.trim(),
+                      selectedFighter.tokenId,
+                      parseFloat(onChainEntryNear) || 0.5,
+                    );
+                    showToast(
+                      res.ok
+                        ? `${selectedFighter.title} joined "${onChainCupId.trim()}" on-chain!`
+                        : res.error || 'Join tournament failed',
+                    );
+                  }}
+                  className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-cinzel font-bold text-[10px] uppercase rounded disabled:opacity-40 cursor-pointer"
+                >
+                  Join ({selectedFighter ? selectedFighter.title : 'Select Fighter'})
+                </button>
               </div>
             </div>
 

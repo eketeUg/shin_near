@@ -645,8 +645,10 @@ export interface ArenaPersistentState {
 
 class NearArenaEngine {
   private state: ArenaPersistentState;
-  public readonly shinTokenId = 'shin.shin-arena-28d.testnet';
-  public readonly arenaContractId = 'shin-arena-28d.testnet';
+  public readonly shinTokenId =
+    process.env.NEXT_PUBLIC_NEAR_SHIN_TOKEN_ID || 'shin.shin-arena-28d.testnet';
+  public readonly arenaContractId =
+    process.env.NEXT_PUBLIC_NEAR_CONTRACT_ID || 'shin-arena-28d.testnet';
 
   constructor() {
     this.state = this.loadOrInitState();
@@ -3318,6 +3320,64 @@ class NearArenaEngine {
       { token_id: tokenId, trainer_id: trainerId },
       feeNear.toString(),
     );
+  }
+
+  // ===========================================================================
+  // PLAYER-FUNDED TOURNAMENTS (ON-CHAIN: 95% WINNERS / 5% DEV TREASURY)
+  // ===========================================================================
+
+  public async createOnChainTournament(
+    tournamentId: string,
+    entryFeeNear: number,
+    maxPlayers: number = 4,
+  ) {
+    const entryFeeMilli = Math.max(100, Math.round(entryFeeNear * 1000));
+    return this.relayCallAsync('create_tournament', {
+      tournament_id: tournamentId,
+      entry_fee_milli_near: entryFeeMilli,
+      max_players: maxPlayers,
+    });
+  }
+
+  public async joinOnChainTournament(
+    tournamentId: string,
+    tokenId: string,
+    entryFeeNear: number,
+  ) {
+    return this.relayCallAsync(
+      'join_tournament',
+      { tournament_id: tournamentId, token_id: tokenId },
+      entryFeeNear.toString(),
+    );
+  }
+
+  public async settleOnChainTournament(
+    tournamentId: string,
+    winnerTokenIds: string[],
+  ) {
+    return this.relayCallAsync('settle_tournament', {
+      tournament_id: tournamentId,
+      winner_token_ids: winnerTokenIds,
+    });
+  }
+
+  public async getOnChainTournament(tournamentId: string): Promise<{
+    tournament_id: string;
+    entry_fee_milli_near: number;
+    max_players: number;
+    entrants: string[];
+    total_pot_milli_near: number;
+    is_settled: boolean;
+    winner_token_ids: string[];
+  } | null> {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    const res = await fetch(
+      `${serverUrl}/api/near/view?method=get_tournament&args=${encodeURIComponent(
+        JSON.stringify({ tournament_id: tournamentId }),
+      )}`,
+    );
+    const data = await res.json();
+    return data?.ok ? data.result : null;
   }
 }
 

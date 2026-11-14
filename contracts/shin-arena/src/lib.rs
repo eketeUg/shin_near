@@ -91,6 +91,11 @@ pub struct NpcDojoMaster {
 #[ext_contract(ext_ft)]
 pub trait FungibleToken {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
+    fn storage_deposit(
+        &mut self,
+        account_id: Option<AccountId>,
+        registration_only: Option<bool>,
+    );
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug)]
@@ -338,6 +343,20 @@ impl ShinArenaContract {
         self.next_token_nonce += 1;
 
         let attached_milli = env::attached_deposit().as_millinear();
+        // Mint fee: 0.5 NEAR (500 milliNEAR) split 80% Dev Treasury / 20% AMM Liquidity Pool;
+        // any excess attached NEAR funds the Fighter's embedded Agent Vault.
+        let mint_fee_milli = attached_milli.min(500);
+        let vault_initial_milli = attached_milli.saturating_sub(mint_fee_milli);
+        if mint_fee_milli > 0 {
+            let dev_mint_cut = mint_fee_milli.saturating_mul(80) / 100;
+            let pool_mint_cut = mint_fee_milli.saturating_sub(dev_mint_cut);
+            self.dev_treasury_milli += dev_mint_cut;
+            self.amm_near_reserve += pool_mint_cut.saturating_mul(1_000_000_000_000_000_000_000);
+            if dev_mint_cut > 0 && self.dev_treasury_id != env::current_account_id() {
+                let _ = Promise::new(self.dev_treasury_id.clone())
+                    .transfer(NearToken::from_millinear(dev_mint_cut));
+            }
+        }
 
         let fighter = FighterNft {
             token_id: token_id.clone(),
@@ -352,7 +371,7 @@ impl ShinArenaContract {
             wins: 0,
             losses: 0,
             elo: 1000,
-            vault_balance_milli_near: attached_milli,
+            vault_balance_milli_near: vault_initial_milli,
             wager_per_fight_milli_near: 1_000, // Default 1 NEAR per fight
             is_agent_active: false,
             auto_train_at_dojo: false,
@@ -941,10 +960,18 @@ impl ShinArenaContract {
             let _ = Promise::new(self.dev_treasury_id.clone()).transfer(NearToken::from_yoctonear(dev_fee_near));
         }
 
+        // Ensure receiver has NEP-145 storage registered on $SHIN before ft_transfer
+        // (registration_only: true refunds unused deposit if already registered)
         ext_ft::ext(self.shin_token_id.clone())
-            .with_attached_deposit(NearToken::from_yoctonear(1))
+            .with_attached_deposit(NearToken::from_yoctonear(1_250_000_000_000_000_000_000))
             .with_static_gas(GAS_FOR_FT_TRANSFER)
-            .ft_transfer(caller, U128(shin_out), Some("SHIN AMM Swap: NEAR -> $SHIN".to_string()))
+            .storage_deposit(Some(caller.clone()), Some(true))
+            .then(
+                ext_ft::ext(self.shin_token_id.clone())
+                    .with_attached_deposit(NearToken::from_yoctonear(1))
+                    .with_static_gas(GAS_FOR_FT_TRANSFER)
+                    .ft_transfer(caller, U128(shin_out), Some("SHIN AMM Swap: NEAR -> $SHIN".to_string())),
+            )
     }
 
     /// NEP-141 receiver callback for `$SHIN` -> `NEAR` swaps via `ft_transfer_call`
@@ -1317,7 +1344,9 @@ mod tests {
 
         assert_eq!(fighter.token_id, "shin-hayabusa-1");
         assert_eq!(fighter.owner_id.as_str(), "alice.testnet");
-        assert_eq!(fighter.vault_balance_milli_near, 5_000);
+        // 5000 milliNEAR attached -> 500 mint fee (400 Dev / 100 AMM Pool), 4500 in Agent Vault
+        assert_eq!(fighter.vault_balance_milli_near, 4_500);
+        assert_eq!(contract.dev_treasury_milli, 400);
         assert_eq!(fighter.elo, 1000);
 
         let alice: AccountId = "alice.testnet".parse().unwrap();
@@ -1355,7 +1384,7 @@ mod tests {
 
         testing_env!(get_context("alice.testnet", 3_500));
         let funded = contract.fund_agent_wallet(fighter.token_id);
-        assert_eq!(funded.vault_balance_milli_near, 4_500);
+        assert_eq!(funded.vault_balance_milli_near, 4_000);
     }
 
     #[test]
@@ -1390,16 +1419,16 @@ mod tests {
         let winner = fighters.iter().find(|f| f.token_id == f1.token_id).unwrap();
         let loser = fighters.iter().find(|f| f.token_id == f2.token_id).unwrap();
 
-        // f1 started with 5000, staked 1000 -> 4000, won 1900 (95% of 2000 pot) + 100 (5% of 2000 bet) = 6000,
-        // auto_train_at_dojo paid 500 -> 5500
-        assert_eq!(winner.vault_balance_milli_near, 5_500);
+        // f1 started with 4500 in vault (5000 - 500 mint fee), staked 1000 -> 3500, won 1900 (95% of 2000 pot) + 100 (5% of 2000 bet) = 5500,
+        // auto_train_at_dojo paid 500 -> 5000
+        assert_eq!(winner.vault_balance_milli_near, 5_000);
         assert_eq!(winner.wins, 1);
         assert_eq!(winner.elo, 1024);
         assert_eq!(winner.power_level, 3); // +1 from win, +1 from auto-train
 
         assert_eq!(loser.losses, 1);
         assert_eq!(loser.elo, 982);
-        assert_eq!(loser.vault_balance_milli_near, 4_000);
+        assert_eq!(loser.vault_balance_milli_near, 3_500);
 
         // Auto-train minted shadow-step-mastery scroll to winner's agent wallet
         assert_eq!(
@@ -1423,7 +1452,7 @@ mod tests {
         let trained = contract.buy_dojo_scroll(f1.token_id.clone(), "ATK".to_string());
         assert_eq!(trained.atk, 83);
         assert_eq!(trained.power_level, 2);
-        assert_eq!(trained.vault_balance_milli_near, 4_500);
+        assert_eq!(trained.vault_balance_milli_near, 4_000);
 
         // Dynamic price increases by 25 milliNEAR after 1 training
         assert_eq!(contract.get_dynamic_dojo_cost(), 525);
@@ -1550,8 +1579,8 @@ mod tests {
         let f1 = contract.mint_fighter("ken".to_string(), "Ken".to_string(), 70, 70, 70);
         let trained = contract.train_fighter_with_trainer(f1.token_id.clone(), "sensei.testnet".parse().unwrap());
         assert_eq!(trained.atk, 72);
-        // 10% of 1000 milliNEAR = 100 milliNEAR to dev treasury
-        assert_eq!(contract.dev_treasury_milli, 100);
+        // 10% of 1000 milliNEAR (100) + 400 mint dev cut = 500 milliNEAR to dev treasury
+        assert_eq!(contract.dev_treasury_milli, 500);
         assert_eq!(contract.get_trainer("sensei.testnet".parse().unwrap()).unwrap().sessions_completed, 1);
     }
 
@@ -1576,9 +1605,9 @@ mod tests {
         testing_env!(get_context("oracle.testnet", 0));
         let settled = contract.settle_tournament("cup-1".to_string(), vec![f1.token_id.clone()]);
         assert!(settled.is_settled);
-        // 95% of 2000 = 1900 milliNEAR added to winner's 1000 vault -> 2900
-        assert_eq!(contract.fighters.get(&f1.token_id).unwrap().vault_balance_milli_near, 2_900);
-        // 5% of 2000 = 100 milliNEAR to dev treasury
-        assert_eq!(contract.dev_treasury_milli, 100);
+        // 95% of 2000 = 1900 milliNEAR added to winner's 500 vault (1000 - 500 mint fee) -> 2400
+        assert_eq!(contract.fighters.get(&f1.token_id).unwrap().vault_balance_milli_near, 2_400);
+        // 5% of 2000 = 100 milliNEAR + 2x 400 mint dev cuts = 900 milliNEAR to dev treasury
+        assert_eq!(contract.dev_treasury_milli, 900);
     }
 }
