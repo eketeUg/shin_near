@@ -1017,10 +1017,103 @@ impl ShinArenaContract {
 
             let _ = Promise::new(sender_id).transfer(NearToken::from_yoctonear(near_out));
             PromiseOrValue::Value(U128(0))
+        } else if let Some(rest) = msg.strip_prefix("buy_dojo_scroll:") {
+            // Format: "buy_dojo_scroll:<token_id>:<scroll_type>"
+            let parts: Vec<&str> = rest.split(':').collect();
+            assert!(parts.len() == 2, "Invalid buy_dojo_scroll msg format");
+            let token_id = parts[0].to_string();
+            let scroll_type = parts[1];
+            assert!(amount.0 > 0, "Must attach $SHIN to purchase Dojo Scroll");
+
+            let mut fighter = self.fighters.get(&token_id).expect("Fighter not found");
+            self.npc_dojo.total_trainings_completed += 1;
+            fighter.power_level += 1;
+            let nep245_scroll_id = match scroll_type {
+                "ATK" => {
+                    fighter.atk += 3;
+                    "scroll:crimson-katana".to_string()
+                }
+                "DEF" => {
+                    fighter.def += 3;
+                    "scroll:iron-posture".to_string()
+                }
+                _ => {
+                    fighter.spd += 3;
+                    "scroll:shadow-step-mastery".to_string()
+                }
+            };
+            self.fighters.insert(&token_id, &fighter);
+            self.internal_mt_mint(
+                &fighter.agent_wallet_id,
+                &[nep245_scroll_id],
+                &[1],
+                Some("Purchased NEP-245 Shinobi Scroll with $SHIN from NPC Dojo"),
+            );
+
+            // Credit $SHIN directly to NPC Merchant's contract-custodied $SHIN treasury
+            let npc_key = "npc:hanzo-dojo:shin".to_string();
+            let prev = self.mt_balances.get(&npc_key).unwrap_or(0);
+            self.mt_balances.insert(&npc_key, &(prev + amount.0));
+
+            env::log_str(&format!(
+                "NPC_DOJO_EARNED_SHIN:{{\"buyer\":\"{}\",\"token_id\":\"{}\",\"shin_amount\":\"{}\"}}",
+                sender_id, token_id, amount.0
+            ));
+            PromiseOrValue::Value(U128(0))
+        } else if let Some(rest) = msg.strip_prefix("train_with_trainer:") {
+            // Format: "train_with_trainer:<token_id>:<trainer_id>"
+            let parts: Vec<&str> = rest.split(':').collect();
+            assert!(parts.len() == 2, "Invalid train_with_trainer msg format");
+            let token_id = parts[0].to_string();
+            let trainer_id: AccountId = parts[1].parse().expect("Invalid trainer AccountId");
+
+            let mut fighter = self.fighters.get(&token_id).expect("Fighter NFT not found");
+            assert_eq!(sender_id, fighter.owner_id, "Only fighter owner can train");
+            let mut trainer = self.trainers.get(&trainer_id).expect("Trainer not registered");
+            assert!(trainer.is_active, "Trainer is not active");
+            assert!(amount.0 > 0, "Must attach $SHIN for trainer fee");
+
+            // 90% $SHIN to Trainer / 10% $SHIN to Dev Treasury
+            let dev_cut = amount.0.saturating_mul(10) / 100;
+            let trainer_cut = amount.0.saturating_sub(dev_cut);
+
+            match trainer.specialty.as_str() {
+                "ATK" => fighter.atk += 2,
+                "DEF" => fighter.def += 2,
+                _ => fighter.spd += 2,
+            }
+            let xp = self.fighter_xp.get(&token_id).unwrap_or(0) + 15;
+            self.fighter_xp.insert(&token_id, &xp);
+            self.fighters.insert(&token_id, &fighter);
+            trainer.sessions_completed += 1;
+            self.trainers.insert(&trainer_id, &trainer);
+
+            if trainer_cut > 0 {
+                let _ = ext_ft::ext(self.shin_token_id.clone())
+                    .with_attached_deposit(NearToken::from_yoctonear(1))
+                    .with_static_gas(GAS_FOR_FT_TRANSFER)
+                    .ft_transfer(trainer_id, U128(trainer_cut), Some("SHIN Player Trainer 90% Fee".to_string()));
+            }
+            if dev_cut > 0 && self.dev_treasury_id != env::current_account_id() {
+                let _ = ext_ft::ext(self.shin_token_id.clone())
+                    .with_attached_deposit(NearToken::from_yoctonear(1))
+                    .with_static_gas(GAS_FOR_FT_TRANSFER)
+                    .ft_transfer(self.dev_treasury_id.clone(), U128(dev_cut), Some("SHIN Trainer 10% Dev Fee".to_string()));
+            }
+            PromiseOrValue::Value(U128(0))
+        } else if msg == "invest_npc" {
+            let npc_key = "npc:hanzo-dojo:shin".to_string();
+            let prev = self.mt_balances.get(&npc_key).unwrap_or(0);
+            self.mt_balances.insert(&npc_key, &(prev + amount.0));
+            PromiseOrValue::Value(U128(0))
         } else {
             // Refund unused tokens for unrecognized messages
             PromiseOrValue::Value(amount)
         }
+    }
+
+    pub fn get_npc_shin_treasury(&self) -> U128 {
+        U128(self.mt_balances.get(&"npc:hanzo-dojo:shin".to_string()).unwrap_or(0))
     }
 
     // =========================================================================
@@ -1609,5 +1702,39 @@ mod tests {
         assert_eq!(contract.fighters.get(&f1.token_id).unwrap().vault_balance_milli_near, 2_400);
         // 5% of 2000 = 100 milliNEAR + 2x 400 mint dev cuts = 900 milliNEAR to dev treasury
         assert_eq!(contract.dev_treasury_milli, 900);
+    }
+
+    #[test]
+    fn test_npc_earns_shin_and_trainer_shin_split() {
+        testing_env!(get_context("alice.testnet", 1_000));
+        let mut contract = ShinArenaContract::new("oracle.testnet".parse().unwrap());
+        let f1 = contract.mint_fighter("hayabusa".to_string(), "Hayabusa".to_string(), 80, 70, 90);
+
+        // Player buys Dojo Scroll with 500 $SHIN -> NPC Dojo earns 500 $SHIN
+        testing_env!(get_context("shin.shin-arena-28d.testnet", 0));
+        let shin_500: u128 = 500 * 1_000_000_000_000_000_000;
+        let res = contract.ft_on_transfer(
+            "alice.testnet".parse().unwrap(),
+            U128(shin_500),
+            format!("buy_dojo_scroll:{}:ATK", f1.token_id),
+        );
+        match res {
+            PromiseOrValue::Value(v) => assert_eq!(v.0, 0),
+            _ => panic!("Expected Value(0)"),
+        }
+        assert_eq!(contract.get_npc_shin_treasury().0, shin_500);
+        assert_eq!(contract.fighters.get(&f1.token_id).unwrap().atk, 83);
+
+        // Player Trainer earns $SHIN (90% Trainer / 10% Dev)
+        testing_env!(get_context("sensei.testnet", 0));
+        contract.register_trainer(500, "SPD".to_string());
+        testing_env!(get_context("shin.shin-arena-28d.testnet", 0));
+        let _ = contract.ft_on_transfer(
+            "alice.testnet".parse().unwrap(),
+            U128(shin_500),
+            format!("train_with_trainer:{}:sensei.testnet", f1.token_id),
+        );
+        assert_eq!(contract.fighters.get(&f1.token_id).unwrap().spd, 92);
+        assert_eq!(contract.get_trainer("sensei.testnet".parse().unwrap()).unwrap().sessions_completed, 1);
     }
 }

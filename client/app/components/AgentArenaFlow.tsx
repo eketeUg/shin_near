@@ -1226,6 +1226,37 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                                   Buy ({item.askPriceNear.toFixed(2)}N)
                                 </button>
 
+                                {/* Buy with $SHIN (Default Economy Currency) */}
+                                {item.category === 'SCROLL' && selectedFighter && (
+                                  <button
+                                    onClick={async () => {
+                                      const shinPrice = Math.round(item.askPriceNear * 1000);
+                                      const scrollType =
+                                        item.tokenId === 'scroll:crimson-katana'
+                                          ? 'ATK'
+                                          : item.tokenId === 'scroll:iron-posture'
+                                            ? 'DEF'
+                                            : 'SPD';
+                                      const res = await nearArenaEngine.buyDojoScrollWithShin(
+                                        merchant.merchantId,
+                                        selectedFighter.tokenId,
+                                        scrollType,
+                                        shinPrice,
+                                      );
+                                      setArenaState({ ...nearArenaEngine.getState() });
+                                      showToast(
+                                        res.ok
+                                          ? `📜 Paid ${shinPrice} $SHIN to ${merchant.name} & trained ${selectedFighter.title}!`
+                                          : res.error || '$SHIN purchase failed',
+                                      );
+                                    }}
+                                    disabled={!merchant.isShopOpen || item.stock <= 0}
+                                    className="px-3 py-1.5 bg-amber-500/20 border border-amber-400/50 text-amber-300 font-cinzel font-black text-[10px] uppercase rounded-lg hover:bg-amber-500/30 disabled:opacity-40 cursor-pointer"
+                                  >
+                                    Pay {Math.round(item.askPriceNear * 1000)} $SHIN
+                                  </button>
+                                )}
+
                                 {/* Sell 1x to NPC button */}
                                 <button
                                   onClick={() => {

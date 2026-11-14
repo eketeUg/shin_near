@@ -275,6 +275,7 @@ export interface NpcMerchantLiveState {
   avatarGif: string;
   specialty: string;
   walletBalanceNear: number;
+  walletBalanceShin?: number;
   insolvencyThresholdNear: number;
   isShopOpen: boolean;
   playerInvestmentNear: number;
@@ -3359,6 +3360,54 @@ class NearArenaEngine {
       tournament_id: tournamentId,
       winner_token_ids: winnerTokenIds,
     });
+  }
+
+  public async trainFighterWithPlayerTrainerShin(
+    tokenId: string,
+    trainerId: string,
+    shinAmount: number,
+  ) {
+    const rawShin = (BigInt(Math.floor(shinAmount * 1000)) * BigInt('1000000000000000')).toString();
+    return this.relayCallAsync(
+      'ft_transfer_call',
+      {
+        receiver_id: this.arenaContractId,
+        amount: rawShin,
+        msg: `train_with_trainer:${tokenId}:${trainerId}`,
+      },
+      '1yocto',
+      this.shinTokenId,
+      '120000000000000',
+    );
+  }
+
+  public async buyDojoScrollWithShin(
+    merchantId: 'hanzo-dojo' | 'kenji-forge',
+    tokenId: string,
+    scrollType: 'ATK' | 'DEF' | 'SPD',
+    shinAmount: number,
+  ) {
+    const rawShin = (BigInt(Math.floor(shinAmount * 1000)) * BigInt('1000000000000000')).toString();
+    const res = await this.relayCallAsync(
+      'ft_transfer_call',
+      {
+        receiver_id: this.arenaContractId,
+        amount: rawShin,
+        msg: `buy_dojo_scroll:${tokenId}:${scrollType}`,
+      },
+      '1yocto',
+      this.shinTokenId,
+      '120000000000000',
+    );
+    if (res.ok) {
+      const merchant = this.state.npcMerchants.find((m) => m.merchantId === merchantId);
+      if (merchant) {
+        merchant.walletBalanceShin = Number(((merchant.walletBalanceShin || 0) + shinAmount).toFixed(2));
+        merchant.totalTradesCount += 1;
+        this.saveState();
+      }
+    }
+    return res;
   }
 
   public async getOnChainTournament(tournamentId: string): Promise<{
