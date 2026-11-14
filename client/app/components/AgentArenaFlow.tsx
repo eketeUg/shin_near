@@ -228,10 +228,10 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       </div>
 
       {/* =====================================================================
-          ARCADE NAVIGATION BLADES (Desktop Top Bar + Mobile Fixed Bottom Bar)
+          ARCADE NAVIGATION BLADES
          ===================================================================== */}
       <div className="px-3 sm:px-6 md:px-8 pt-3 sm:pt-5 pb-2 max-w-7xl mx-auto w-full flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
-        <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1 w-full lg:w-auto">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 w-full lg:w-auto">
           {[
             { id: 'LIVE_ARENA', label: '🔥 Shōbu Pit', icon: Flame },
             {
@@ -263,37 +263,6 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
           })}
         </div>
 
-        {/* Mobile Fixed Bottom Navbar */}
-        <nav
-          aria-label="Shadow Budōkan Navigation"
-          className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-black/95 backdrop-blur-md border-t border-white/15 px-2 py-1.5 grid grid-cols-4 gap-1"
-          style={{ paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}
-        >
-          {[
-            { id: 'LIVE_ARENA', label: 'Shōbu Pit', icon: Flame },
-            { id: 'MY_AGENTS', label: `Clan (${ownedFighters.length})`, icon: Shield },
-            { id: 'DOJO_MARKET', label: 'Dojo', icon: Store },
-            { id: 'LEDGER', label: 'Chronicle', icon: ScrollText },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg font-cinzel text-[10px] font-bold uppercase tracking-wide transition-all cursor-pointer ${
-                  active
-                    ? 'bg-shin-red/20 text-shin-gold border border-shin-red/50'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <Icon size={16} />
-                <span className="truncate max-w-full">{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
         <button
           onClick={handleSpawnMyAgentMatch}
           className="w-full lg:w-auto arcade-skew px-5 py-2.5 bg-shin-gold text-black font-cinzel font-black text-xs tracking-widest uppercase hover:bg-yellow-400 transition-all shadow-[0_0_25px_rgba(251,191,36,0.45)] cursor-pointer"
@@ -308,7 +277,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       {/* =====================================================================
           MAIN CONTENT CONTAINER
          ===================================================================== */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 py-5 pb-24 md:pb-5">
+      <div className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 py-5">
         {/* ============================================================
             TAB 1: COLOSSEUM PIT (LIVE AI DUELS & CROWD BACKING)
            ============================================================ */}
@@ -344,8 +313,8 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
               </div>
             </div>
 
-            {/* Arcade VS Fight Posters Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Arcade VS Fight Posters Grid (2 per row on mobile, 3 on desktop) */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6">
               {arenaState.activeMatches.map((match) => {
                 const totalSpec = match.spectatorPoolP1Near + match.spectatorPoolP2Near;
                 const p1Odds =
@@ -361,35 +330,37 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                 return (
                   <div
                     key={match.matchId}
-                    className="bg-gradient-to-b from-gray-900/95 via-black to-black border-2 border-white/15 hover:border-shin-gold rounded-2xl p-5 flex flex-col justify-between transition-all shadow-[0_0_30px_rgba(0,0,0,0.8)] relative overflow-hidden group"
+                    className="bg-gradient-to-b from-gray-900/95 via-black to-black border-2 border-white/15 hover:border-shin-gold rounded-xl sm:rounded-2xl p-2.5 sm:p-5 flex flex-col justify-between transition-all shadow-[0_0_30px_rgba(0,0,0,0.8)] relative overflow-hidden group"
                   >
                     {/* Top Match Header */}
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[10px] font-cinzel text-gray-300 bg-white/5 px-2.5 py-1 rounded border border-white/10">
-                        👁 {match.viewers} Watching
+                    <div className="flex flex-wrap items-center justify-between gap-1 mb-2 sm:mb-3">
+                      <span className="text-[8px] sm:text-[10px] font-cinzel text-gray-300 bg-white/5 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded border border-white/10">
+                        👁 {match.viewers}
                       </span>
-                      <span className="bg-shin-red/20 text-shin-red border border-shin-red/50 text-[10px] font-cinzel font-black px-3 py-0.5 rounded-full flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-shin-red animate-ping" />
-                        FIGHT POT: {Math.round(match.fighterPoolNear * 1000).toLocaleString()} $SHIN
+                      <span className="bg-shin-red/20 text-shin-red border border-shin-red/50 text-[8px] sm:text-[10px] font-cinzel font-black px-1.5 sm:px-3 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-shin-red animate-ping shrink-0" />
+                        <span className="truncate">
+                          {Math.round(match.fighterPoolNear * 1000).toLocaleString()} $SHIN
+                        </span>
                       </span>
                     </div>
 
                     {/* Visual VS Stage */}
-                    <div className="grid grid-cols-11 items-center bg-gradient-to-r from-amber-950/30 via-black to-red-950/30 border border-white/10 rounded-xl p-3 mb-4 relative">
+                    <div className="grid grid-cols-11 items-center bg-gradient-to-r from-amber-950/30 via-black to-red-950/30 border border-white/10 rounded-lg sm:rounded-xl p-1.5 sm:p-3 mb-2 sm:mb-4 relative">
                       {/* Fighter 1 */}
-                      <div className="col-span-5 flex flex-col items-center text-center">
-                        <div className="relative w-24 h-24 flex items-end justify-center overflow-hidden">
+                      <div className="col-span-5 flex flex-col items-center text-center min-w-0">
+                        <div className="relative w-12 h-12 sm:w-24 sm:h-24 flex items-end justify-center overflow-hidden">
                           <img
                             src={getCharGif(match.p1.charId)}
                             alt={match.p1.name}
-                            className="w-24 h-24 object-contain scale-125 origin-bottom"
+                            className="w-12 h-12 sm:w-24 sm:h-24 object-contain scale-125 origin-bottom"
                             style={{ imageRendering: 'pixelated' }}
                           />
                         </div>
-                        <div className="font-cinzel font-black text-xs text-white mt-1 truncate w-full">
+                        <div className="font-cinzel font-black text-[9px] sm:text-xs text-white mt-1 truncate w-full">
                           {match.p1.title}
                         </div>
-                        <div className="text-[10px] text-shin-gold font-mono font-bold">
+                        <div className="text-[8px] sm:text-[10px] text-shin-gold font-mono font-bold truncate w-full">
                           Lv.{match.p1.powerLevel} • {match.p1.wins}W/{match.p1.losses}L
                         </div>
                         {showNearUnderHood && (
@@ -401,25 +372,25 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
 
                       {/* VS Emblem */}
                       <div className="col-span-1 flex flex-col items-center justify-center">
-                        <div className="w-8 h-8 rounded-full bg-shin-red/20 border border-shin-red flex items-center justify-center font-cinzel font-black text-xs text-shin-red shadow-[0_0_15px_rgba(255,42,42,0.6)]">
+                        <div className="w-5 h-5 sm:w-8 sm:h-8 rounded-full bg-shin-red/20 border border-shin-red flex items-center justify-center font-cinzel font-black text-[8px] sm:text-xs text-shin-red shadow-[0_0_15px_rgba(255,42,42,0.6)]">
                           VS
                         </div>
                       </div>
 
                       {/* Fighter 2 */}
-                      <div className="col-span-5 flex flex-col items-center text-center">
-                        <div className="relative w-24 h-24 flex items-end justify-center overflow-hidden">
+                      <div className="col-span-5 flex flex-col items-center text-center min-w-0">
+                        <div className="relative w-12 h-12 sm:w-24 sm:h-24 flex items-end justify-center overflow-hidden">
                           <img
                             src={getCharGif(match.p2.charId)}
                             alt={match.p2.name}
-                            className="w-24 h-24 object-contain scale-x-[-1.25] scale-y-125 origin-bottom"
+                            className="w-12 h-12 sm:w-24 sm:h-24 object-contain scale-x-[-1.25] scale-y-125 origin-bottom"
                             style={{ imageRendering: 'pixelated' }}
                           />
                         </div>
-                        <div className="font-cinzel font-black text-xs text-white mt-1 truncate w-full">
+                        <div className="font-cinzel font-black text-[9px] sm:text-xs text-white mt-1 truncate w-full">
                           {match.p2.title}
                         </div>
-                        <div className="text-[10px] text-red-400 font-mono font-bold">
+                        <div className="text-[8px] sm:text-[10px] text-red-400 font-mono font-bold truncate w-full">
                           Lv.{match.p2.powerLevel} • {match.p2.wins}W/{match.p2.losses}L
                         </div>
                         {showNearUnderHood && (
@@ -431,62 +402,66 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                     </div>
 
                     {/* Pots Overview */}
-                    <div className="grid grid-cols-2 gap-2 mb-3 text-center">
-                      <div className="bg-shin-gold/10 border border-shin-gold/30 rounded-lg p-2">
-                        <div className="text-[9px] text-gray-400 uppercase">Warrior Winner Pot</div>
-                        <div className="text-sm font-mono font-bold text-shin-gold">
+                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mb-2 sm:mb-3 text-center">
+                      <div className="bg-shin-gold/10 border border-shin-gold/30 rounded-lg p-1.5 sm:p-2">
+                        <div className="text-[7px] sm:text-[9px] text-gray-400 uppercase truncate">
+                          Winner Pot
+                        </div>
+                        <div className="text-[10px] sm:text-sm font-mono font-bold text-shin-gold truncate">
                           {Math.round(match.fighterPoolNear * 1000).toLocaleString()} $SHIN
                         </div>
                       </div>
-                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2">
-                        <div className="text-[9px] text-gray-400 uppercase">Crowd Backing Pot</div>
-                        <div className="text-sm font-mono font-bold text-emerald-400">
+                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-1.5 sm:p-2">
+                        <div className="text-[7px] sm:text-[9px] text-gray-400 uppercase truncate">
+                          Crowd Pot
+                        </div>
+                        <div className="text-[10px] sm:text-sm font-mono font-bold text-emerald-400 truncate">
                           {Math.round(totalSpec * 1000).toLocaleString()} $SHIN
                         </div>
                       </div>
                     </div>
 
                     {/* Quick Crowd Backing Bar */}
-                    <div className="space-y-2 mb-4 bg-white/5 p-3 rounded-xl border border-white/10">
-                      <div className="flex items-center justify-between text-[10px] text-gray-300 font-cinzel uppercase tracking-wider">
-                        <span>Back a Warrior ($SHIN)</span>
-                        <div className="flex gap-1">
+                    <div className="space-y-1.5 sm:space-y-2 mb-2.5 sm:mb-4 bg-white/5 p-2 sm:p-3 rounded-lg sm:rounded-xl border border-white/10">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[8px] sm:text-[10px] text-gray-300 font-cinzel uppercase tracking-wider">
+                        <span className="truncate">Back ($SHIN)</span>
+                        <div className="grid grid-cols-4 sm:flex gap-1">
                           {[0.5, 1, 2, 5].map((val) => (
                             <button
                               key={val}
                               onClick={() =>
                                 setBetAmounts((prev) => ({ ...prev, [match.matchId]: val }))
                               }
-                              className={`px-2 py-0.5 rounded font-mono text-[10px] border cursor-pointer ${
+                              className={`px-1 sm:px-2 py-0.5 rounded font-mono text-[8px] sm:text-[10px] border cursor-pointer truncate ${
                                 currentBetAmt === val
                                   ? 'bg-shin-gold text-black border-shin-gold font-bold'
                                   : 'bg-black/60 text-gray-400 border-white/10'
                               }`}
                             >
-                              {(val * 1000).toLocaleString()} $SHIN
+                              {val === 0.5 ? '500' : `${val}k`}
                             </button>
                           ))}
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-1 sm:gap-2">
                         <button
                           onClick={() =>
                             handlePlaceLobbyBet(match.matchId, 'p1', match.p1.title)
                           }
-                          className="py-2 px-2.5 bg-amber-950/70 hover:bg-amber-800 border border-shin-gold/50 rounded-lg text-xs font-cinzel font-bold text-shin-gold flex items-center justify-between cursor-pointer"
+                          className="py-1.5 sm:py-2 px-1.5 sm:px-2.5 bg-amber-950/70 hover:bg-amber-800 border border-shin-gold/50 rounded-lg text-[9px] sm:text-xs font-cinzel font-bold text-shin-gold flex items-center justify-between gap-1 cursor-pointer min-w-0"
                         >
-                          <span className="truncate">Back {match.p1.name}</span>
-                          <span className="font-mono text-white">{p1Odds}x</span>
+                          <span className="truncate">{match.p1.name}</span>
+                          <span className="font-mono text-white shrink-0">{p1Odds}x</span>
                         </button>
                         <button
                           onClick={() =>
                             handlePlaceLobbyBet(match.matchId, 'p2', match.p2.title)
                           }
-                          className="py-2 px-2.5 bg-red-950/70 hover:bg-red-800 border border-shin-red/50 rounded-lg text-xs font-cinzel font-bold text-red-300 flex items-center justify-between cursor-pointer"
+                          className="py-1.5 sm:py-2 px-1.5 sm:px-2.5 bg-red-950/70 hover:bg-red-800 border border-shin-red/50 rounded-lg text-[9px] sm:text-xs font-cinzel font-bold text-red-300 flex items-center justify-between gap-1 cursor-pointer min-w-0"
                         >
-                          <span className="truncate">Back {match.p2.name}</span>
-                          <span className="font-mono text-white">{p2Odds}x</span>
+                          <span className="truncate">{match.p2.name}</span>
+                          <span className="font-mono text-white shrink-0">{p2Odds}x</span>
                         </button>
                       </div>
                     </div>
@@ -494,10 +469,10 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
                     {/* Enter Live 2D Fight Button */}
                     <button
                       onClick={() => onWatchAgentFight(match)}
-                      className="w-full py-3.5 bg-gradient-to-r from-shin-red to-red-700 hover:from-red-500 hover:to-red-600 text-white font-cinzel font-black text-xs tracking-[0.2em] uppercase rounded-xl shadow-[0_0_20px_rgba(255,42,42,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full py-2 sm:py-3.5 bg-gradient-to-r from-shin-red to-red-700 hover:from-red-500 hover:to-red-600 text-white font-cinzel font-black text-[9px] sm:text-xs tracking-[0.12em] sm:tracking-[0.2em] uppercase rounded-lg sm:rounded-xl shadow-[0_0_20px_rgba(255,42,42,0.4)] transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer"
                     >
-                      <Swords size={15} />
-                      <span>ENTER PIT &amp; WATCH LIVE</span>
+                      <Swords size={13} className="shrink-0" />
+                      <span className="truncate">WATCH LIVE</span>
                     </button>
                   </div>
                 );
