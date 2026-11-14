@@ -2587,17 +2587,25 @@ class NearArenaEngine {
       (c) => !legacyFakeIds.has(c.contactId) && c.accountId !== myAccountId,
     );
 
-    // Only list real on-chain Fighter NFTs (!f.isNpc) as Agents in the Dojo Lounge
+    // Include all autonomous Arena Agents & NPCs (plus any player-deployed Fighter NFTs) in the Dojo Lounge
+    const seenAgentKeys = new Set<string>();
     const agentContacts: DojoSocialContact[] = this.state.fighters
-      .filter((f) => !f.isNpc)
+      .filter((f) => {
+        const key = f.agentWalletId || f.tokenId;
+        if (!key || seenAgentKeys.has(key)) return false;
+        seenAgentKeys.add(key);
+        return true;
+      })
       .map((f) => {
         const archMeta = AGENT_PERSONALITY_ARCHETYPES.find(
           (a) => a.id === f.personality?.archetype,
         );
+        const agentAcct =
+          f.agentWalletId || `${String(f.tokenId).toLowerCase()}.shin-arena-28d.testnet`;
         return {
           contactId: `agent-${f.tokenId}`,
           username: f.title,
-          accountId: f.agentWalletId,
+          accountId: agentAcct,
           userType: 'AGENT',
           charId: f.charId,
           isOnline: f.isAgentActive,

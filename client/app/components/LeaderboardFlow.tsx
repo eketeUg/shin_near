@@ -151,7 +151,7 @@ const LeaderboardFlow: React.FC<LeaderboardFlowProps> = ({ onBack, onHome }) => 
   const walletShin = Math.round(arenaState.playerWallet.SHIN ?? 0).toLocaleString();
 
   return (
-    <div className="min-h-screen w-full bg-black text-white flex flex-col overflow-y-auto">
+    <div className="fixed inset-0 z-40 h-screen w-full bg-black text-white flex flex-col overflow-y-auto pb-16">
       {toast && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[100] bg-shin-gold text-black font-cinzel font-black text-xs px-5 py-2.5 rounded-full shadow-[0_0_25px_rgba(251,191,36,0.9)] flex items-center gap-2">
           <CheckCircle2 size={15} /> {toast}
