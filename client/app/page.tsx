@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Volume2, VolumeX, Trophy, Swords } from 'lucide-react';
+import { Volume2, VolumeX, Trophy } from 'lucide-react';
 import { io } from 'socket.io-client';
 import GameCanvasWrapper from './components/GameCanvasWrapper';
 import LoadingScreen from './components/LoadingScreen';
@@ -61,8 +61,7 @@ export default function Home() {
     matchLabel: string;
     opponentName: string;
   } | null>(null);
-  const [liveDuelAlert, setLiveDuelAlert] = useState<any | null>(null);
-  const dismissedDuelIdRef = useRef<string | null>(null);
+  const [liveDuelsCount, setLiveDuelsCount] = useState<number>(0);
   const [deployedChars, setDeployedChars] = useState<string[]>([]);
 
   useEffect(() => {
@@ -142,14 +141,7 @@ export default function Home() {
     });
     socket.on('active_matches_updated', (list: any[]) => {
       if (!Array.isArray(list)) return;
-      const top = list.find((m) => !m?.sim?.ending) || list[0] || null;
-      if (!top) {
-        setLiveDuelAlert(null);
-        return;
-      }
-      if (dismissedDuelIdRef.current !== top.matchId) {
-        setLiveDuelAlert(top);
-      }
+      setLiveDuelsCount(list.filter((m) => !m?.sim?.ending).length);
     });
     socket.on('tournament_started', (cup: any) => checkMyReadyMatch(cup));
     socket.on('tournament_updated', (payload: any) => {
@@ -520,6 +512,7 @@ export default function Home() {
               setReturnToAgentArenaAfterFight(true);
               setShowMintFlow(true);
             }}
+            liveDuelsCount={liveDuelsCount}
             isMuted={isMuted}
             onToggleMute={toggleMute}
           />
@@ -752,53 +745,6 @@ export default function Home() {
             </button>
             <button
               onClick={() => setTourneyAlert(null)}
-              className="text-gray-400 hover:text-white text-xs px-1.5 py-1 cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Global Live Agent Duel Notification */}
-      {!isLoading && liveDuelAlert && !tourneyAlert && !showLiveFights && !showMatchmaking && !isGameStarted && !isSpectating && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[88] max-w-lg w-[92%] bg-gray-950/95 border border-red-500/70 rounded-2xl px-4 py-2.5 shadow-[0_0_25px_rgba(239,68,68,0.28)] flex items-center justify-between gap-3 backdrop-blur-md">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-            <Swords size={16} className="text-red-400 shrink-0" />
-            <div className="min-w-0">
-              <div className="text-[11px] font-cinzel font-black text-red-400 uppercase tracking-wider truncate">
-                Live Duel • {liveDuelAlert.fighterPoolShin || 500} $SHIN Pool
-              </div>
-              <div className="text-xs font-mono text-gray-200 truncate">
-                <strong className="text-white">{liveDuelAlert.p1Name}</strong> vs{' '}
-                <strong className="text-white">{liveDuelAlert.p2Name}</strong>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => {
-                const match = liveDuelAlert;
-                dismissedDuelIdRef.current = match.matchId;
-                setLiveDuelAlert(null);
-                setShowLiveFights(false);
-                setShowAgentArena(false);
-                setShowTournaments(false);
-                setShowDojoLobby(false);
-                setShowLeaderboard(false);
-                setSpectatingMatch(match);
-                setIsSpectating(true);
-              }}
-              className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white font-cinzel font-black text-[10px] uppercase rounded-lg cursor-pointer transition-colors"
-            >
-              Watch Live
-            </button>
-            <button
-              onClick={() => {
-                dismissedDuelIdRef.current = liveDuelAlert.matchId;
-                setLiveDuelAlert(null);
-              }}
               className="text-gray-400 hover:text-white text-xs px-1.5 py-1 cursor-pointer"
             >
               ✕

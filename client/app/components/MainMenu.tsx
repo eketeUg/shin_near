@@ -36,6 +36,7 @@ interface MainMenuProps {
   onOpenLeaderboard?: () => void;
   onOpenColosseum?: (initialTab?: 'LIVE_ARENA' | 'MY_AGENTS' | 'DOJO_MARKET' | 'LEDGER') => void;
   onAwakenWarrior?: (charId?: CharacterId) => void;
+  liveDuelsCount?: number;
   isMuted: boolean;
   onToggleMute: () => void;
 }
@@ -49,6 +50,7 @@ const MainMenu = ({
   onOpenLeaderboard,
   onOpenColosseum,
   onAwakenWarrior,
+  liveDuelsCount = 0,
   isMuted,
   onToggleMute,
 }: MainMenuProps) => {
@@ -290,10 +292,11 @@ const MainMenu = ({
               playClickSound();
               onOpenColosseum?.('LIVE_ARENA');
             }}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/70 border border-red-500/40 text-xs font-cinzel text-red-300 cursor-pointer transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/70 border border-red-500/40 text-[11px] sm:text-xs font-cinzel text-red-300 cursor-pointer transition-all shrink-0"
           >
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-            <span>{arenaState.activeMatches.length} Live Budōkan Duels</span>
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0" />
+            <span className="sm:hidden">{Math.max(arenaState.activeMatches.length, liveDuelsCount)} Live</span>
+            <span className="hidden sm:inline">{Math.max(arenaState.activeMatches.length, liveDuelsCount)} Live Budōkan Duels</span>
           </button>
 
           {/* Dedicated Judge / Under-The-Hood Inspector Button */}
