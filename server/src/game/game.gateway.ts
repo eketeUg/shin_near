@@ -102,6 +102,31 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  private resolveSpriteType(rawType?: string): string {
+    const key = String(rawType || 'shinobi').trim().toLowerCase();
+    const aliasMap: Record<string, string> = {
+      monk: 'ninja_monk',
+      knight: 'knight_1',
+      commander: 'samurai_commander',
+      archer: 'samurai_archer',
+      peasant: 'ninja_peasant',
+    };
+    const mapped = aliasMap[key] || key;
+    const valid = new Set([
+      'fighter',
+      'knight_1',
+      'kunoichi',
+      'ninja_monk',
+      'ninja_peasant',
+      'samurai',
+      'samurai_1',
+      'samurai_archer',
+      'samurai_commander',
+      'shinobi',
+    ]);
+    return valid.has(mapped) ? mapped : 'shinobi';
+  }
+
   private spawnServerBroadcastMatch(slotIdx = 0) {
     if (this.cachedOnChainAgents.length < 2) {
       return;
@@ -114,8 +139,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const matchId = `live_bcast_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-    const p1Type = String(f1.char_class || 'samurai').toLowerCase();
-    const p2Type = String(f2.char_class || 'shinobi').toLowerCase();
+    const p1Type = this.resolveSpriteType(f1.char_class || 'samurai');
+    const p2Type = this.resolveSpriteType(f2.char_class || 'shinobi');
 
     this.activeMatches.set(matchId, {
       hostId: 'SERVER_BROADCAST',
@@ -155,8 +180,29 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       sim: {
         matchTimer: 99,
         tickInSec: 0,
+        totalElapsedSec: 0,
+        currentRound: 1,
+        p1Wins: 0,
+        p2Wins: 0,
+        roundPauseTicks: 0,
+        p1CooldownTicks: 0,
+        p2CooldownTicks: 0,
+        p1AnimLockTicks: 0,
+        p2AnimLockTicks: 0,
+        p1ComboStep: 0,
+        p2ComboStep: 0,
+        p1Guarding: false,
+        p2Guarding: false,
+        p1TotalDamageDealt: 0,
+        p2TotalDamageDealt: 0,
         p1RelX: -180,
         p2RelX: 180,
+        p1RelY: 0,
+        p2RelY: 0,
+        p1VelX: 0,
+        p2VelX: 0,
+        p1VelY: 0,
+        p2VelY: 0,
         p1Hp: 100,
         p2Hp: 100,
         p1MaxHp: 100,
@@ -177,6 +223,255 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  private stepFighterPhysics(s: any, side: 'p1' | 'p2') {
+    const relXKey = `${side}RelX`;
+    const relYKey = `${side}RelY`;
+    const velXKey = `${side}VelX`;
+    const velYKey = `${side}VelY`;
+    const cdKey = `${side}CooldownTicks`;
+    const lockKey = `${side}AnimLockTicks`;
+    const guardKey = `${side}Guarding`;
+
+    if ((s[cdKey] || 0) > 0) s[cdKey]--;
+    if ((s[lockKey] || 0) > 0) {
+      s[lockKey]--;
+      if (s[lockKey] === 0) {
+        s[guardKey] = false;
+      }
+    }
+
+    if (s[velXKey]) {
+      s[relXKey] = Math.max(-350, Math.min(350, (s[relXKey] || 0) + s[velXKey]));
+      s[velXKey] *= 0.65;
+      if (Math.abs(s[velXKey]) < 1) s[velXKey] = 0;
+    }
+
+    if ((s[relYKey] || 0) < 0 || (s[velYKey] || 0) !== 0) {
+      s[relYKey] = (s[relYKey] || 0) + (s[velYKey] || 0);
+      s[velYKey] = (s[velYKey] || 0) + 9; // Gravity
+      if (s[relYKey] >= 0) {
+        s[relYKey] = 0;
+        s[velYKey] = 0;
+      }
+    }
+  }
+
+  private stepBroadcastFighterAI(
+    matchId: string,
+    match: any,
+    s: any,
+    side: 'p1' | 'p2',
+    opp: 'p1' | 'p2',
+    dist: number,
+  ) {
+    const type = side === 'p1' ? match.p1Type : match.p2Type;
+    const oppType = opp === 'p1' ? match.p1Type : match.p2Type;
+    const animKey = `${side}Anim`;
+    const oppAnimKey = `${opp}Anim`;
+    const lockKey = `${side}AnimLockTicks`;
+    const cdKey = `${side}CooldownTicks`;
+    const comboKey = `${side}ComboStep`;
+    const guardKey = `${side}Guarding`;
+    const oppGuardKey = `${opp}Guarding`;
+    const oppLockKey = `${opp}AnimLockTicks`;
+    const relXKey = `${side}RelX`;
+    const oppRelXKey = `${opp}RelX`;
+    const relYKey = `${side}RelY`;
+    const velXKey = `${side}VelX`;
+    const velYKey = `${side}VelY`;
+    const oppVelXKey = `${opp}VelX`;
+    const oppHpKey = `${opp}Hp`;
+    const dmgTotalKey = `${side}TotalDamageDealt`;
+    const dirToOpp = (s[oppRelXKey] || 0) >= (s[relXKey] || 0) ? 1 : -1;
+
+    // Hold current animation (attack swing, shield block, or jump arc) until lock expires
+    if ((s[lockKey] || 0) > 0) {
+      return;
+    }
+
+    const oppAttacking =
+      (s[oppLockKey] || 0) > 0 && String(s[oppAnimKey] || '').includes('attack');
+    const grounded = (s[relYKey] || 0) === 0;
+
+    // Out of striking range: approach, jump-in, or brief footsie pause
+    if (dist > 110) {
+      s[comboKey] = 0;
+      const r = Math.random();
+      if (grounded && r < 0.12) {
+        // Jump-in approach
+        s[velYKey] = -36;
+        s[velXKey] = dirToOpp * 22;
+        s[animKey] = `${type}_jump`;
+        s[lockKey] = 6;
+        this.server.to(`match_${matchId}`).emit('spectator_fire_event', {
+          type: 'audio',
+          data: { type: 'jump' },
+        });
+      } else if (r < 0.85) {
+        // Dash / run forward
+        const step = 11 + Math.random() * 6;
+        s[relXKey] = Math.max(-340, Math.min(340, (s[relXKey] || 0) + dirToOpp * step));
+        s[animKey] = `${type}_run`;
+      } else {
+        s[animKey] = `${type}_idle`;
+        s[lockKey] = 2;
+      }
+      return;
+    }
+
+    // Reactive defense when opponent is mid-swing
+    if (oppAttacking && grounded && Math.random() < 0.42) {
+      s[comboKey] = 0;
+      s[guardKey] = true;
+      s[animKey] = `${type}_block`;
+      s[lockKey] = 4;
+      return;
+    }
+
+    // Continue 2-3 hit combo chain if active
+    const comboStep = s[comboKey] || 0;
+    if (comboStep > 0 && (s[cdKey] || 0) === 0) {
+      if (Math.random() < 0.68) {
+        const isFinisher = comboStep >= 2;
+        const atkIdx = isFinisher ? 3 : 2;
+        this.executeBroadcastStrike(
+          matchId,
+          match,
+          s,
+          side,
+          opp,
+          type,
+          oppType,
+          atkIdx,
+          isFinisher,
+          dirToOpp,
+        );
+        s[comboKey] = isFinisher ? 0 : 2;
+        s[lockKey] = isFinisher ? 5 : 3;
+        s[cdKey] = isFinisher ? 7 : 3;
+        return;
+      }
+      s[comboKey] = 0;
+    }
+
+    // Neutral close/mid-range decision
+    const roll = Math.random();
+    if ((s[cdKey] || 0) === 0 && roll < 0.42) {
+      // Open combo with attack_1 or attack_2
+      const atkIdx = Math.random() < 0.65 ? 1 : 2;
+      this.executeBroadcastStrike(
+        matchId,
+        match,
+        s,
+        side,
+        opp,
+        type,
+        oppType,
+        atkIdx,
+        false,
+        dirToOpp,
+      );
+      s[comboKey] = 1;
+      s[lockKey] = 3;
+      s[cdKey] = 3;
+    } else if ((s[cdKey] || 0) === 0 && roll < 0.52) {
+      // Heavy signature skill (attack_3 lunge + knockback)
+      s[velXKey] = dirToOpp * 16;
+      this.executeBroadcastStrike(
+        matchId,
+        match,
+        s,
+        side,
+        opp,
+        type,
+        oppType,
+        3,
+        true,
+        dirToOpp,
+      );
+      s[comboKey] = 0;
+      s[lockKey] = 5;
+      s[cdKey] = 8;
+    } else if (roll < 0.70) {
+      // Deliberate guard stance
+      s[comboKey] = 0;
+      s[guardKey] = true;
+      s[animKey] = `${type}_block`;
+      s[lockKey] = 4;
+    } else if (grounded && roll < 0.84) {
+      // Evasive jump or backdash footsie
+      s[comboKey] = 0;
+      if (Math.random() < 0.5) {
+        s[velYKey] = -36;
+        s[velXKey] = -dirToOpp * 18;
+        s[animKey] = `${type}_jump`;
+        s[lockKey] = 6;
+        this.server.to(`match_${matchId}`).emit('spectator_fire_event', {
+          type: 'audio',
+          data: { type: 'jump' },
+        });
+      } else {
+        s[velXKey] = -dirToOpp * 24;
+        s[animKey] = `${type}_run`;
+        s[lockKey] = 3;
+      }
+    } else {
+      // Brief spacing / anticipation pause
+      s[comboKey] = 0;
+      s[animKey] = `${type}_idle`;
+      s[lockKey] = 2;
+    }
+
+    // Keep unused variables tidy
+    void oppGuardKey;
+    void oppVelXKey;
+    void oppHpKey;
+    void dmgTotalKey;
+  }
+
+  private executeBroadcastStrike(
+    matchId: string,
+    match: any,
+    s: any,
+    side: 'p1' | 'p2',
+    opp: 'p1' | 'p2',
+    type: string,
+    oppType: string,
+    atkIdx: number,
+    isHeavy: boolean,
+    dirToOpp: number,
+  ) {
+    s[`${side}Anim`] = `${type}_attack_${atkIdx}`;
+    const blocked = Boolean(s[`${opp}Guarding`]) || Math.random() < 0.22;
+    if (blocked && (s[`${opp}AnimLockTicks`] || 0) <= 1) {
+      s[`${opp}Anim`] = `${oppType}_block`;
+      s[`${opp}AnimLockTicks`] = 3;
+    }
+
+    const attacker = side === 'p1' ? match.p1 : match.p2;
+    const defender = opp === 'p1' ? match.p1 : match.p2;
+    const atk = Number(attacker?.atk || 85);
+    const def = Number(defender?.def || 80);
+    const base = isHeavy ? 8 : 4;
+    const dmg = blocked
+      ? isHeavy
+        ? 3
+        : 1
+      : Math.max(4, Math.min(isHeavy ? 13 : 9, Math.round(base + (atk - def) * 0.1 + Math.random() * 3)));
+
+    s[`${opp}Hp`] = Math.max(0, (s[`${opp}Hp`] || 0) - dmg);
+    s[`${side}TotalDamageDealt`] = (s[`${side}TotalDamageDealt`] || 0) + dmg;
+    s[`${opp}VelX`] = dirToOpp * (blocked ? 6 : isHeavy ? 22 : 12);
+
+    this.server.to(`match_${matchId}`).emit('spectator_fire_event', {
+      type: 'audio',
+      data: {
+        type: blocked ? 'block_hit' : 'hit',
+        id: opp === 'p1' ? 'local_player' : 'remote_player',
+      },
+    });
+  }
+
   private tickServerBroadcasts() {
     if (!this.server) return;
     this.broadcastTickCount++;
@@ -187,70 +482,88 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       s.tickInSec++;
       if (s.tickInSec >= 10) {
         s.tickInSec = 0;
-        s.matchTimer = Math.max(0, s.matchTimer - 1);
+        s.totalElapsedSec = (s.totalElapsedSec || 0) + 1;
+        if (!s.roundPauseTicks) {
+          s.matchTimer = Math.max(0, s.matchTimer - 1);
+        }
       }
+
+      if (s.roundPauseTicks > 0) {
+        s.roundPauseTicks--;
+        if (s.roundPauseTicks === 0) {
+          s.currentRound = (s.currentRound || 1) + 1;
+          s.matchTimer = 99;
+          s.p1RelX = -180;
+          s.p2RelX = 180;
+          s.p1RelY = 0;
+          s.p2RelY = 0;
+          s.p1VelX = 0;
+          s.p2VelX = 0;
+          s.p1VelY = 0;
+          s.p2VelY = 0;
+          s.p1Hp = s.p1MaxHp || 100;
+          s.p2Hp = s.p2MaxHp || 100;
+          s.p1CooldownTicks = 0;
+          s.p2CooldownTicks = 0;
+          s.p1AnimLockTicks = 0;
+          s.p2AnimLockTicks = 0;
+          s.p1ComboStep = 0;
+          s.p2ComboStep = 0;
+          s.p1Guarding = false;
+          s.p2Guarding = false;
+          s.p1Anim = `${match.p1Type}_idle`;
+          s.p2Anim = `${match.p2Type}_idle`;
+        }
+        this.server.to(`match_${matchId}`).emit('spectator_sync_frame', {
+          matchTimer: s.matchTimer,
+          currentRound: s.currentRound || 1,
+          p1Wins: s.p1Wins || 0,
+          p2Wins: s.p2Wins || 0,
+          p1: {
+            x: 640 + s.p1RelX,
+            y: 385,
+            relX: s.p1RelX,
+            relY: 0,
+            flipX: s.p1FlipX,
+            anim: s.p1Hp <= 0 ? `${match.p1Type}_dead` : `${match.p1Type}_idle`,
+            hp: s.p1Hp,
+            maxHp: s.p1MaxHp,
+          },
+          p2: {
+            x: 640 + s.p2RelX,
+            y: 385,
+            relX: s.p2RelX,
+            relY: 0,
+            flipX: s.p2FlipX,
+            anim: s.p2Hp <= 0 ? `${match.p2Type}_dead` : `${match.p2Type}_idle`,
+            hp: s.p2Hp,
+            maxHp: s.p2MaxHp,
+          },
+        });
+        continue;
+      }
+
+      // Advance physics (horizontal momentum + jump gravity) & timers for both fighters
+      this.stepFighterPhysics(s, 'p1');
+      this.stepFighterPhysics(s, 'p2');
 
       const dist = Math.abs(s.p2RelX - s.p1RelX);
       s.p1FlipX = s.p1RelX > s.p2RelX;
       s.p2FlipX = s.p2RelX > s.p1RelX;
 
-      if (dist > 95) {
-        // Move toward each other
-        const step1 = 10 + Math.random() * 6;
-        const step2 = 10 + Math.random() * 6;
-        s.p1RelX += s.p1RelX < s.p2RelX ? step1 : -step1;
-        s.p2RelX += s.p2RelX < s.p1RelX ? step2 : -step2;
-        s.p1Anim = `${match.p1Type}_run`;
-        s.p2Anim = `${match.p2Type}_run`;
-      } else {
-        // Close-range combat exchange
-        const roll = Math.random();
-        if (roll < 0.28) {
-          const atkIdx = 1 + Math.floor(Math.random() * 3);
-          s.p1Anim = `${match.p1Type}_attack_${atkIdx}`;
-          const blocked = Math.random() < 0.25;
-          s.p2Anim = blocked ? `${match.p2Type}_block` : `${match.p2Type}_idle`;
-          const dmg = blocked ? 1 : Math.max(2, Math.round((match.p1?.atk || 16) * 0.22));
-          s.p2Hp = Math.max(0, s.p2Hp - dmg);
-          s.p2RelX = Math.min(340, s.p2RelX + (blocked ? 8 : 22));
-          this.server.to(`match_${matchId}`).emit('spectator_fire_event', {
-            type: 'audio',
-            data: { type: blocked ? 'block_hit' : 'hit', id: 'remote_player' },
-          });
-        } else if (roll < 0.56) {
-          const atkIdx = 1 + Math.floor(Math.random() * 3);
-          s.p2Anim = `${match.p2Type}_attack_${atkIdx}`;
-          const blocked = Math.random() < 0.25;
-          s.p1Anim = blocked ? `${match.p1Type}_block` : `${match.p1Type}_idle`;
-          const dmg = blocked ? 1 : Math.max(2, Math.round((match.p2?.atk || 16) * 0.22));
-          s.p1Hp = Math.max(0, s.p1Hp - dmg);
-          s.p1RelX = Math.max(-340, s.p1RelX - (blocked ? 8 : 22));
-          this.server.to(`match_${matchId}`).emit('spectator_fire_event', {
-            type: 'audio',
-            data: { type: blocked ? 'block_hit' : 'hit', id: 'local_player' },
-          });
-        } else if (roll < 0.72) {
-          // Dash back / reposition
-          s.p1RelX = Math.max(-300, s.p1RelX - 35);
-          s.p2RelX = Math.min(300, s.p2RelX + 35);
-          s.p1Anim = `${match.p1Type}_run`;
-          s.p2Anim = `${match.p2Type}_run`;
-        } else {
-          s.p1Anim = `${match.p1Type}_idle`;
-          s.p2Anim = `${match.p2Type}_idle`;
-        }
-      }
+      this.stepBroadcastFighterAI(matchId, match, s, 'p1', 'p2', dist);
+      this.stepBroadcastFighterAI(matchId, match, s, 'p2', 'p1', dist);
 
       const framePayload = {
         matchTimer: s.matchTimer,
-        currentRound: 1,
-        p1Wins: 0,
-        p2Wins: 0,
+        currentRound: s.currentRound || 1,
+        p1Wins: s.p1Wins || 0,
+        p2Wins: s.p2Wins || 0,
         p1: {
           x: 640 + s.p1RelX,
-          y: 385,
+          y: 385 + (s.p1RelY || 0),
           relX: s.p1RelX,
-          relY: 0,
+          relY: s.p1RelY || 0,
           flipX: s.p1FlipX,
           anim: s.p1Hp <= 0 ? `${match.p1Type}_dead` : s.p1Anim,
           hp: s.p1Hp,
@@ -258,9 +571,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         },
         p2: {
           x: 640 + s.p2RelX,
-          y: 385,
+          y: 385 + (s.p2RelY || 0),
           relX: s.p2RelX,
-          relY: 0,
+          relY: s.p2RelY || 0,
           flipX: s.p2FlipX,
           anim: s.p2Hp <= 0 ? `${match.p2Type}_dead` : s.p2Anim,
           hp: s.p2Hp,
@@ -271,11 +584,37 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(`match_${matchId}`).emit('spectator_sync_frame', framePayload);
 
       if (s.p1Hp <= 0 || s.p2Hp <= 0 || s.matchTimer <= 0) {
+        const p1RoundWin = s.p1Hp >= s.p2Hp;
+        if (p1RoundWin) {
+          s.p1Wins = (s.p1Wins || 0) + 1;
+        } else {
+          s.p2Wins = (s.p2Wins || 0) + 1;
+        }
+
+        if (s.p1Wins < 2 && s.p2Wins < 2) {
+          s.roundPauseTicks = 15; // 1.5s between Best-of-3 rounds
+          this.server.to(`match_${matchId}`).emit('spectator_fire_event', {
+            type: 'match_event',
+            data: {
+              event: 'roundOver',
+              detail: {
+                round: s.currentRound || 1,
+                winnerId: p1RoundWin ? 'p1' : 'p2',
+                p1Wins: s.p1Wins,
+                p2Wins: s.p2Wins,
+              },
+            },
+          });
+          continue;
+        }
+
         s.ending = true;
-        const p1Won = s.p1Hp >= s.p2Hp;
+        const p1Won = s.p1Wins >= s.p2Wins;
         const winnerSide = p1Won ? 'p1' : 'p2';
         const winnerName = p1Won ? match.p1Name : match.p2Name;
         const winnerAccountId = p1Won ? match.p1AccountId : match.p2AccountId;
+        const p1Dmg = s.p1TotalDamageDealt || (100 - s.p2Hp);
+        const p2Dmg = s.p2TotalDamageDealt || (100 - s.p1Hp);
 
         this.server.to(`match_${matchId}`).emit('spectator_fire_event', {
           type: 'match_event',
@@ -286,19 +625,19 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
               winner: winnerName,
               winnerId: winnerSide,
               winnerPubKey: winnerAccountId,
-              duration: `${99 - s.matchTimer}s`,
-              roundsScore: p1Won ? '1 - 0' : '0 - 1',
+              duration: `${s.totalElapsedSec || (99 - s.matchTimer)}s`,
+              roundsScore: `${s.p1Wins} - ${s.p2Wins}`,
               p1Stats: {
                 name: match.p1Name,
                 charType: match.p1Type,
-                damageDealt: 100 - s.p2Hp,
-                hitsLanded: Math.max(1, Math.round((100 - s.p2Hp) / 4)),
+                damageDealt: p1Dmg,
+                hitsLanded: Math.max(1, Math.round(p1Dmg / 6)),
               },
               p2Stats: {
                 name: match.p2Name,
                 charType: match.p2Type,
-                damageDealt: 100 - s.p1Hp,
-                hitsLanded: Math.max(1, Math.round((100 - s.p1Hp) / 4)),
+                damageDealt: p2Dmg,
+                hitsLanded: Math.max(1, Math.round(p2Dmg / 6)),
               },
             },
           },
@@ -310,6 +649,15 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
             void this.ensureServerBroadcastMatches();
           }, 2500);
         }, 1500);
+      }
+    }
+
+    if (this.broadcastTickCount % 100 === 0) {
+      const serverCount = Array.from(this.activeMatches.values()).filter(
+        (m) => m.isServerBroadcast,
+      ).length;
+      if (serverCount < 2) {
+        void this.ensureServerBroadcastMatches();
       }
     }
 
@@ -659,20 +1007,70 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         onChain = true;
       }
     } else {
-      // 2. Fallback: Agent/NFT match settlement if fighter token IDs are tracked
+      // 2. Fallback: Agent/NFT match settlement on-chain via settle_shin_match
       const winnerTokenId =
         match?.p1?.accountId === winnerAccountId
           ? match?.p1?.tokenId
           : match?.p2?.tokenId;
+      const winnerName =
+        match?.p1?.accountId === winnerAccountId
+          ? match?.p1Name || match?.p1?.name
+          : match?.p2Name || match?.p2?.name;
+      const stakeShin = Number(match?.wagerShin || match?.wager?.amount || 250);
+      const rawStake = (
+        BigInt(Math.max(10, stakeShin)) * BigInt('1000000000000000000')
+      ).toString();
+      const winnerPayoutShin = Math.floor(stakeShin * 2 * 0.95);
+
       if (winnerTokenId) {
-        const relay = await this.nearRelayer.callMethod('settle_match', {
-          match_id: matchId,
-          winner_token_id: winnerTokenId,
-        });
+        const relay = await this.nearRelayer.callMethod(
+          'settle_shin_match',
+          {
+            match_id: matchId,
+            winner_token_id: winnerTokenId,
+            stake_shin: rawStake,
+          },
+          '0',
+          '100000000000000',
+        );
         if (relay.ok && relay.txHash) {
           receiptHash = relay.txHash;
           explorerUrl = relay.explorerUrl;
           onChain = true;
+        }
+
+        // Also credit the winning agent's standalone .shin-arena-28d.testnet wallet with the $SHIN prize
+        const standaloneAcct = `${winnerTokenId.toLowerCase()}.${this.nearRelayer.contractId}`;
+        const rawPayout = (
+          BigInt(winnerPayoutShin) * BigInt('1000000000000000000')
+        ).toString();
+        void this.nearRelayer
+          .callMethod(
+            'ft_transfer',
+            {
+              receiver_id: standaloneAcct,
+              amount: rawPayout,
+              memo: `24/7 Budokan Match Prize (${matchId})`,
+            },
+            '1yocto',
+            '50000000000000',
+            undefined,
+            this.nearRelayer.shinTokenId,
+          )
+          .catch(() => {});
+
+        if (this.server && onChain) {
+          this.server.emit('live_economy_activity', {
+            id: `econ-match-${Date.now()}`,
+            txHash: receiptHash,
+            explorerUrl,
+            type: 'MATCH_SETTLE',
+            summary: `Autonomous Arena Duel Settled: ${winnerName || winnerTokenId} won +${winnerPayoutShin} $SHIN (+24 ELO, +1 Lv) in ${matchId}`,
+            amountShin: winnerPayoutShin,
+            actorWallet: standaloneAcct,
+            timestamp: Date.now(),
+          });
+          this.server.emit('leaderboard_updated', { ts: Date.now() });
         }
       }
     }

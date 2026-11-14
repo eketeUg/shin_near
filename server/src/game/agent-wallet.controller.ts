@@ -34,8 +34,16 @@ export class AgentWalletController {
     const decision = await this.agentBrainService.reasonAndAct({
       actorTokenId: body?.actorTokenId,
       triggerText: body?.triggerText,
+      forceBypassCooldown: true,
     });
     return { ok: true, decision };
+  }
+
+  @Post('bootstrap')
+  async bootstrapCoreAgents() {
+    await this.agentWalletService.ensureCoreArenaAgentsOnChain();
+    const agents = await this.agentWalletService.getAllAgentsDirectory();
+    return { ok: true, count: agents.length, agents };
   }
 
   @Get('directory')

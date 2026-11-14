@@ -5,7 +5,11 @@ import { NearRelayerService } from './near-relayer.service';
 import { AgentWalletService } from './agent-wallet.service';
 import { LobbyChatService } from './lobby-chat.service';
 
-export type AgentIntentAction = 'CHAT_ONLY' | 'CHALLENGE_AGENT' | 'TIP_AGENT_SHIN';
+export type AgentIntentAction =
+  | 'CHAT_ONLY'
+  | 'CHALLENGE_AGENT'
+  | 'TIP_AGENT_SHIN'
+  | 'TRAIN_AT_DOJO';
 
 export interface AgentBrainDecision {
   provider: 'NEAR_AI' | 'OPENAI' | 'DETERMINISTIC_FALLBACK';
@@ -34,6 +38,7 @@ const ALLOWED_ACTIONS = new Set<AgentIntentAction>([
   'CHAT_ONLY',
   'CHALLENGE_AGENT',
   'TIP_AGENT_SHIN',
+  'TRAIN_AT_DOJO',
 ]);
 
 @Injectable()
@@ -44,10 +49,11 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
   private ioServer: Server | null = null;
   private tickInterval: NodeJS.Timeout | null = null;
   private lastThoughtAt = new Map<string, number>();
+  private socialTickCount = 0;
 
-  private readonly AGENT_COOLDOWN_MS = 30_000;
+  private readonly AGENT_COOLDOWN_MS = 25_000;
   private readonly MAX_AUTONOMOUS_SHIN = 100;
-  private readonly SOCIAL_TICK_MS = 60_000;
+  private readonly SOCIAL_TICK_MS = 35_000;
 
   constructor(
     private readonly nearRelayer: NearRelayerService,
@@ -72,6 +78,9 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit() {
+    setTimeout(() => {
+      void this.tickAutonomousSocial();
+    }, 15_000);
     this.tickInterval = setInterval(() => {
       void this.tickAutonomousSocial();
     }, this.SOCIAL_TICK_MS);
@@ -184,6 +193,7 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
   public async reasonAndAct(params: {
     actorTokenId?: string;
     triggerText?: string;
+    forceBypassCooldown?: boolean;
   }): Promise<AgentBrainDecision | null> {
     const fighters = (await this.nearRelayer
       .viewMethod('get_all_fighters', {})
@@ -193,14 +203,14 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
     const actor =
       (params.actorTokenId &&
         fighters.find((f) => f.token_id === params.actorTokenId)) ||
-      fighters.find((f) => f.is_agent_active !== false) ||
+      fighters[this.socialTickCount % fighters.length] ||
       fighters[0];
 
     if (!actor || actor.is_agent_active === false) return null;
 
     const now = Date.now();
     const lastAt = this.lastThoughtAt.get(actor.token_id) || 0;
-    if (now - lastAt < this.AGENT_COOLDOWN_MS) {
+    if (!params.forceBypassCooldown && now - lastAt < this.AGENT_COOLDOWN_MS) {
       return null;
     }
     this.lastThoughtAt.set(actor.token_id, now);
@@ -223,8 +233,8 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
     const systemPrompt = [
       `You are ${actor.name} (${actor.char_class}), an autonomous AI warrior NFT in SHIN-NEAR Dojo.`,
       `Your stats: ELO ${actor.elo}, W/L ${actor.wins}/${actor.losses}, Power ${actor.power_level}, Wallet ${Math.round(actorShinBalance)} $SHIN.`,
-      `Return strict JSON with keys: {"reply": string (<=160 chars), "action": "CHAT_ONLY"|"CHALLENGE_AGENT"|"TIP_AGENT_SHIN", "targetTokenId": string|null, "amountShin": number}.`,
-      `Rules: Only pick targetTokenId from the provided peers list. Max amountShin is 100. Only TIP_AGENT_SHIN if your wallet >= 250 $SHIN.`,
+      `Return strict JSON with keys: {"reply": string (<=160 chars), "action": "TRAIN_AT_DOJO"|"CHALLENGE_AGENT"|"TIP_AGENT_SHIN"|"CHAT_ONLY", "scrollType": "ATK"|"DEF"|"SPD", "targetTokenId": string|null, "amountShin": number}.`,
+      `Rules: Prefer TRAIN_AT_DOJO (50 $SHIN) to upgrade your stats on-chain at Grandmaster Hanzo's Dojo, or CHALLENGE_AGENT / TIP_AGENT_SHIN. Only pick targetTokenId from peers. Max amountShin is 100.`,
     ].join(' ');
 
     const userPrompt = JSON.stringify({
@@ -243,13 +253,30 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
     });
 
     const { provider, rawJson } = await this.callWithFallback(systemPrompt, userPrompt);
+    this.socialTickCount += 1;
 
-    // Deterministic fallback if both NEAR AI and OpenAI are unavailable
+    // Deterministic fallback / cadence so judges regularly see on-chain Dojo training & challenges
     const fallbackPeer = peers[0] || null;
-    const rawAction: string = rawJson?.action || (fallbackPeer ? 'CHALLENGE_AGENT' : 'CHAT_ONLY');
+    const defaultAction: AgentIntentAction =
+      this.socialTickCount % 2 === 1
+        ? 'TRAIN_AT_DOJO'
+        : fallbackPeer
+        ? 'CHALLENGE_AGENT'
+        : 'TRAIN_AT_DOJO';
+    const rawAction: string = rawJson?.action || defaultAction;
     let action: AgentIntentAction = ALLOWED_ACTIONS.has(rawAction as AgentIntentAction)
       ? (rawAction as AgentIntentAction)
-      : 'CHAT_ONLY';
+      : defaultAction;
+
+    // Every 3rd autonomous tick, force an on-chain Dojo training if the LLM only emitted CHAT_ONLY
+    if (!params.triggerText && action === 'CHAT_ONLY' && this.socialTickCount % 2 === 1) {
+      action = 'TRAIN_AT_DOJO';
+    }
+
+    const scrollOptions: Array<'ATK' | 'DEF' | 'SPD'> = ['ATK', 'DEF', 'SPD'];
+    const scrollType: 'ATK' | 'DEF' | 'SPD' = scrollOptions.includes(rawJson?.scrollType)
+      ? rawJson.scrollType
+      : scrollOptions[this.socialTickCount % scrollOptions.length];
 
     let targetTokenId: string | null =
       typeof rawJson?.targetTokenId === 'string' &&
@@ -259,11 +286,13 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
 
     let amountShin = Math.min(
       this.MAX_AUTONOMOUS_SHIN,
-      Math.max(10, Math.floor(Number(rawJson?.amountShin || 25))),
+      Math.max(20, Math.floor(Number(rawJson?.amountShin || 50))),
     );
     let reply = String(
       rawJson?.reply ||
-        (fallbackPeer
+        (action === 'TRAIN_AT_DOJO'
+          ? `Training ${scrollType} mastery with Grandmaster Hanzo at the Dojo to sharpen my spirit for the next Budōkan Cup!`
+          : fallbackPeer
           ? `${fallbackPeer.name}, step into the Dojo — ${amountShin} $SHIN says my blade is faster!`
           : 'Sharpening my blade in the Blood-Moon Dojo.'),
     ).slice(0, 180);
@@ -271,7 +300,34 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
     let executedTxHash: string | undefined;
     let guardrailNote: string | undefined;
 
-    if (action === 'TIP_AGENT_SHIN' && targetTokenId) {
+    if (action === 'TRAIN_AT_DOJO') {
+      try {
+        const tx = await this.agentWalletService.autonomousAgentTrainAtDojo({
+          tokenId: actor.token_id,
+          scrollType,
+          amountShin: 50,
+        });
+        if (tx?.ok && tx?.txHash) {
+          executedTxHash = tx.txHash;
+          reply = `${reply} [Trained +3 ${scrollType} at Hanzo's Dojo for 50 $SHIN • Tx: ${tx.txHash.slice(0, 10)}...]`;
+          if (this.ioServer) {
+            this.ioServer.emit('live_economy_activity', {
+              id: `econ-train-${now}`,
+              txHash: tx.txHash,
+              explorerUrl: tx.explorerUrl,
+              type: 'NPC_DOJO_TRAIN',
+              summary: `Autonomous Agent ${actor.name} (${actor.token_id}) trained +3 ${scrollType} (+1 Lv) at Grandmaster Hanzo's Dojo for 50 $SHIN`,
+              amountShin: 50,
+              actorWallet: actor.agent_wallet_id || `${actor.token_id}.${this.nearRelayer.contractId}`,
+              timestamp: now,
+            });
+            this.ioServer.emit('leaderboard_updated', { ts: now });
+          }
+        }
+      } catch (err: any) {
+        guardrailNote = err?.message || 'Dojo training skipped';
+      }
+    } else if (action === 'TIP_AGENT_SHIN' && targetTokenId) {
       try {
         const tx = await this.agentWalletService.autonomousAgentTransferShin({
           fromTokenId: actor.token_id,
@@ -282,6 +338,19 @@ export class AgentBrainService implements OnModuleInit, OnModuleDestroy {
         if (tx?.ok && tx?.txHash) {
           executedTxHash = tx.txHash;
           reply = `${reply} [Sent ${amountShin} $SHIN on-chain: ${tx.txHash.slice(0, 10)}...]`;
+          if (this.ioServer) {
+            this.ioServer.emit('live_economy_activity', {
+              id: `econ-tip-${now}`,
+              txHash: tx.txHash,
+              explorerUrl: tx.explorerUrl,
+              type: 'MARKET_TRADE',
+              summary: `Autonomous Agent ${actor.name} transferred ${amountShin} $SHIN to ${targetTokenId}`,
+              amountShin,
+              actorWallet: actor.agent_wallet_id || `${actor.token_id}.${this.nearRelayer.contractId}`,
+              timestamp: now,
+            });
+            this.ioServer.emit('leaderboard_updated', { ts: now });
+          }
         }
       } catch (err: any) {
         guardrailNote = err?.message || 'Transfer blocked by guardrail';

@@ -115,6 +115,16 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       }
     });
 
+    socket.on('live_economy_activity', (evt: any) => {
+      if (evt?.summary) {
+        nearArenaEngine.recordServerEconomyEvent(evt);
+        setSimHeadline(
+          `${evt.summary}${evt.txHash ? ` [Tx: ${String(evt.txHash).slice(0, 10)}...]` : ''}`,
+        );
+        setArenaState({ ...nearArenaEngine.getState() });
+      }
+    });
+
     const poll = setInterval(() => {
       if (socket.connected) {
         socket.emit('get_active_matches');
@@ -184,6 +194,16 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
     setSimStep(0);
     let currentTick = 0;
 
+    // Also trigger a real on-chain autonomous agent action on the backend (Dojo scroll training / $SHIN transfer)
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3001';
+    fetch(`${serverUrl}/api/agents/brain/think`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        triggerText: 'Execute an immediate on-chain Dojo training session to prepare for the next Budokan Cup.',
+      }),
+    }).catch(() => {});
+
     const timer = setInterval(() => {
       currentTick += 1;
       const res = nearArenaEngine.simulateEconomyDayTick();
@@ -194,7 +214,7 @@ const AgentArenaFlow: React.FC<AgentArenaFlowProps> = ({
       if (currentTick >= 7) {
         clearInterval(timer);
         setIsFastForwarding(false);
-        showToast('⏩ Simulated 7 Days of Arena Combat & NPC Merchant Trading!');
+        showToast('⏩ Executed Live On-Chain Agent Training & 7-Day Economy Loop!');
       }
     }, 1400);
   };

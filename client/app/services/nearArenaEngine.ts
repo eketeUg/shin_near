@@ -1414,7 +1414,37 @@ class NearArenaEngine {
           this.state.npcDojo.currentDynamicCostNear = Number(
             (costData.result / 1000).toFixed(3),
           );
+          this.state.npcDojo.totalTrainingsCompleted = Math.max(
+            0,
+            Math.round((costData.result - 850) / 25),
+          );
         }
+      }
+
+      // Sync Grandmaster Hanzo's on-chain $SHIN treasury balance (`get_npc_shin_treasury`)
+      try {
+        const npcShinRes = await fetch(
+          `${serverUrl}/api/near/view?method=get_npc_shin_treasury`,
+        );
+        if (npcShinRes.ok) {
+          const npcData = await npcShinRes.json();
+          if (npcData?.ok && typeof npcData?.result === 'string') {
+            const rawBig = BigInt(npcData.result || '0');
+            const shinTreasury = Number(rawBig / BigInt('1000000000000000')) / 1000;
+            if (shinTreasury > 0) {
+              const hanzo = this.state.npcMerchants.find(
+                (m) => m.merchantId === 'hanzo-dojo',
+              );
+              if (hanzo) {
+                hanzo.walletBalanceNear = Number(
+                  Math.max(hanzo.walletBalanceNear, shinTreasury / 1000).toFixed(2),
+                );
+              }
+            }
+          }
+        }
+      } catch {
+        // Ignore if offline
       }
 
       // Sync Fighter NFTs directly from shin-arena-28d.testnet (removes unrecorded local or NPC NFTs)
@@ -1475,6 +1505,43 @@ class NearArenaEngine {
       // Keep current state if backend is unreachable
     }
     return this.state.playerWallet;
+  }
+
+  /**
+   * Records a live 24/7 on-chain economy event broadcasted from the NestJS server
+   * (`settle_shin_match`, `buy_dojo_scroll`, `settle_tournament`, or `ft_transfer`)
+   * into the client ledger & Near Inspector and refreshes on-chain contract state.
+   */
+  public recordServerEconomyEvent(evt: {
+    id?: string;
+    txHash?: string;
+    explorerUrl?: string;
+    type?: ArenaLedgerTx['type'];
+    summary?: string;
+    amountShin?: number;
+    actorWallet?: string;
+    timestamp?: number;
+  }): void {
+    if (!evt?.summary) return;
+    const id = evt.id || `srv-tx-${Date.now()}`;
+    if (this.state.ledger.some((x) => x.id === id || (evt.txHash && x.txHash === evt.txHash))) {
+      return;
+    }
+    this.state.ledger.unshift({
+      id,
+      txHash: evt.txHash || makeTxHash(),
+      explorerUrl:
+        evt.explorerUrl ||
+        (evt.txHash ? `https://testnet.nearblocks.io/txns/${evt.txHash}` : undefined),
+      onChain: Boolean(evt.txHash),
+      type: evt.type || 'FIGHT_POOL_SETTLED',
+      summary: evt.summary,
+      amountNear: Number(((evt.amountShin || 0) / 1000).toFixed(3)),
+      actorWallet: evt.actorWallet || NEAR_ARENA_CONTRACT_ID,
+      timestamp: evt.timestamp || Date.now(),
+    });
+    this.saveState();
+    void this.syncOnChainState();
   }
 
   /**

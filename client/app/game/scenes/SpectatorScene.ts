@@ -24,18 +24,44 @@ export class SpectatorScene extends Phaser.Scene {
         super({ key: 'SpectatorScene' });
     }
 
+    private resolveSpriteType(rawType?: string, fallback: string = 'shinobi'): string {
+        const key = String(rawType || fallback).trim().toLowerCase();
+        const aliasMap: Record<string, string> = {
+            monk: 'ninja_monk',
+            knight: 'knight_1',
+            commander: 'samurai_commander',
+            archer: 'samurai_archer',
+            peasant: 'ninja_peasant',
+        };
+        const mapped = aliasMap[key] || key;
+        const valid = new Set([
+            'fighter', 'knight_1', 'kunoichi', 'ninja_monk', 'ninja_peasant',
+            'samurai', 'samurai_1', 'samurai_archer', 'samurai_commander', 'shinobi'
+        ]);
+        return valid.has(mapped) ? mapped : fallback;
+    }
+
+    private resolveAnimKey(rawAnim: string | undefined, charPrefix: string): string {
+        if (!rawAnim) return `${charPrefix}_idle`;
+        if (this.anims.exists(rawAnim)) return rawAnim;
+        const actionMatch = rawAnim.match(/(idle|run|jump|attack_1|attack_2|attack_3|block|dead)$/);
+        const action = actionMatch ? actionMatch[1] : 'idle';
+        const candidate = `${charPrefix}_${action}`;
+        return this.anims.exists(candidate) ? candidate : `${charPrefix}_idle`;
+    }
+
     init(data: { matchId: string, p1Type?: string, p2Type?: string, hostName?: string, p1Name?: string, p2Name?: string, isInteractiveClient?: boolean, opponentChar?: string, myChar?: string, opponentName?: string, myName?: string }) {
         this.matchId = data.matchId;
         
         if (data.isInteractiveClient) {
-            this.p1CharType = data.opponentChar || 'shinobi'; // Host is P1
-            this.p2CharType = data.myChar || 'samurai';       // Client is P2
+            this.p1CharType = this.resolveSpriteType(data.opponentChar, 'shinobi'); // Host is P1
+            this.p2CharType = this.resolveSpriteType(data.myChar, 'samurai');       // Client is P2
             this.p1Name = data.opponentName || 'Player 1';
             this.p2Name = data.myName || 'YOU';
             this.isInteractiveClient = data.isInteractiveClient;
         } else {
-            this.p1CharType = (data.p1Type || 'shinobi').toLowerCase();
-            this.p2CharType = (data.p2Type || 'samurai').toLowerCase();
+            this.p1CharType = this.resolveSpriteType(data.p1Type, 'shinobi');
+            this.p2CharType = this.resolveSpriteType(data.p2Type, 'samurai');
             this.p1Name = data.p1Name || data.hostName || 'Player 1';
             this.p2Name = data.p2Name || data.opponentName || 'Challenger';
         }
@@ -240,8 +266,9 @@ export class SpectatorScene extends Phaser.Scene {
             this.player.setPosition(p1X, p1Y);
             this.player.setFlipX(data.p1.flipX);
             // Only play animation if changed to avoid resetting current animation
-            if (this.player.anims.currentAnim?.key !== data.p1.anim && data.p1.anim) {
-                this.player.anims.play(data.p1.anim, true);
+            const p1AnimKey = this.resolveAnimKey(data.p1.anim, this.p1CharType);
+            if (this.player.anims.currentAnim?.key !== p1AnimKey && this.anims.exists(p1AnimKey)) {
+                this.player.anims.play(p1AnimKey, true);
             }
             // Sync UI Health
             window.dispatchEvent(new CustomEvent('playerHealthChanged', { detail: { playerId: 'local_player', hp: data.p1.hp, maxHp: data.p1.maxHp } }));
@@ -253,8 +280,9 @@ export class SpectatorScene extends Phaser.Scene {
             const p2Y = typeof data.p2.relY === 'number' ? groundY + data.p2.relY : data.p2.y;
             this.player2.setPosition(p2X, p2Y);
             this.player2.setFlipX(data.p2.flipX);
-            if (this.player2.anims.currentAnim?.key !== data.p2.anim && data.p2.anim) {
-                this.player2.anims.play(data.p2.anim, true);
+            const p2AnimKey = this.resolveAnimKey(data.p2.anim, this.p2CharType);
+            if (this.player2.anims.currentAnim?.key !== p2AnimKey && this.anims.exists(p2AnimKey)) {
+                this.player2.anims.play(p2AnimKey, true);
             }
             window.dispatchEvent(new CustomEvent('playerHealthChanged', { detail: { playerId: 'remote_player', hp: data.p2.hp, maxHp: data.p2.maxHp } }));
         }

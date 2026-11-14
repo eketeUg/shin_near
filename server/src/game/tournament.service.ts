@@ -115,7 +115,7 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
   private readonly HUMAN_FORFEIT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
   private readonly AGENT_ENTRY_SHIN = 500;
   private readonly ROUND_DURATION_MS = 15000;
-  private readonly REST_DURATION_SEC = 120;
+  private readonly REST_DURATION_SEC = 45;
   private isAdvancingHumanCup = false;
   private mailTransporter: nodemailer.Transporter | null = null;
 
@@ -912,6 +912,7 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
         finalM.p1CharId = side === 'p1' ? semi1.p1CharId : semi1.p2CharId;
         this.agentCup.currentStage = 'SEMI_2';
         this.nextRoundAt = Date.now() + this.ROUND_DURATION_MS;
+        this.broadcastTournamentUpdate();
       } else if (this.agentCup.currentStage === 'SEMI_2' && semi2.status !== 'COMPLETED' && semi2.p1Id && semi2.p2Id) {
         const side = this.pickAgentWinner(semi2.p1Id, semi2.p2Id);
         semi2.winnerId = side === 'p1' ? semi2.p1Id : semi2.p2Id;
@@ -923,6 +924,7 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
         finalM.status = 'READY';
         this.agentCup.currentStage = 'GRAND_FINAL';
         this.nextRoundAt = Date.now() + this.ROUND_DURATION_MS;
+        this.broadcastTournamentUpdate();
       } else if (this.agentCup.currentStage === 'GRAND_FINAL' && finalM.p1Id && finalM.p2Id) {
         const side = this.pickAgentWinner(finalM.p1Id, finalM.p2Id);
         finalM.winnerId = side === 'p1' ? finalM.p1Id : finalM.p2Id;
@@ -945,9 +947,45 @@ export class TournamentService implements OnModuleInit, OnModuleDestroy {
             this.agentCup.settleTxHash = settleRes.txHash;
             this.agentCup.explorerUrl = settleRes.explorerUrl;
           }
+
+          // Credit champion's standalone .shin-arena-28d.testnet wallet with the $SHIN prize
+          if (finalM.winnerId) {
+            const standaloneAcct = `${finalM.winnerId.toLowerCase()}.${this.nearRelayer.contractId}`;
+            const rawPrize = (
+              BigInt(this.agentCup.winnerPayoutShin) * BigInt('1000000000000000000')
+            ).toString();
+            void this.nearRelayer
+              .callMethod(
+                'ft_transfer',
+                {
+                  receiver_id: standaloneAcct,
+                  amount: rawPrize,
+                  memo: `Champion Prize for ${this.agentCup.title}`,
+                },
+                '1yocto',
+                '50000000000000',
+                undefined,
+                this.nearRelayer.shinTokenId,
+              )
+              .catch(() => {});
+
+            if (this.ioServer) {
+              this.ioServer.emit('live_economy_activity', {
+                id: `econ-cup-${Date.now()}`,
+                txHash: this.agentCup.settleTxHash || `cup-${this.agentCup.cupNumber}`,
+                explorerUrl: this.agentCup.explorerUrl,
+                type: 'MATCH_SETTLE',
+                summary: `🏆 ${finalM.winnerName} (${finalM.winnerId}) won ${this.agentCup.title} (+${this.agentCup.winnerPayoutShin} $SHIN on-chain)`,
+                amountShin: this.agentCup.winnerPayoutShin,
+                actorWallet: standaloneAcct,
+                timestamp: Date.now(),
+              });
+            }
+          }
         } catch (err) {
           this.logger.warn(`Failed to settle agent cup on-chain: ${String(err)}`);
         }
+        this.broadcastTournamentUpdate();
       }
     } finally {
       this.isAdvancingAgentCup = false;

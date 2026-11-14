@@ -35,7 +35,7 @@ export class GameScene extends Phaser.Scene {
     private p1PubKey: string = '';
     private p2PubKey: string = '';
     private difficulty: 'EASY' | 'HARD' = 'EASY';
-    private totalRounds: number = 1;
+    private totalRounds: number = 3;
     private p1Wins: number = 0;
     private p2Wins: number = 0;
     private currentRound: number = 1;
@@ -80,7 +80,7 @@ export class GameScene extends Phaser.Scene {
         if (data.p1Doctrine) this.p1Doctrine = data.p1Doctrine;
         if (data.p2Doctrine) this.p2Doctrine = data.p2Doctrine;
         if (data.difficulty) this.difficulty = data.difficulty;
-        if (data.rounds) this.totalRounds = data.rounds;
+        this.totalRounds = data.rounds ? data.rounds : 3;
         this.isOnlineHost =
             data.isOnlineHost !== undefined
                 ? data.isOnlineHost
@@ -404,9 +404,10 @@ export class GameScene extends Phaser.Scene {
                 const seconds = durationSeconds % 60;
                 const durationStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
+                const matchWinner: 'p1' | 'p2' = this.p1Wins >= this.p2Wins ? 'p1' : 'p2';
                 const results = {
-                    winner: winner === 'p1' ? this.p1Name : this.p2Name,
-                    winnerId: winner,
+                    winner: matchWinner === 'p1' ? this.p1Name : this.p2Name,
+                    winnerId: matchWinner,
                     matchId: this.matchId,
                     mode: this.gameMode,
                     roundsScore: `${this.p1Wins} - ${this.p2Wins}`,

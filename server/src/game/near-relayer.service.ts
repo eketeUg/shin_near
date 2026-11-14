@@ -53,7 +53,17 @@ export class NearRelayerService implements OnModuleInit {
   private readonly logger = new Logger(NearRelayerService.name);
 
   readonly networkId = process.env.NEAR_NETWORK || 'testnet';
-  readonly rpcUrl = process.env.NEAR_RPC_URL || 'https://test.rpc.fastnear.com';
+  readonly rpcUrl =
+    process.env.NEAR_RPC_URL || 'https://test.rpc.fastnear.com';
+  readonly fallbackRpcUrls = Array.from(
+    new Set([
+      this.rpcUrl,
+      'https://test.rpc.fastnear.com',
+      'https://near-testnet.lava.build',
+      'https://near-testnet.drpc.org',
+      'https://endpoints.omniatech.io/v1/near/testnet/public',
+    ]),
+  );
   readonly contractId = process.env.NEAR_CONTRACT_ID || 'shin-arena-28d.testnet';
   readonly shinTokenId =
     process.env.NEAR_SHIN_TOKEN_ID || 'shin.shin-arena-28d.testnet';
@@ -62,9 +72,12 @@ export class NearRelayerService implements OnModuleInit {
     process.env.NEAR_CONTRACT_ID ||
     'shin-arena-28d.testnet';
 
-  private provider = new providers.JsonRpcProvider({ url: this.rpcUrl });
+  private provider = new providers.FailoverRpcProvider(
+    this.fallbackRpcUrls.map((url) => new providers.JsonRpcProvider({ url })),
+  );
   private relayerAccount: Account | null = null;
   private txQueue: Promise<unknown> = Promise.resolve();
+  private viewCache = new Map<string, { value: unknown; expiresAt: number }>();
 
   async onModuleInit() {
     await this.initRelayer();
@@ -149,23 +162,40 @@ export class NearRelayerService implements OnModuleInit {
     targetContractId?: string,
   ): Promise<unknown> {
     const resolvedContract = this.resolveAllowedContract(targetContractId);
-    const argsBase64 = Buffer.from(JSON.stringify(args)).toString('base64');
-    const res: any = await this.provider.query({
-      request_type: 'call_function',
-      finality: 'final',
-      account_id: resolvedContract,
-      method_name: methodName,
-      args_base64: argsBase64,
-    });
-    if (Array.isArray(res?.result)) {
-      const text = Buffer.from(res.result).toString('utf8');
-      try {
-        return JSON.parse(text);
-      } catch {
-        return text;
-      }
+    const cacheKey = `${resolvedContract}:${methodName}:${JSON.stringify(args)}`;
+    const now = Date.now();
+    const cached = this.viewCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return cached.value;
     }
-    return null;
+
+    const argsBase64 = Buffer.from(JSON.stringify(args)).toString('base64');
+    try {
+      const res: any = await this.provider.query({
+        request_type: 'call_function',
+        finality: 'final',
+        account_id: resolvedContract,
+        method_name: methodName,
+        args_base64: argsBase64,
+      });
+      if (Array.isArray(res?.result)) {
+        const text = Buffer.from(res.result).toString('utf8');
+        let parsed: unknown = text;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          parsed = text;
+        }
+        this.viewCache.set(cacheKey, { value: parsed, expiresAt: now + 8000 });
+        return parsed;
+      }
+      return null;
+    } catch (err) {
+      if (cached) {
+        return cached.value;
+      }
+      throw err;
+    }
   }
 
   callMethod(
@@ -384,6 +414,7 @@ export class NearRelayerService implements OnModuleInit {
         }
       }
 
+      this.viewCache.clear();
       this.logger.log(
         `[NEAR TX] ${methodName} on ${resolvedContract} -> ${txHash}`,
       );
