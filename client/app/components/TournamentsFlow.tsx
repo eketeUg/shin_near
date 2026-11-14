@@ -92,6 +92,7 @@ interface AgentCupState {
 }
 
 interface TournamentsFlowProps {
+  ownedCharacters?: string[];
   onStartTournamentDuel: (duelConfig: {
     matchId: string;
     roomCode?: string;
@@ -107,14 +108,16 @@ interface TournamentsFlowProps {
   onHome: () => void;
 }
 
-const CHAR_OPTIONS = [
-  { id: 'fighter', label: 'Kensei (Balanced)' },
-  { id: 'shinobi', label: 'Hayabusa (Fast)' },
-  { id: 'kunoichi', label: 'Akatsuki (Agile)' },
-  { id: 'samurai', label: 'Takeshi (Heavy)' },
-];
+const CHAR_LABELS: Record<string, string> = {
+  fighter: 'Kensei (Balanced)',
+  shinobi: 'Hayabusa (Fast)',
+  kunoichi: 'Akatsuki (Agile)',
+  samurai: 'Takeshi (Heavy)',
+  samurai_commander: 'Shogun Takeshi',
+};
 
 const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
+  ownedCharacters = ['fighter'],
   onStartTournamentDuel,
   onBack,
   onHome,
@@ -123,7 +126,8 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
   const [activeTab, setActiveTab] = useState<'HUMAN' | 'AGENT'>('HUMAN');
   const [humanCup, setHumanCup] = useState<HumanCupState | null>(null);
   const [agentCup, setAgentCup] = useState<AgentCupState | null>(null);
-  const [selectedChar, setSelectedChar] = useState('fighter');
+  const availableChars = ownedCharacters.length > 0 ? ownedCharacters : ['fighter'];
+  const [selectedChar, setSelectedChar] = useState(availableChars[0] || 'fighter');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [showInspectorModal, setShowInspectorModal] = useState(false);
@@ -511,24 +515,26 @@ const TournamentsFlow: React.FC<TournamentsFlowProps> = ({
                     </div>
                   ) : !hasJoinedHumanCup ? (
                     <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[11px] font-mono text-gray-400 uppercase">
-                          Choose Warrior:
-                        </span>
-                        {CHAR_OPTIONS.map((c) => (
-                          <button
-                            key={c.id}
-                            onClick={() => setSelectedChar(c.id)}
-                            className={`px-3 py-1.5 rounded-lg text-[11px] font-mono border cursor-pointer ${
-                              selectedChar === c.id
-                                ? 'bg-shin-gold/20 border-shin-gold text-shin-gold font-bold'
-                                : 'bg-white/5 border-white/10 text-gray-300'
-                            }`}
-                          >
-                            {c.label}
-                          </button>
-                        ))}
-                      </div>
+                      {availableChars.length > 1 && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] font-mono text-gray-400 uppercase">
+                            Select Owned Warrior:
+                          </span>
+                          {availableChars.map((cid) => (
+                            <button
+                              key={cid}
+                              onClick={() => setSelectedChar(cid)}
+                              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono border cursor-pointer ${
+                                selectedChar === cid
+                                  ? 'bg-shin-gold/20 border-shin-gold text-shin-gold font-bold'
+                                  : 'bg-white/5 border-white/10 text-gray-300'
+                              }`}
+                            >
+                              {CHAR_LABELS[cid] || cid}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <button
                         disabled={
                           isSubmitting ||

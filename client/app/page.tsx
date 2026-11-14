@@ -687,6 +687,7 @@ export default function Home() {
       {/* Dedicated Humans-Only & Continuous Agent-Only Tournaments Flow */}
       {!isLoading && showTournaments && (
         <TournamentsFlow
+          ownedCharacters={ownedChars}
           onStartTournamentDuel={(duelConfig) => {
             activeTournamentBoutRef.current = {
               matchId: duelConfig.matchId,
